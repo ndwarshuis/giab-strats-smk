@@ -17,8 +17,8 @@ def expand_strat_targets_inner(ref_final_key, build_key):
     bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
     function_targets = [
         (all_low_complexity, bd.want_low_complexity),
-        (gc_inputs_flat, bd.want_gc),
-        (mappabilty_inputs, bd.want_mappability),
+        # (gc_inputs_flat, bd.want_gc),
+        # (mappabilty_inputs, bd.want_mappability),
         (het_hom_inputs, bd.want_hets),
         (all_xy_sex, True),
         (all_other, True),
@@ -41,16 +41,38 @@ def expand_strat_targets_inner(ref_final_key, build_key):
     invalid = [f for f in all_targets if not f.startswith(str(config.final_root_dir))]
     if len(invalid) > 0:
         raise DesignError(f"invalid targets: {invalid}")
-    return all_targets
+    return [str(t) for t in all_targets]
 
 
 def expand_strat_targets(wildcards):
     return expand_strat_targets_inner(wildcards.ref_final_key, wildcards.build_key)
 
 
+def dummy(wildcards):
+    bd = config.to_build_data(
+        strip_full_refkey(wildcards.ref_final_key), wildcards.build_key
+    )
+    if bd.want_gc:
+        return gc_inputs_flat(wildcards.ref_final_key, wildcards.build_key)
+    else:
+        return []
+
+
+def dummy2(wildcards):
+    bd = config.to_build_data(
+        strip_full_refkey(wildcards.ref_final_key), wildcards.build_key
+    )
+    if bd.want_mappability:
+        return mappabilty_inputs(wildcards.ref_final_key, wildcards.build_key)
+    else:
+        return []
+
+
 rule list_all_strats:
     input:
         expand_strat_targets,
+        dummy,
+        dummy2,
     output:
         post_inter_dir / "all_strats.txt",
     localrule: True
