@@ -1,28 +1,102 @@
 from pathlib import Path
 from snakemake.utils import min_version
 
-min_version("7.20")
-
-
 # required to get snakemake to properly depickle a pydantic model
 sys.path.extend(["./workflow/scripts/python"])
 from common.config import GiabStrats
+from common.functional import unzip2
+from common.config import strip_full_refkey
+
+min_version("7.20")
 
 config = GiabStrats.parse_obj(config)
+
+
+def expand_final_to_src(paths, wildcards):
+    """Turn a final ref key into a source refkey.
+
+    This is only used in rules that are based directly on the reference, in
+    which case this is trivial because the final and source refkeys are always
+    the same. This rule is necessary because we make a distinction at the
+    wildcard level b/t source and final.
+
+    """
+    return expand(paths, allow_missing=True, ref_src_key=wildcards.ref_final_key)
+
+
+def to_output_pattern(dirs, name, wildcards):
+    """Create and output pattern for a normalization rule."""
+    return expand(
+        dirs.inter.filtersort.subbed / f"{name}.bed.gz",
+        build_key=wildcards.build_key,
+    )[0]
+
+
+def read_checkpoint(rulename, wildcards, other=[]):
+    """Read a normalization checkpoint"""
+    r = getattr(checkpoints, rulename)
+    c = r.get(
+        ref_key=strip_full_refkey(wildcards.ref_final_key),
+        build_key=wildcards.build_key,
+        **{k: wildcards[k] for k in other},
+    )
+    with c.output[0].open() as f:
+        return json.load(f)
+
+
+def read_named_checkpoint(rulename, name, wildcards):
+    """Read a normalization checkpoint (with name)"""
+    # TODO not DRY
+    r = getattr(checkpoints, rulename)
+    rk = strip_full_refkey(wildcards.ref_final_key)
+    c = r.get(ref_key=rk, build_key=wildcards.build_key)
+    # TODO isn't there supposed to be a [0] after [name]?
+    with c.output[name].open() as f:
+        return json.load(f)
+
+
+def bed_src_inputs(pathlist, f, wildcards):
+    """Expand pathlist given a refkey and a function to lookup a source file
+    for which refsrckeys can be defined."""
+    rk = wildcards.ref_key
+    rsks = config.refkey_to_bed_refsrckeys(f, rk)
+    return expand(pathlist, ref_src_key=rsks)
+
+
+def bed_src_bd_inputs(pathlist, f, wildcards):
+    """Like 'bed_src_inputs' but for build data. Used for benchmark files."""
+    rk = wildcards.ref_key
+    bk = wildcards.build_key
+    rsks = config.buildkey_to_bed_refsrckeys(f, rk, bk)
+    return expand(pathlist, allow_missing=True, ref_src_key=rsks, build_key=bk)
+
+
+def to_bed_src(f, wildcards):
+    """Shorthand for looking up bed file source using a function and wildcards."""
+    return config.refsrckey_to_bed_src(f, wildcards.ref_src_key)
+
+
+_alphanumdash = "[A-Za-z0-9-]+"
+_alphanumdash_hap = "[A-Za-z0-9-]+(\.hap(1|2))?"
 
 
 wildcard_constraints:
     # permit alphanumerics and dashes only, underscores will be used for
     # separation in filepaths; this convention makes it impossible for
     # wildcards to be ambiguous
-    ref_key="[A-Za-z0-9-]+",
-    build_key="[A-Za-z0-9-]+",
+    ref_key=_alphanumdash,
+    build_key=_alphanumdash,
+    # separate ref key for downloading (which may or may not follow the
+    # cardinality of the target reference)
+    ref_src_key=_alphanumdash_hap,
+    ref_final_key=_alphanumdash_hap,
     # this appears way too often, so define constraint here
     sex_chr="[XY]",
 
 
-include: "rules/repseq.smk"
+include: "rules/tools.smk"
 include: "rules/ref.smk"
+include: "rules/diploid.smk"
 include: "rules/xy.smk"
 include: "rules/low_complexity.smk"
 include: "rules/gc.smk"
@@ -40,16 +114,21 @@ include: "rules/postprocess.smk"
 # the big stuff, like .fa files and large bed files)
 rule all_resources:
     input:
-        expand(rules.download_ref.output, ref_key=config.all_refkeys),
-        expand(rules.download_gaps.output, ref_key=config.all_refkey_gap),
-        expand(rules.download_rmsk.output, ref_key=config.all_refkey_rmsk),
-        expand(rules.download_trf.output, ref_key=config.all_refkey_trf),
-        expand(rules.download_censat.output, ref_key=config.all_refkey_censat),
+        expand(rules.download_ref.output, ref_src_key=config.all_ref_refsrckeys),
+        expand(rules.download_gaps.output, ref_src_key=config.all_refkey_gap),
+        expand(rules.download_rmsk.output, ref_src_key=config.all_refkey_rmsk),
+        expand(rules.download_simreps.output, ref_src_key=config.all_refkey_simreps),
+        expand(rules.download_censat.output, ref_src_key=config.all_refkey_censat),
+        expand(rules.download_superdups.output, ref_src_key=config.all_refkey_segdups),
+        expand(rules.download_ftbl.output, ref_src_key=config.all_refkey_ftbl),
+        expand(rules.download_gff.output, ref_src_key=config.all_refkey_gff),
         expand(
-            rules.download_ftbl.output + rules.download_gff.output,
-            ref_key=config.all_refkey_functional,
+            rules.download_bench_vcf.output
+            + rules.download_bench_bed.output
+            + rules.download_query_vcf.output,
+            ref_src_key=(t := unzip2(config.all_buildkey_bench))[0],
+            build_key=t[1],
         ),
-        expand(rules.download_superdups.output, ref_key=config.all_refkey_segdups),
 
 
 rule all:

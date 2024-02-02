@@ -1,16 +1,10 @@
 from os.path import splitext, basename
 from pathlib import Path
-from common.config import CoreLevel
+from common.config import CoreLevel, strip_full_refkey
 
-map_dir = CoreLevel.MAPPABILITY
-map_inter_dir = config.intermediate_build_dir / map_dir.value
-map_log_dir = config.log_build_dir / map_dir.value
-map_bench_dir = config.bench_build_dir / map_dir.value
+# TODO this entire thing needs to be split apart when run with dip1 references
 
-
-def map_final_path(name):
-    return config.build_strat_path(map_dir, name)
-
+mlty = config.to_bed_dirs(CoreLevel.MAPPABILITY)
 
 ################################################################################
 # download a bunch of stuff to run GEM
@@ -72,10 +66,10 @@ rule unpack_gem:
 
 rule filter_mappability_ref:
     input:
-        fa=rules.download_ref.output[0],
+        fa=lambda w: expand_final_to_src(rules.download_ref.output[0], w)[0],
         idx=rules.index_ref.output[0],
     output:
-        map_inter_dir / "ref.fa",
+        mlty.inter.postsort.data / "ref.fa",
     conda:
         "../envs/bedtools.yml"
     script:
@@ -84,17 +78,21 @@ rule filter_mappability_ref:
 
 rule gem_index:
     input:
-        fa=rules.filter_mappability_ref.output,
+        fa=rules.filter_mappability_ref.output[0],
         bin=rules.unpack_gem.output.indexer,
     output:
-        map_inter_dir / "index.gem",
+        mlty.inter.postsort.data / "index.gem",
     params:
         base=lambda wildcards, output: splitext(output[0])[0],
-    threads: 8
+    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 4) * 1.5
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.gemIndex
+        ),
     log:
-        map_log_dir / "index.log",
+        mlty.inter.postsort.log / "index.log",
     benchmark:
-        map_bench_dir / "index.txt"
+        mlty.inter.postsort.bench / "index.txt"
     shell:
         """
         PATH={config.tools_bin_dir}:$PATH
@@ -108,17 +106,21 @@ rule gem_index:
 
 rule gem_mappability:
     input:
-        fa=rules.gem_index.output,
+        idx=rules.gem_index.output[0],
         bin=rules.unpack_gem.output.mappability,
     output:
-        map_inter_dir / "unique_l{l}_m{m}_e{e}.mappability",
+        mlty.inter.postsort.data / "unique_l{l}_m{m}_e{e}.mappability",
     params:
         base=lambda wildcards, output: splitext(output[0])[0],
-    threads: 8
+    threads: lambda w: int(config.thread_per_chromosome(w.ref_final_key, w.build_key, 4) * 1.5)
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.gemMappability
+        ),
     log:
-        map_log_dir / "mappability_l{l}_m{m}_e{e}.log",
+        mlty.inter.postsort.data / "mappability_l{l}_m{m}_e{e}.log",
     benchmark:
-        map_bench_dir / "mappability_l{l}_m{m}_e{e}.txt"
+        mlty.inter.postsort.bench / "mappability_l{l}_m{m}_e{e}.txt"
     wildcard_constraints:
         **gem_wc_constraints,
     shell:
@@ -128,7 +130,7 @@ rule gem_mappability:
         -e {wildcards.e} \
         -l {wildcards.l} \
         -T {threads} \
-        -I {input.fa} \
+        -I {input.idx} \
         -o {params.base} > {log} 2>&1
         """
 
@@ -136,16 +138,20 @@ rule gem_mappability:
 rule gem_to_wig:
     input:
         idx=rules.gem_index.output,
-        map=rules.gem_mappability.output,
+        map=rules.gem_mappability.output[0],
         bin=rules.unpack_gem.output.gem2wig,
     output:
-        map_inter_dir / "unique_l{l}_m{m}_e{e}.wig",
+        mlty.inter.postsort.data / "unique_l{l}_m{m}_e{e}.wig",
     params:
         base=lambda wildcards, output: splitext(output[0])[0],
     log:
-        map_log_dir / "gem2wig_l{l}_m{m}_e{e}.log",
+        mlty.inter.postsort.log / "gem2wig_l{l}_m{m}_e{e}.log",
     benchmark:
-        map_bench_dir / "gem2wig_l{l}_m{m}_e{e}.txt"
+        mlty.inter.postsort.bench / "gem2wig_l{l}_m{m}_e{e}.txt"
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.gemToWig
+        ),
     wildcard_constraints:
         **gem_wc_constraints,
     shell:
@@ -163,7 +169,7 @@ rule wig_to_bed:
     input:
         rules.gem_to_wig.output,
     output:
-        map_inter_dir / "unique_l{l}_m{m}_e{e}.bed.gz",
+        mlty.inter.postsort.data / "unique_l{l}_m{m}_e{e}.bed.gz",
     conda:
         "../envs/map.yml"
     wildcard_constraints:
@@ -184,9 +190,9 @@ rule wig_to_bed:
 
 
 def nonunique_inputs(wildcards):
-    rk = wildcards.ref_key
+    rk = strip_full_refkey(wildcards.ref_final_key)
     bk = wildcards.build_key
-    l, m, e = config.buildkey_to_mappability(rk, bk)
+    l, m, e = config.to_build_data(rk, bk).mappability_params
     return expand(rules.wig_to_bed.output, zip, allow_missing=True, l=l, m=m, e=e)
 
 
@@ -196,30 +202,38 @@ checkpoint merge_nonunique:
         gapless=rules.get_gapless.output.auto,
         genome=rules.get_genome.output,
     output:
-        map_inter_dir / "nonunique_output.json",
+        mlty.inter.postsort.data / "nonunique_output.json",
     params:
         path_pattern=lambda w: expand(
-            map_final_path("{{}}"),
-            ref_key=w.ref_key,
+            mlty.final("{{}}"),
+            ref_final_key=w.ref_final_key,
             build_key=w.build_key,
         )[0],
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.mergeNonunique
+        ),
+    benchmark:
+        mlty.inter.postsort.bench / "merge_nonunique.txt"
     conda:
         "../envs/bedtools.yml"
     script:
         "../scripts/python/bedtools/mappability/merge_nonunique.py"
 
 
-def nonunique_inputs(ref_key, build_key):
-    c = checkpoints.merge_nonunique.get(ref_key=ref_key, build_key=build_key)
+def nonunique_inputs(ref_final_key, build_key):
+    c = checkpoints.merge_nonunique.get(
+        ref_final_key=ref_final_key, build_key=build_key
+    )
     with c.output[0].open() as f:
         return json.load(f)
 
 
 rule invert_merged_nonunique:
     input:
-        lambda w: nonunique_inputs(w.ref_key, w.build_key)["all_lowmap"],
+        lambda w: nonunique_inputs(w.ref_final_key, w.build_key)["all_lowmap"],
     output:
-        map_final_path("notinlowmappabilityall"),
+        mlty.final("notinlowmappabilityall"),
     conda:
         "../envs/bedtools.yml"
     params:
@@ -233,12 +247,14 @@ rule invert_merged_nonunique:
         """
 
 
-def nonunique_inputs_flat(ref_key, build_key):
-    res = nonunique_inputs(ref_key, build_key)
+def nonunique_inputs_flat(ref_final_key, build_key):
+    res = nonunique_inputs(ref_final_key, build_key)
     return [res["all_lowmap"], *res["single_lowmap"]]
 
 
-def mappabilty_inputs(ref_key, build_key):
-    return nonunique_inputs_flat(ref_key, build_key) + expand(
-        rules.invert_merged_nonunique.output, ref_key=ref_key, build_key=build_key
+def mappabilty_inputs(ref_final_key, build_key):
+    return nonunique_inputs_flat(ref_final_key, build_key) + expand(
+        rules.invert_merged_nonunique.output,
+        ref_final_key=ref_final_key,
+        build_key=build_key,
     )

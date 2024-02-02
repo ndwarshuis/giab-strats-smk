@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, NamedTuple, Callable
 import subprocess as sp
 import common.config as cfg
+from common.functional import DesignError
 import json
 
 # use subprocess here because I don't see an easy way to stream a bedtools
@@ -33,7 +34,7 @@ def write_simple_range_beds(
     for out, bigger, smaller in torun:
         with open(out, "wb") as f:
             p0 = sp.Popen(
-                ["subtractBed", "-a", bigger.bed, "-b", smaller.bed],
+                ["subtractBed", "-a", bigger.bed, "-b", smaller.bed, "-sorted"],
                 stdout=sp.PIPE,
             )
             p1 = sp.run(["bgzip", "-c"], stdin=p0.stdout, stdout=f)
@@ -57,7 +58,7 @@ def write_middle_range_bed(
             stdout=sp.PIPE,
         )
         p1 = sp.Popen(
-            ["subtractBed", "-a", "stdin", "-b", lower.bed],
+            ["subtractBed", "-a", "stdin", "-b", lower.bed, "-sorted"],
             stdin=p0.stdout,
             stdout=sp.PIPE,
         )
@@ -109,10 +110,13 @@ def write_intersected_range_beds(
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
-    rk = cfg.RefKey(smk.wildcards.ref_key)
-    bk = cfg.BuildKey(smk.wildcards.build_key)
-    gps = sconf.buildkey_to_include(rk, bk).gc
-    assert gps is not None, "this should not happen"
+    ws: dict[str, str] = smk.wildcards
+    rfk = cfg.wc_to_reffinalkey(ws)
+    bk = cfg.wc_to_buildkey(ws)
+    bd = sconf.to_build_data(cfg.strip_full_refkey(rfk), bk)
+    gps = bd.build.include.gc
+    if gps is None:
+        raise DesignError
     # ASSUME both of these input lists are sorted by GC fraction
     low = [GCInput(p, f, r) for p, (f, r) in zip(smk.input.low, gps.low)]
     high = [GCInput(p, f, r) for p, (f, r) in zip(smk.input.high, gps.high)]

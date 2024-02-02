@@ -1,34 +1,67 @@
-from common.config import CoreLevel
+from common.config import CoreLevel, si_to_ftbl, si_to_gff
 
-func_dir = CoreLevel.FUNCTIONAL
-func_src_dir = config.ref_src_dir / func_dir.value
-func_inter_dir = config.intermediate_build_dir / func_dir.value
-func_log_build_dir = config.log_src_dir / func_dir.value
+func = config.to_bed_dirs(CoreLevel.FUNCTIONAL)
 
 
-def func_final_path(name):
-    return config.build_strat_path(func_dir, name)
-
-
-rule filter_cds:
-    input:
-        mapper=rules.ftbl_to_mapper.output[0],
-        bed=rules.gff_to_bed.output[0],
+use rule download_ref as download_ftbl with:
     output:
-        func_inter_dir / "refseq_cds.bed.gz",
+        func.src.data / "ftbl.txt.gz",
+    params:
+        src=lambda w: config.refsrckey_to_functional_src(si_to_ftbl, w.ref_src_key),
+    localrule: True
+    log:
+        func.src.log / "ftbl.log",
+
+
+use rule download_ref as download_gff with:
+    output:
+        func.src.data / "gff.txt.gz",
+    params:
+        src=lambda w: config.refsrckey_to_functional_src(si_to_gff, w.ref_src_key),
+    localrule: True
+    log:
+        func.src.log / "gff.log",
+
+
+checkpoint normalize_cds:
+    input:
+        unpack(
+            lambda w: {
+                k: expand(
+                    p,
+                    ref_src_key=config.refkey_to_functional_refsrckeys(f, w.ref_key),
+                )
+                for k, f, p in zip(
+                    ["ftbl", "gff"],
+                    [si_to_ftbl, si_to_gff],
+                    [rules.download_ftbl.output, rules.download_gff.output],
+                )
+            }
+        ),
+    output:
+        **{k: func.inter.filtersort.data / f"{k}.json" for k in ["cds", "vdj"]},
+    params:
+        cds_output=lambda w: to_output_pattern(func, "cds", w),
+        vdj_output=lambda w: to_output_pattern(func, "vdj", w),
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_key, w.build_key, lambda m: m.normalizeCds
+        ),
+    benchmark:
+        func.inter.filtersort.bench / "normalize_cds.txt"
     conda:
         "../envs/bedtools.yml"
     script:
-        "../scripts/python/bedtools/functional/filter_cds.py"
+        "../scripts/python/bedtools/functional/normalize_cds.py"
 
 
 rule merge_functional:
     input:
-        bed=rules.filter_cds.output,
+        bed=lambda w: read_named_checkpoint("normalize_cds", "cds", w),
         genome=rules.get_genome.output,
         gapless=rules.get_gapless.output.auto,
     output:
-        func_final_path("refseq_cds"),
+        func.final("refseq_cds"),
     conda:
         "../envs/bedtools.yml"
     shell:
@@ -45,7 +78,7 @@ rule invert_functional:
         genome=rules.get_genome.output,
         gapless=rules.get_gapless.output.auto,
     output:
-        func_final_path("notinrefseq_cds"),
+        func.final("notinrefseq_cds"),
     conda:
         "../envs/bedtools.yml"
     shell:

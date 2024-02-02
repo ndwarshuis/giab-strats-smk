@@ -14,12 +14,7 @@ from pathlib import Path
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
-    rk = cfg.RefKey(smk.wildcards["ref_key"])
-    bk = cfg.BuildKey(smk.wildcards["build_key"])
-
-    pattern = sconf.refkey_to_final_chr_pattern(rk)
-    pats = sconf.refkey_to_mappability_patterns(rk)
-    cis = sconf.buildkey_to_chr_indices(rk, bk)
+    ws: dict[str, str] = smk.wildcards
 
     idx = pd.read_table(
         Path(smk.input["idx"]),
@@ -28,19 +23,30 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         usecols=[0],
     )
 
-    chrs = [
-        *filter(
-            lambda c: any(i.chr_name_full(pattern) == c for i in cis)
-            or any(re.match(p, c) for p in pats),
-            idx[0].tolist(),
-        )
-    ]
+    def run_samtools(
+        bd: cfg.BuildData_[cfg.RefSourceT, cfg.AnyBedT, cfg.AnyBedT_, cfg.AnySrcT],
+        pat: cfg.ChrPattern,
+    ) -> None:
+        main_chrs = pat.to_names(bd.chr_indices)
+        chrs: list[str] = [
+            c
+            for c in idx[0].tolist()
+            if c in main_chrs
+            or any(re.match(p, c) is not None for p in bd.refdata.mappability_patterns)
+        ]
+        with open(Path(smk.output[0]), "w") as f:
+            # ASSUME sort order doesn't matter and ref is bgzip'd or unzip'd
+            # NOTE the output is not bgzip'd because GEM doesn't like it
+            p = sp.Popen(["samtools", "faidx", smk.input["fa"], *chrs], stdout=f)
+            p.wait()
 
-    with open(Path(smk.output[0]), "w") as f:
-        # ASSUME sort order doesn't matter and ref is bgzip'd or unzip'd
-        # NOTE the output is not bgzip'd because GEM doesn't like it
-        p = sp.Popen(["samtools", "faidx", Path(smk.input["fa"]), *chrs], stdout=f)
-        p.wait()
+    sconf.with_build_data_full(
+        cfg.wc_to_reffinalkey(ws),
+        cfg.wc_to_buildkey(ws),
+        lambda bd: run_samtools(bd, bd.refdata.ref.chr_pattern),
+        lambda bd: run_samtools(bd, bd.refdata.ref.chr_pattern),
+        lambda hap, bd: run_samtools(bd, bd.refdata.ref.chr_pattern.from_either(hap)),
+    )
 
 
 main(snakemake, snakemake.config)  # type: ignore
