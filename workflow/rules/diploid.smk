@@ -219,14 +219,6 @@ use rule merge_all_hets as merge_SNVorSV_hets with:
         dip.inter.postsort.data / "SNV_or_SV_het_regions.bed.gz",
 
 
-def combine_dip_inputs(rule, wildcards):
-    # NOTE: the wildcard value of ref_final_key will not have a haplotype (as
-    # per logic of dip1 references)
-    k = cfg.RefKeyFull(wildcards.ref_final_key, h).name
-    r = getattr(rules, rule).output
-    return {h.name: expand(r, ref_final_key=k) for h in cfg.Haplotype}
-
-
 rule combine_dip1_hets:
     input:
         unpack(lambda w: combine_dip_inputs("merge_all_hets", w)),
@@ -243,12 +235,6 @@ use rule combine_dip1_hets as combine_SNVorSV_dip1_hets with:
         unpack(lambda w: combine_dip_inputs("merge_SNVorSV_hets", w)),
     output:
         dip.inter.postsort.data / "combined_SNV_SV_het_regions.bed.gz",
-
-
-def dip1_either(left, right, wildcards):
-    left_ = getattr(rules, left).output
-    right_ = getattr(rules, right).output
-    return config.dip1_either(left_, right_, wildcards.ref_final_key)
 
 
 rule merge_het_regions:

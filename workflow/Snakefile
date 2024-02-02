@@ -76,6 +76,22 @@ def to_bed_src(f, wildcards):
     return config.refsrckey_to_bed_src(f, wildcards.ref_src_key)
 
 
+def combine_dip_inputs(rule, wildcards):
+    # NOTE: the wildcard value of ref_final_key will not have a haplotype (as
+    # per logic of dip1 references)
+    k = cfg.RefKeyFull(wildcards.ref_final_key, h).name
+    r = getattr(rules, rule).output
+    return {
+        h.name: expand(r, allow_missing=True, ref_final_key=k) for h in cfg.Haplotype
+    }
+
+
+def dip1_either(left, right, wildcards):
+    left_ = getattr(rules, left).output
+    right_ = getattr(rules, right).output
+    return config.dip1_either(left_, right_, wildcards["ref_final_key"])
+
+
 _alphanumdash = "[A-Za-z0-9-]+"
 _alphanumdash_hap = "[A-Za-z0-9-]+(\.hap(1|2))?"
 

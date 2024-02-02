@@ -2,8 +2,6 @@ from os.path import splitext, basename
 from pathlib import Path
 from common.config import CoreLevel, strip_full_refkey
 
-# TODO this entire thing needs to be split apart when run with dip1 references
-
 mlty = config.to_bed_dirs(CoreLevel.MAPPABILITY)
 
 ################################################################################
@@ -76,9 +74,24 @@ rule filter_mappability_ref:
         "../scripts/python/bedtools/mappability/filter_ref.py"
 
 
+use rule split_ref as split_mappability_ref with:
+    input:
+        lambda w: expand(
+            rules.filter_mappability_ref.output,
+            allow_missing=True,
+            ref_final_key=strip_full_refkey(w["ref_final_key"]),
+        ),
+    output:
+        mlty.inter.postsort.data / "ref_split.fa",
+
+
 rule gem_index:
     input:
-        fa=rules.filter_mappability_ref.output[0],
+        fa=lambda w: config.dip1_hap_either(
+            rules.split_mappability_ref.output,
+            rules.filter_mappability_ref.output,
+            w["ref_final_key"],
+        ),
         bin=rules.unpack_gem.output.indexer,
     output:
         mlty.inter.postsort.data / "index.gem",
@@ -185,20 +198,37 @@ rule wig_to_bed:
         """
 
 
+rule combine_dip1_nonunique_beds:
+    input:
+        unpack(lambda w: combine_dip_inputs("wig_to_bed", w)),
+    output:
+        mlty.inter.postsort.data / "unique_l{l}_m{m}_e{e}.bed.gz",
+    shell:
+        """
+        cat {input.hap1} {input.hap2} > {output}
+        """
+
+
 ################################################################################
 # create stratifications
 
 
-def nonunique_inputs(wildcards):
-    rk = strip_full_refkey(wildcards.ref_final_key)
-    bk = wildcards.build_key
+def merge_nonunique_inputs(wildcards):
+    rkf = wildcards["ref_final_key"]
+    rk = strip_full_refkey(rkf)
+    bk = wildcards["build_key"]
     l, m, e = config.to_build_data(rk, bk).mappability_params
-    return expand(rules.wig_to_bed.output, zip, allow_missing=True, l=l, m=m, e=e)
+    p = config.dip1_hap_either(
+        rules.combine_dip1_nonunique_beds.output,
+        rules.wig_to_bed.output,
+        rkf,
+    )
+    return expand(p, zip, allow_missing=True, l=l, m=m, e=e)
 
 
 checkpoint merge_nonunique:
     input:
-        bed=nonunique_inputs,
+        bed=merge_nonunique_inputs,
         gapless=rules.get_gapless.output.auto,
         genome=rules.get_genome.output,
     output:

@@ -222,23 +222,15 @@ checkpoint normalize_bench_bed:
 # Split a single reference file into two haplotypes. Only valid for dip1
 # references; anything else will indicate an error by singing some lovely
 # emoprog
-def test(w):
-    print(w.ref_final_key)
-    return expand(
-        rules.filter_sort_ref.output,
-        allow_missing=True,
-        ref_final_key=strip_full_refkey(w["ref_final_key"]),
-    )
 
 
 rule split_ref:
     input:
-        test,
-        # lambda w: expand(
-        #     rules.filter_sort_ref.output,
-        #     allow_missing=True,
-        #     ref_final_key=strip_full_refkey(w["ref_final_key"]),
-        # ),
+        lambda w: expand(
+            rules.filter_sort_ref.output,
+            allow_missing=True,
+            ref_final_key=strip_full_refkey(w["ref_final_key"]),
+        ),
     output:
         ref.inter.build.data / "ref_split.fa.gz",
     conda:

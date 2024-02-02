@@ -3018,7 +3018,21 @@ class GiabStrats(BaseModel):
         """
         rk_, hap = parse_full_refkey(rk)
         if hap is None:
-            raise DesignError(f"Refkey must have a haplotype {rk_}")
+            raise DesignError(f"Refkey must have a haplotype: {rk_}")
+        if rk_ in self.haploid_stratifications:
+            raise DesignError(f"Refkey must be either dip1 or dip2: {rk_}")
+        elif rk_ in self.diploid1_stratifications:
+            return True
+        elif rk_ in self.diploid2_stratifications:
+            return False
+        else:
+            raise DesignError(f"Unknown refkey: {rk_}")
+
+    def refkey_is_dip1_hap(self, rk: RefKeyFullS) -> bool:
+        """Like 'refkey_is_dip1' but treat hap as if they were dip2."""
+        rk_, hap = parse_full_refkey(rk)
+        if hap is None:
+            return False
         if rk_ in self.haploid_stratifications:
             raise DesignError(f"Refkey must be either dip1 or dip2: {rk_}")
         elif rk_ in self.diploid1_stratifications:
@@ -3031,6 +3045,10 @@ class GiabStrats(BaseModel):
     def dip1_either(self, left: X, right: X, rk: RefKeyFullS) -> X:
         """Return left if dip1, right if dip2, and error otherwise."""
         return left if self.refkey_is_dip1(rk) else right
+
+    def dip1_hap_either(self, left: X, right: X, rk: RefKeyFullS) -> X:
+        """Return left if dip1, right if dip2 or hap."""
+        return left if self.refkey_is_dip1_hap(rk) else right
 
     def thread_per_chromosome(self, rk: RefKeyFullS, bk: BuildKey, n: int) -> int:
         cis = self.to_build_data(strip_full_refkey(rk), bk).chr_indices
