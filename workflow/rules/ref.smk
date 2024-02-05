@@ -243,11 +243,12 @@ use rule index_unzipped_ref as index_split_ref with:
     input:
         rules.split_ref.output,
     output:
-        ref.inter.build.data / "ref.fna.fai",
+        rules.split_ref.output[0] + ".fai",
     log:
         ref.inter.build.log / "index_ref.log",
 
 
+# TODO this will fail since the refkey for dip1 will have a hap appended to it
 use rule get_genome as get_split_genome with:
     input:
         rules.split_ref.output,

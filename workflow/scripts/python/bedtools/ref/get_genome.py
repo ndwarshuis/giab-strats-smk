@@ -19,7 +19,6 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         dtype={0: str, 1: int},
         usecols=[0, 1],
     )
-
     filtered = filter_sort_bed(im, fm, df, 2)
     filtered.to_csv(smk.output[0], sep="\t", header=False, index=False)
 

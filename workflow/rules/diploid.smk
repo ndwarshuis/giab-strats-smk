@@ -14,11 +14,10 @@ dip = config.to_bed_dirs(CoreLevel.DIPLOID)
 def minimap_inputs(wildcards):
     rk = wildcards["ref_final_key"]
     other_rk = flip_full_refkey(rk)
-    fa, idx = config.dip1_either(
-        (rules.split_ref.output, rules.index_split_ref.output),
-        (rules.unzip_ref.output, rules.index_unzipped_ref.output),
-        rk,
-    )
+    isdip1 = config.refkey_is_split_dip1_or_dip2(rk)
+    dip1 = (rules.split_ref.output, rules.index_split_ref.output)
+    dip2 = (rules.unzip_ref.output, rules.index_unzipped_ref.output)
+    fa, idx = dip1 if isdip1 else dip2
 
     def expand_rk(path, rk):
         return expand(path, allow_missing=True, ref_final_key=rk)
@@ -65,11 +64,7 @@ rule breaks_cross_alignment_to_bed:
     input:
         paf=rules.cross_align_breaks.output,
         paftools_bin=rules.download_paftools.output,
-        genome=lambda w: config.dip1_either(
-            rules.get_split_genome.output,
-            rules.get_genome.output,
-            w["ref_final_key"],
-        ),
+        genome=lambda w: split_dip1_or_dip2("get_split_genome", "get_genome", w),
     output:
         dip.inter.postsort.data / "breaks_cross_align.bed.gz",
     log:
@@ -151,10 +146,10 @@ rule filter_sort_variant_cross_alignment:
 rule variant_cross_alignment_to_bed:
     input:
         bam=rules.filter_sort_variant_cross_alignment.output,
-        hap=lambda w: config.dip1_either(
-            rules.split_ref.output,
-            rules.unzip_ref.output,
-            w["ref_final_key"],
+        hap=lambda w: (
+            rules.split_ref.output
+            if config.refkey_is_split_dip1_or_dip2(w["ref_final_key"])
+            else rules.unzip_ref.output
         ),
     output:
         dip.inter.postsort.data / "variant_cross_align.bed.gz",
@@ -239,7 +234,7 @@ use rule combine_dip1_hets as combine_SNVorSV_dip1_hets with:
 
 rule merge_het_regions:
     input:
-        lambda w: dip1_either("combine_dip1_hets", "merge_all_hets", w),
+        lambda w: dip1_or_dip2("combine_dip1_hets", "merge_all_hets", w),
     output:
         dip.final("het_regions_{merge_len}k"),
     conda:
@@ -258,7 +253,7 @@ rule merge_het_regions:
 
 use rule merge_het_regions as merge_het_SNVorSV_regions with:
     input:
-        lambda w: dip1_either("combine_SNVorSV_dip1_hets", "merge_SNVorSV_hets", w),
+        lambda w: dip1_or_dip2("combine_SNVorSV_dip1_hets", "merge_SNVorSV_hets", w),
     output:
         dip.final("het_SNVorSV_regions_{merge_len}k"),
     wildcard_constraints:

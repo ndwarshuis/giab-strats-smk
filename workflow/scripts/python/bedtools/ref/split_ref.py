@@ -17,7 +17,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     rk, hap = cfg.parse_full_refkey(cfg.wc_to_reffinalkey(ws))
     bd = sconf.to_build_data(rk, bk)
 
-    if not isinstance(bd, cfg.Dip1BuildData):
+    if not isinstance(bd.refdata.ref, cfg.Dip1ChrSrc):
         raise DesignError("This code was a masterpiece 'til you refactored it")
 
     if hap is None:

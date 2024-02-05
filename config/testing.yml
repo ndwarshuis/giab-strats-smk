@@ -549,8 +549,8 @@ diploid1_stratifications:
           url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.fasta.gz
       chr_pattern:
         hapnames:
-          hap1: 'chr%i_MATERNAL'
-          hap2: 'chr%i_PATERNAL'
+          hap1: 'MATERNAL'
+          hap2: 'PATERNAL'
     strat_inputs:
       low_complexity:
         rmsk: null

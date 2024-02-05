@@ -87,10 +87,10 @@ use rule split_ref as split_mappability_ref with:
 
 rule gem_index:
     input:
-        fa=lambda w: config.dip1_hap_either(
-            rules.split_mappability_ref.output,
-            rules.filter_mappability_ref.output,
-            w["ref_final_key"],
+        fa=lambda w: split_dip1_or_dip2_hap(
+            "split_mappability_ref",
+            "filter_mappability_ref",
+            w,
         ),
         bin=rules.unpack_gem.output.indexer,
     output:
@@ -218,11 +218,7 @@ def merge_nonunique_inputs(wildcards):
     rk = strip_full_refkey(rkf)
     bk = wildcards["build_key"]
     l, m, e = config.to_build_data(rk, bk).mappability_params
-    p = config.dip1_hap_either(
-        rules.combine_dip1_nonunique_beds.output,
-        rules.wig_to_bed.output,
-        rkf,
-    )
+    p = dip1_or_dip2_hap("combine_dip1_nonunique_beds", "wig_to_bed", rkf)
     return expand(p, zip, allow_missing=True, l=l, m=m, e=e)
 
 
