@@ -1,4 +1,4 @@
-from typing import TypeVar, Callable
+from typing import TypeVar, Callable, NoReturn
 
 
 X = TypeVar("X")
@@ -64,6 +64,15 @@ class DesignError(Exception):
     should not happen' error)"""
 
     pass
+
+
+def raise_inline(msg: str) -> NoReturn:
+    """Raise a design error.
+
+    Useful for when I'm in a lambda and want to scream like a typical metalcore
+    vocalist.
+    """
+    raise DesignError(msg)
 
 
 def none_unsafe(x: X | None, f: Y, msg: None | str = None) -> Y:

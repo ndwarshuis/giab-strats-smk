@@ -5,7 +5,7 @@ from snakemake.utils import min_version
 sys.path.extend(["./workflow/scripts/python"])
 from common.config import GiabStrats
 from common.functional import unzip2
-from common.config import strip_full_refkey
+from common.config import strip_full_refkey, RefKeyFull, Haplotype
 
 min_version("7.20")
 
@@ -74,6 +74,40 @@ def bed_src_bd_inputs(pathlist, f, wildcards):
 def to_bed_src(f, wildcards):
     """Shorthand for looking up bed file source using a function and wildcards."""
     return config.refsrckey_to_bed_src(f, wildcards.ref_src_key)
+
+
+def combine_dip_inputs(rule, wildcards):
+    # NOTE: the wildcard value of ref_final_key will not have a haplotype (as
+    # per logic of dip1 references)
+    return {
+        h.name: expand(
+            getattr(rules, rule).output,
+            allow_missing=True,
+            ref_final_key=RefKeyFull(wildcards.ref_final_key, h).name,
+        )
+        for h in Haplotype
+    }
+
+
+def _either_rule(f, left, right, wildcards):
+    t = f(wildcards["ref_final_key"])
+    return (getattr(rules, left) if t else getattr(rules, right)).output
+
+
+def dip1_or_dip2(left, right, wildcards):
+    return _either_rule(config.refkey_is_dip1_or_dip2, left, right, wildcards)
+
+
+def split_dip1_or_dip2(left, right, wildcards):
+    return _either_rule(config.refkey_is_split_dip1_or_dip2, left, right, wildcards)
+
+
+def dip1_or_dip2_hap(left, right, wildcards):
+    return _either_rule(config.refkey_is_dip1_or_dip2_hap, left, right, wildcards)
+
+
+def split_dip1_or_dip2_hap(left, right, wildcards):
+    return _either_rule(config.refkey_is_split_dip1_or_dip2_hap, left, right, wildcards)
 
 
 _alphanumdash = "[A-Za-z0-9-]+"

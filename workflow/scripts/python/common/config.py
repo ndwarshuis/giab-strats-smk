@@ -137,6 +137,7 @@ from common.functional import (
     unzip2,
     unzip3,
     noop,
+    raise_inline,
 )
 from common.io import is_gzip, is_bgzip
 import common.bed as bed
@@ -1150,6 +1151,15 @@ class DipChrPattern(BaseModel, ChrPattern):
         assert (
             v.count(CHR_INDEX_PLACEHOLDER) == 1 and v.count(CHR_HAP_PLACEHOLDER) == 1
         ), "chr template must have '%i' and '%h' in it"
+        return v
+
+    @validator("hapnames")
+    def is_valid_hapname(cls, v: Diploid[HaplotypeName]) -> Diploid[HaplotypeName]:
+        def is_valid(n: HaplotypeName, h: Haplotype) -> None:
+            t = CHR_INDEX_PLACEHOLDER in n or CHR_HAP_PLACEHOLDER in n
+            assert not t, f"name for {h.name} must not have '%i' and '%h' in it"
+
+        v.both(is_valid)
         return v
 
     def to_chr_name(self, i: ChrIndex, h: Haplotype) -> str | None:
@@ -3001,12 +3011,10 @@ class GiabStrats(BaseModel):
 
     # other nice functions
 
-    def refkey_is_dip1(self, rk: RefKeyFullS) -> bool:
+    def refkey_is_dip1_or_dip2(self, rk: RefKeyFullS) -> bool:
         """Test if refkey is dip1 or dip2.
 
         Return True if dip1, false if dip2, and error otherwise.
-
-        Incoming key must have a haplotype appended to it. Otherwise error.
 
         This function is useful for cases where dip1 rules need to be "split"
         into component haplotypes. Normally each rule for a dip1 configuration
@@ -3016,21 +3024,53 @@ class GiabStrats(BaseModel):
         from a dip2 key unless we run the logic of checking the het1/dip1/dip2
         refkey maps (which is what this function does).
         """
-        rk_, hap = parse_full_refkey(rk)
-        if hap is None:
-            raise DesignError(f"Refkey must have a haplotype {rk_}")
-        if rk_ in self.haploid_stratifications:
-            raise DesignError(f"Refkey must be either dip1 or dip2: {rk_}")
-        elif rk_ in self.diploid1_stratifications:
-            return True
-        elif rk_ in self.diploid2_stratifications:
-            return False
-        else:
-            raise DesignError(f"Unknown refkey: {rk_}")
+        return self.with_ref_data_full(
+            rk,
+            lambda _: raise_inline(f"hap1 refkey not allowed: {rk}"),
+            lambda _: True,
+            lambda _, __: False,
+        )
 
-    def dip1_either(self, left: X, right: X, rk: RefKeyFullS) -> X:
-        """Return left if dip1, right if dip2, and error otherwise."""
-        return left if self.refkey_is_dip1(rk) else right
+    def refkey_is_split_dip1_or_dip2(self, rk: RefKeyFullS) -> bool:
+        """Like 'refkey_is_dip1' but check if dip1 has a haplotype.
+
+        dip1 is not supposed to have a haplotype normally, but will if we split
+        it into two haplotype streams which happens in mappability for example.
+        """
+        rk_, hap = parse_full_refkey(rk)
+        return self.with_ref_data(
+            rk_,
+            lambda _: raise_inline(f"hap1 refkey not allowed: {rk}"),
+            lambda _: not_none_unsafe(hap, lambda _: True),
+            lambda _: not_none_unsafe(hap, lambda _: False),
+        )
+
+    def refkey_is_dip1_or_dip2_hap(self, rk: RefKeyFullS) -> bool:
+        """Like 'refkey_is_dip1' but treat hap as if it were dip2."""
+        return self.with_ref_data_full(
+            rk,
+            lambda _: False,
+            lambda _: True,
+            lambda _, __: False,
+        )
+
+    def refkey_is_split_dip1_or_dip2_hap(self, rk: RefKeyFullS) -> bool:
+        """Like 'refkey_is_split_dip1_hap' but treat hap as if it were dip2."""
+        rk_, hap = parse_full_refkey(rk)
+        return self.with_ref_data(
+            rk_,
+            lambda _: none_unsafe(hap, False),
+            lambda _: not_none_unsafe(hap, lambda _: True),
+            lambda _: not_none_unsafe(hap, lambda _: False),
+        )
+
+    # def dip1_either(self, left: X, right: X, rk: RefKeyFullS) -> X:
+    #     """Return left if dip1, right if dip2, and error otherwise."""
+    #     return left if self.refkey_is_dip1(rk) else right
+
+    # def dip1_hap_either(self, left: X, right: X, rk: RefKeyFullS) -> X:
+    #     """Return left if dip1, right if dip2 or hap."""
+    #     return left if self.refkey_is_dip1_hap(rk) else right
 
     def thread_per_chromosome(self, rk: RefKeyFullS, bk: BuildKey, n: int) -> int:
         cis = self.to_build_data(strip_full_refkey(rk), bk).chr_indices
