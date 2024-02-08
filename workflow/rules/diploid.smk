@@ -64,7 +64,6 @@ rule breaks_cross_alignment_to_bed:
     input:
         paf=rules.cross_align_breaks.output,
         paftools_bin=rules.download_paftools.output,
-        genome=lambda w: split_dip1_or_dip2("get_split_genome", "get_genome", w),
     output:
         dip.inter.postsort.data / "breaks_cross_align.bed.gz",
     log:
@@ -77,10 +76,27 @@ rule breaks_cross_alignment_to_bed:
         sort -k6,6 -k8,8n | \
         k8 {input.paftools_bin} call - 2> {log} | \
         grep ^R | \
-        cut -f2- | \
-        bedtools complement -i stdin -g {input.genome} | \
+        cut -f2,3,4 | \
         gzip -c > {output}
         """
+
+
+# These need to be sorted since the paftools call script needs a sorted input
+# but for convenience we don't sort numerically (doing so would require
+# threading complex python logic through the otherwise elegant pipeline above).
+# We could also presort (rather than sort twice) but this would require lots of
+# space to store the paf rather than a relatively small bed file (ie no sequence
+# strings)
+rule sort_breaks_bed:
+    input:
+        bed=rules.cross_align_breaks.output,
+        genome=lambda w: split_dip1_or_dip2("get_split_genome", "get_genome", w),
+    output:
+        dip.inter.postsort.data / "sorted_breaks_cross_align.bed.gz",
+    conda:
+        "../envs/quasi-dipcall.yml"
+    script:
+        "../scripts/python/bedtools/diploid/sort_breaks.py"
 
 
 # Get variants (large and small) between the two haplotypes using the same
@@ -193,7 +209,7 @@ rule filter_SNVorSV:
 rule merge_all_hets:
     input:
         rules.variant_cross_alignment_to_bed.output,
-        rules.breaks_cross_alignment_to_bed.output,
+        rules.sort_breaks_bed.output,
     output:
         dip.inter.postsort.data / "het_regions.bed.gz",
     conda:

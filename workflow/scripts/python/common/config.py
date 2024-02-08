@@ -910,6 +910,13 @@ class DipToDipChrConversion(_NonDivergentConversion):
     def final_mapper(self) -> bed.FinalMapper:
         return self.toPattern.final_mapper(self.indices)
 
+    def split(self, h: Haplotype) -> HapToHapChrConversion:
+        return HapToHapChrConversion(
+            self.fromPattern.to_hap_pattern(h),
+            self.toPattern.to_hap_pattern(h),
+            self.indices,
+        )
+
 
 @dataclass(frozen=True)
 class HapToDipChrConversion:
@@ -2654,7 +2661,7 @@ class GiabStrats(BaseModel):
         dip1_f: Callable[[Dip1RefData], X],
         dip2_f: Callable[[Haplotype, Dip2RefData], X],
     ) -> X:
-        """Like 'with_ref_data_full' but takes a full refkey and supplies the
+        """Like 'with_ref_data' but takes a full refkey and supplies the
         haplotype in the dip2 case.
         """
         rk_, hap = parse_full_refkey(rk)
@@ -2663,6 +2670,40 @@ class GiabStrats(BaseModel):
             lambda rd: none_unsafe(hap, hap_f(rd)),
             lambda rd: none_unsafe(hap, dip1_f(rd)),
             lambda rd: not_none_unsafe(hap, lambda hap: dip2_f(hap, rd)),
+        )
+
+    def with_ref_data_split_full(
+        self,
+        rk: RefKeyFullS,
+        hap_f: Callable[[HapRefData], X],
+        dip1_f: Callable[[Haplotype, Dip1RefData], X],
+        dip2_f: Callable[[Haplotype, Dip2RefData], X],
+    ) -> X:
+        """Like 'with_ref_data_full' but takes a refkey with a haplotype in
+        the dip1 case (ie when "split")
+        """
+        rk_, hap = parse_full_refkey(rk)
+        return self.with_ref_data(
+            rk_,
+            lambda rd: none_unsafe(hap, hap_f(rd)),
+            lambda rd: not_none_unsafe(hap, lambda hap: dip1_f(hap, rd)),
+            lambda rd: not_none_unsafe(hap, lambda hap: dip2_f(hap, rd)),
+        )
+
+    def with_ref_data_split_full_nohap(
+        self,
+        rk: RefKeyFullS,
+        dip1_f: Callable[[Haplotype, Dip1RefData], X],
+        dip2_f: Callable[[Haplotype, Dip2RefData], X],
+    ) -> X:
+        """Like 'with_ref_data_split_full' but forbids the hap1 case (ie
+        for diploid only rules/scripts)
+        """
+        return self.with_ref_data_split_full(
+            rk,
+            lambda _: raise_inline(f"hap1 refkey not allowed: {rk}"),
+            dip1_f,
+            dip2_f,
         )
 
     def with_build_data(
@@ -2692,6 +2733,40 @@ class GiabStrats(BaseModel):
             lambda bd: none_unsafe(hap, hap_f(bd)),
             lambda bd: none_unsafe(hap, dip1_f(bd)),
             lambda bd: not_none_unsafe(hap, lambda hap: dip2_f(hap, bd)),
+        )
+
+    def with_build_data_split_full(
+        self,
+        rfk: RefKeyFullS,
+        bk: BuildKey,
+        hap_f: Callable[[HapBuildData], X],
+        dip1_f: Callable[[Haplotype, Dip1BuildData], X],
+        dip2_f: Callable[[Haplotype, Dip2BuildData], X],
+    ) -> X:
+        """Like 'with_ref_data_split_full' but for build data"""
+        rk_, hap = parse_full_refkey(rfk)
+        return self.with_build_data(
+            rk_,
+            bk,
+            lambda rd: none_unsafe(hap, hap_f(rd)),
+            lambda rd: not_none_unsafe(hap, lambda hap: dip1_f(hap, rd)),
+            lambda rd: not_none_unsafe(hap, lambda hap: dip2_f(hap, rd)),
+        )
+
+    def with_build_data_split_full_nohap(
+        self,
+        rfk: RefKeyFullS,
+        bk: BuildKey,
+        dip1_f: Callable[[Haplotype, Dip1BuildData], X],
+        dip2_f: Callable[[Haplotype, Dip2BuildData], X],
+    ) -> X:
+        """Like 'with_ref_data_split_full_nohap' but for build data"""
+        return self.with_build_data_split_full(
+            rfk,
+            bk,
+            lambda _: raise_inline(f"hap1 refkey not allowed: {rfk}"),
+            dip1_f,
+            dip2_f,
         )
 
     def with_ref_data_and_bed(
@@ -3037,12 +3112,10 @@ class GiabStrats(BaseModel):
         dip1 is not supposed to have a haplotype normally, but will if we split
         it into two haplotype streams which happens in mappability for example.
         """
-        rk_, hap = parse_full_refkey(rk)
-        return self.with_ref_data(
-            rk_,
-            lambda _: raise_inline(f"hap1 refkey not allowed: {rk}"),
-            lambda _: not_none_unsafe(hap, lambda _: True),
-            lambda _: not_none_unsafe(hap, lambda _: False),
+        return self.with_ref_data_split_full_nohap(
+            rk,
+            lambda _, __: True,
+            lambda _, __: False,
         )
 
     def refkey_is_dip1_or_dip2_hap(self, rk: RefKeyFullS) -> bool:
@@ -3056,12 +3129,11 @@ class GiabStrats(BaseModel):
 
     def refkey_is_split_dip1_or_dip2_hap(self, rk: RefKeyFullS) -> bool:
         """Like 'refkey_is_split_dip1_hap' but treat hap as if it were dip2."""
-        rk_, hap = parse_full_refkey(rk)
-        return self.with_ref_data(
-            rk_,
-            lambda _: none_unsafe(hap, False),
-            lambda _: not_none_unsafe(hap, lambda _: True),
-            lambda _: not_none_unsafe(hap, lambda _: False),
+        return self.with_ref_data_split_full(
+            rk,
+            lambda _: False,
+            lambda _, __: True,
+            lambda _, __: False,
         )
 
     # def dip1_either(self, left: X, right: X, rk: RefKeyFullS) -> X:
