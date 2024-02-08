@@ -84,6 +84,7 @@ rule unit_test_strats:
         strats=rules.list_all_strats.output,
         gapless_auto=rules.get_gapless.output.auto,
         gapless_parY=rules.get_gapless.output.parY,
+        genome=rules.get_genome.output[0],
         strat_list=rules.generate_tsv_list.output[0],
         checksums=rules.generate_md5sums.output[0],
     output:

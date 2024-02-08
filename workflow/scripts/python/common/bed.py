@@ -164,8 +164,9 @@ def complementBed(
 def subtractBed(
     i: IO[bytes] | int,
     b: Path,
+    genome: Path,
 ) -> tuple[sp.Popen[bytes], IO[bytes]]:
-    cmd = ["subtractBed", "-a", "stdin", "-b", str(b)]
+    cmd = ["subtractBed", "-a", "stdin", "-b", str(b), "-sorted", "-g", str(genome)]
     return spawn_stream(cmd, i)
 
 
@@ -203,6 +204,16 @@ def bgzip(i: IO[bytes], o: IO[bytes]) -> sp.CompletedProcess[bytes]:
     final step in a pipeline.
     """
     return sp.run(["bgzip", "-c"], stdin=i, stdout=o)
+
+
+def gunzip(i: Path) -> tuple[sp.Popen[bytes], IO[bytes]]:
+    """Stream bgzip to endpoint.
+
+    NOTE: this will block since this is almost always going to be the
+    final step in a pipeline.
+    """
+    p = sp.Popen(["gunzip", "-c", i], stdout=sp.PIPE)
+    return (p, not_none_unsafe(p.stdout, noop))
 
 
 def sort_bed_numerically(df: pd.DataFrame, n: int) -> pd.DataFrame:

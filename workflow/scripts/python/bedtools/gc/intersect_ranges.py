@@ -1,12 +1,17 @@
 from pathlib import Path
 from typing import Any, NamedTuple, Callable
-import subprocess as sp
 import common.config as cfg
 from common.functional import DesignError
+from common.bed import (
+    complementBed,
+    subtractBed,
+    intersectBed,
+    bgzip_file,
+    multiIntersectBed,
+    mergeBed,
+    gunzip,
+)
 import json
-
-# use subprocess here because I don't see an easy way to stream a bedtools
-# python object to a bgzip file (it only seems to do gzip...oh well)
 
 
 class GCInput(NamedTuple):
@@ -18,6 +23,7 @@ class GCInput(NamedTuple):
 def write_simple_range_beds(
     final_path: Callable[[str], Path],
     gs: list[GCInput],
+    genome: Path,
     is_low: bool,
 ) -> list[str]:
     def fmt_out(bigger_frac: int, smaller_frac: int) -> Path:
@@ -32,15 +38,9 @@ def write_simple_range_beds(
         for bigger, smaller in pairs
     ]
     for out, bigger, smaller in torun:
-        with open(out, "wb") as f:
-            p0 = sp.Popen(
-                ["subtractBed", "-a", bigger.bed, "-b", smaller.bed, "-sorted"],
-                stdout=sp.PIPE,
-            )
-            p1 = sp.run(["bgzip", "-c"], stdin=p0.stdout, stdout=f)
-            p0.wait()
-            if not (p0.returncode == p1.returncode == 0):
-                exit(1)
+        _, o1 = gunzip(bigger.bed)
+        _, o2 = subtractBed(o1, smaller.bed, genome)
+        bgzip_file(o2, out)
     return [str(t[0]) for t in torun]
 
 
@@ -52,27 +52,11 @@ def write_middle_range_bed(
     gapless: Path,
 ) -> str:
     out = final_path(f"gc{lower.fraction}to{upper.fraction}_slop50")
-    with open(out, "wb") as f:
-        p0 = sp.Popen(
-            ["complementBed", "-i", upper.bed, "-g", genome],
-            stdout=sp.PIPE,
-        )
-        p1 = sp.Popen(
-            ["subtractBed", "-a", "stdin", "-b", lower.bed, "-sorted"],
-            stdin=p0.stdout,
-            stdout=sp.PIPE,
-        )
-        p2 = sp.Popen(
-            ["intersectBed", "-a", "stdin", "-b", gapless, "-sorted", "-g", genome],
-            stdin=p1.stdout,
-            stdout=sp.PIPE,
-        )
-        p3 = sp.run(["bgzip", "-c"], stdin=p2.stdout, stdout=f)
-        p0.wait()
-        p1.wait()
-        p2.wait()
-        if not (p0.returncode == p1.returncode == p2.returncode == p3.returncode == 0):
-            exit(1)
+    with open(upper.bed, "rb") as i:
+        _, o0 = complementBed(i, genome)
+        _, o1 = subtractBed(o0, lower.bed, genome)
+        _, o2 = intersectBed(o1, gapless, genome)
+        bgzip_file(o2, out)
     return str(out)
 
 
@@ -90,22 +74,9 @@ def write_intersected_range_beds(
         for i, (b1, b2) in enumerate(pairs)
     ]
     for i, bed_out, b1, b2 in torun:
-        with open(bed_out, "wb") as f:
-            p0 = sp.Popen(
-                ["multiIntersectBed", "-i", b1.bed, b2.bed],
-                stdout=sp.PIPE,
-            )
-            p1 = sp.Popen(
-                ["mergeBed", "-i", "stdin"],
-                stdin=p0.stdout,
-                stdout=sp.PIPE,
-            )
-            p2 = sp.run(["bgzip", "-c"], stdin=p1.stdout, stdout=f)
-            p0.wait()
-            p1.wait()
-            if not (p0.returncode == p1.returncode == p2.returncode == 0):
-                exit(1)
-
+        _, o1 = multiIntersectBed([b1.bed, b2.bed])
+        _, o2 = mergeBed(o1, [])
+        bgzip_file(o2, bed_out)
     return [str(t[1]) for t in torun]
 
 
@@ -128,8 +99,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         p.parent.mkdir(exist_ok=True, parents=True)
         return p
 
-    low_strats = write_simple_range_beds(final_path, low, True)
-    high_strats = write_simple_range_beds(final_path, high, False)
+    low_strats = write_simple_range_beds(final_path, low, genome, True)
+    high_strats = write_simple_range_beds(final_path, high, genome, False)
     range_strat = write_middle_range_bed(
         final_path,
         low[-1],

@@ -5,7 +5,7 @@ from os.path import dirname, basename
 from os import scandir
 import common.config as cfg
 from common.io import setup_logging, is_bgzip
-from common.bed import InternalChrIndex
+from common.bed import InternalChrIndex, subtractBed, gunzip
 import subprocess as sp
 
 log = setup_logging(snakemake.log[0])  # type: ignore
@@ -16,6 +16,7 @@ RevMapper = dict[str, InternalChrIndex]
 class GaplessBT(NamedTuple):
     auto: Path
     parY: Path
+    genome: Path
 
 
 def test_bgzip(strat_file: Path) -> list[str]:
@@ -83,13 +84,10 @@ def test_bed_not_in_gaps(strat_file: Path, gapless: GaplessBT) -> bool:
         gapless_path = gapless.parY if isXY else gapless.auto
         # gunzip needed here because subtract bed will output gibberish if we
         # give it an empty gzip file
-        p0 = sp.Popen(["gunzip", "-c", strat_file], stdout=sp.PIPE)
-        p1 = sp.run(
-            ["subtractBed", "-a", "stdin", "-b", gapless_path, "-sorted"],
-            stdin=p0.stdout,
-            stdout=sp.PIPE,
-        )
-        return len(p1.stdout) == 0
+        _, o = gunzip(strat_file)
+        p, _ = subtractBed(o, gapless_path, gapless.genome)
+        out, _ = p.communicate()
+        return len(out) == 0
 
 
 def test_bed(
@@ -183,6 +181,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     gapless = GaplessBT(
         auto=Path(smk.input["gapless_auto"]),
         parY=Path(smk.input["gapless_parY"]),
+        genome=Path(smk.input["genome"]),
     )
 
     strat_failures = [

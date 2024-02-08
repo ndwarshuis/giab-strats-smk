@@ -47,10 +47,13 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         parY_out.symlink_to(auto_out.resolve())
     else:
         gap_inputs: list[Path] = inputs["gaps"]
+        rk = cfg.wc_to_reffinalkey(ws)
+        bk = cfg.wc_to_buildkey(ws)
 
+        bd = sconf.to_build_data(cfg.strip_full_refkey(rk), bk)
         gaps_df = sconf.with_build_data_and_bed_full(
-            cfg.wc_to_reffinalkey(ws),
-            cfg.wc_to_buildkey(ws),
+            rk,
+            bk,
             go,
             lambda bd, bf: match1_unsafe(
                 gap_inputs, lambda i: cfg.read_filter_sort_hap_bed(bd, bf, i)
@@ -88,14 +91,13 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         # gaps_bed = bt().from_dataframe(gaps)
         # gaps_with_parY = bt().from_dataframe(genome_bed).subtract(gaps_bed)
 
-        # If we have a parY bed, subtract parY from the gaps bed, otherwise
-        # just link them since we have nothing to subtract off
-        # TODO add logic to ignore parY when on maternal hap (not necessary but
-        # makes things cleaner)
-        if hasattr(inputs, "parY"):
+        # If we have a parY bed and chrY is included, subtract parY from the
+        # gaps bed, otherwise just link them since we have nothing to subtract
+        # off
+        if hasattr(inputs, "parY") and bd.want_xy_y:
             parY_src = Path(inputs["parY"])
             with bed_to_stream(gaps_with_parY) as s:
-                _, o = subtractBed(s, parY_src)
+                _, o = subtractBed(s, parY_src, genome_path)
                 gaps_no_parY = read_bed_default(o)
             write_bed(parY_out, gaps_with_parY)
             write_bed(auto_out, gaps_no_parY)
