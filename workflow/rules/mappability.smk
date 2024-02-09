@@ -62,10 +62,26 @@ rule unpack_gem:
 # index/align
 
 
+def filter_mappability_ref_inputs(wildcards):
+    rk = wildcards["ref_final_key"]
+    rk_ = strip_full_refkey(rk) if config.refkey_is_split_dip1(rk) else rk
+    return {
+        "fa": expand(
+            rules.download_ref.output,
+            allow_missing=True,
+            ref_src_key=rk_,
+        ),
+        "idx": expand(
+            rules.index_full_ref.output,
+            allow_missing=True,
+            ref_final_key=rk_,
+        ),
+    }
+
+
 rule filter_mappability_ref:
     input:
-        fa=lambda w: expand_final_to_src(rules.download_ref.output[0], w)[0],
-        idx=rules.index_full_ref.output[0],
+        unpack(filter_mappability_ref_inputs),
     output:
         mlty.inter.postsort.data / "ref.fa",
     log:

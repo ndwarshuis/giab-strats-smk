@@ -14,8 +14,8 @@ from common.samtools import filter_sort_fasta
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
-    fa = Path(smk.input["fa"])
-    idx = Path(smk.input["idx"])
+    fa = Path(smk.input["fa"][0])
+    idx = Path(smk.input["idx"][0])
     log = Path(smk.log[0])
     out = Path(smk.output[0])
 

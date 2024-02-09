@@ -573,6 +573,17 @@ diploid1_stratifications:
           segdups: false
           functional: false
           mappability: []
+      test-map:
+        chr_filter: [21]
+        include:
+          low_complexity: false
+          xy: false
+          gc: null
+          functional: false
+          telomeres: false
+          hets: []
+          mappability:
+            - {length: 50, mismatches: 0, indels: 0}
 
 diploid2_stratifications:
   HG002:
@@ -609,6 +620,17 @@ diploid2_stratifications:
           segdups: false
           functional: false
           mappability: []
+      test-map:
+        chr_filter: [21]
+        include:
+          low_complexity: false
+          xy: false
+          gc: null
+          functional: false
+          telomeres: false
+          hets: []
+          mappability:
+            - {length: 50, mismatches: 0, indels: 0}
 
 comparison_strats:
   GRCh38_v33: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.3/genome-stratifications-GRCh38@all.tar.gz
