@@ -14,10 +14,11 @@ dip = config.to_bed_dirs(CoreLevel.DIPLOID)
 def minimap_inputs(wildcards):
     rk = wildcards["ref_final_key"]
     other_rk = flip_full_refkey(rk)
-    isdip1 = config.refkey_is_split_dip1_or_dip2(rk)
-    dip1 = (rules.split_ref.output, rules.index_split_ref.output)
-    dip2 = (rules.unzip_ref.output, rules.index_unzipped_ref.output)
-    fa, idx = dip1 if isdip1 else dip2
+    isdip1 = config.refkey_is_split_dip1_nohap(rk)
+    attr = "filter_sort_split_ref" if isdip1 else "filter_sort_ref"
+    out = getattr(rules, attr).output
+    fa = out["fa"]
+    idx = out["index"]
 
     def expand_rk(path, rk):
         return expand(path, allow_missing=True, ref_final_key=rk)
@@ -87,14 +88,22 @@ rule breaks_cross_alignment_to_bed:
 # We could also presort (rather than sort twice) but this would require lots of
 # space to store the paf rather than a relatively small bed file (ie no sequence
 # strings)
+#
+# TODO misleading name since this also complements after sorting
 rule sort_breaks_bed:
     input:
         bed=rules.cross_align_breaks.output,
-        genome=lambda w: split_dip1_or_dip2("get_split_genome", "get_genome", w),
+        genome=lambda w: (
+            rules.filter_sort_split_ref.output["genome"]
+            if config.refkey_is_split_dip1_nohap(w["ref_final_key"])
+            else rules.filter_sort_ref.output["genome"]
+        ),
     output:
         dip.inter.postsort.data / "sorted_breaks_cross_align.bed.gz",
+    log:
+        dip.inter.postsort.log / "sort_breaks_bed.txt",
     conda:
-        "../envs/quasi-dipcall.yml"
+        "../envs/bedtools.yml"
     script:
         "../scripts/python/bedtools/diploid/sort_breaks.py"
 
@@ -163,10 +172,10 @@ rule variant_cross_alignment_to_bed:
     input:
         bam=rules.filter_sort_variant_cross_alignment.output,
         hap=lambda w: (
-            rules.split_ref.output
-            if config.refkey_is_split_dip1_or_dip2(w["ref_final_key"])
-            else rules.unzip_ref.output
-        ),
+            rules.filter_sort_split_ref.output
+            if config.refkey_is_split_dip1_nohap(w["ref_final_key"])
+            else rules.filter_sort_ref.output
+        )["fa"],
     output:
         dip.inter.postsort.data / "variant_cross_align.bed.gz",
     conda:
@@ -257,12 +266,13 @@ rule merge_het_regions:
         "../envs/bedtools.yml"
     params:
         gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
     wildcard_constraints:
         merge_len=f"\d+",
     shell:
         """
         mergeBed -i {input} -d $(({wildcards.merge_len}*1000)) | \
-        intersectBed -a stdin -b {params.gapless} -sorted | \
+        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
         bgzip -c > {output}
         """
 
@@ -281,7 +291,7 @@ rule invert_het_regions:
         rules.merge_het_regions.output,
     params:
         gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     conda:
         "../envs/bedtools.yml"
     output:
@@ -291,7 +301,7 @@ rule invert_het_regions:
     shell:
         """
         complementBed -i {input} -g {params.genome} | \
-        intersectBed -a stdin -b {params.gapless} -sorted | \
+        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
         bgzip -c > {output}
         """
 

@@ -35,7 +35,7 @@ checkpoint normalize_superdups:
 rule merge_superdups:
     input:
         bed=lambda w: read_checkpoint("normalize_superdups", w),
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         segdup.final("segdups"),
@@ -67,7 +67,7 @@ rule filter_long_superdups:
 rule notin_superdups:
     input:
         bed=rules.merge_superdups.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         segdup.final("notinsegdups"),
@@ -84,7 +84,7 @@ rule notin_superdups:
 use rule notin_superdups as notin_long_superdups with:
     input:
         bed=rules.filter_long_superdups.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         segdup.final("notinsegdups_gt10kb"),

@@ -130,8 +130,10 @@ def bed_to_stream(df: pd.DataFrame) -> Generator[IO[bytes], None, None]:
     try:
         yield _r
     finally:
-        _w.close()
+        # close read end first so that we send SIGPIPE if the reader exits
+        # prematurely
         _r.close()
+        _w.close()
 
 
 def write_bed(path: Path, df: pd.DataFrame) -> None:

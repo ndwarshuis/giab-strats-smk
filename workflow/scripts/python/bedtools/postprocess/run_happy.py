@@ -34,7 +34,7 @@ def main(smk: Any) -> None:
                 cmd,
                 stderr=sp.STDOUT,
                 stdout=f,
-                env={"HGREF": smk.input["ref"][0], **os.environ},
+                env={"HGREF": smk.input["ref"], **os.environ},
             )
             if res.returncode != 0:
                 exit(1)

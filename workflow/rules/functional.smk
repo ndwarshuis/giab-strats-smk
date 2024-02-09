@@ -58,7 +58,7 @@ checkpoint normalize_cds:
 rule merge_functional:
     input:
         bed=lambda w: read_named_checkpoint("normalize_cds", "cds", w),
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         func.final("refseq_cds"),
@@ -75,7 +75,7 @@ rule merge_functional:
 rule invert_functional:
     input:
         bed=rules.merge_functional.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         func.final("notinrefseq_cds"),
@@ -84,7 +84,7 @@ rule invert_functional:
     shell:
         """
         complementBed -i {input.bed} -g {input.genome} | \
-        intersectBed -a stdin -b {input.gapless} -sorted | \
+        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
         bgzip -c > {output}
         """
 

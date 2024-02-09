@@ -4,21 +4,12 @@ from common.config import (
     bd_to_bench_vcf,
     bd_to_query_vcf,
     strip_full_refkey,
+    RefkeyConfiguration,
 )
-from bedtools.ref.helpers import filter_sort_ref_outputs
 
 ref = config.ref_dirs
 
-
-# lots of things depend on PAR which is why this isn't part of the XY module
-rule write_PAR_intermediate:
-    output:
-        ref.inter.build.data / "chr{sex_chr}_PAR.bed.gz",
-    conda:
-        "../envs/bedtools.yml"
-    localrule: True
-    script:
-        "../scripts/python/bedtools/xy/write_par.py"
+# reference
 
 
 rule download_ref:
@@ -37,7 +28,7 @@ rule download_ref:
 
 # note this is only needed for mappability where we need all chromosome names;
 # for anything else we can get an index for the filtered and sorted FASTA
-rule index_ref:
+rule index_full_ref:
     input:
         lambda w: expand_final_to_src(rules.download_ref.output, w),
     output:
@@ -48,36 +39,40 @@ rule index_ref:
         ref.inter.prebuild.log / "index_ref.log",
     shell:
         """
-        gunzip -c {input} | \
-        samtools faidx - -o - \
-        2> {log} > {output}
+        samtools faidx {input} -o - 2> {log} > {output}
         """
 
 
-rule get_genome:
-    input:
-        rules.index_ref.output,
-    output:
-        ref.inter.build.data / "genome.txt",
-    params:
-        allowed_refkeys="any",
-    conda:
-        "../envs/bedtools.yml"
-    log:
-        ref.inter.build.log / "get_genome.log",
-    script:
-        "../scripts/python/bedtools/ref/get_genome.py"
+# filtered/sorted reference + index + genome
+#
+# For each build, select the chromosomes we actually want and sort them in in
+# numerical order. If we do this here, nearly all downstream steps won't need to
+# be sorted, since they will query the reference in the order presented within.
+# Additionally, make and index and genome file corresponding to each of these
+# sorted/filtered references.
+#
+# Note that in the case of dip1 the reference can be split into two separate
+# haplotypes or not. When split, there are also instances where we want to
+# enforce diploid-only references (so either dip1 or dip2) and disallow hap
+# references. Encode these three possibilities here
 
 
-def _filter_sort_ref_outputs(refkeys, bgzip):
-    return filter_sort_ref_outputs(refkeys, bgzip, ref.inter.build.data)
+def filter_sort_ref_outputs(refkeys):
+    r = RefkeyConfiguration(refkeys)
+    fa = r.value + "_filtered_ref.fa"
+    prefix = ref.inter.build.data
+    return {
+        "fa": prefix / fa,
+        "index": prefix / (fa + ".fai"),
+        "genome": prefix / (r.value + "_genome.txt"),
+    }
 
 
 rule filter_sort_ref:
     input:
         lambda w: expand_final_to_src(rules.download_ref.output, w),
     output:
-        **_filter_sort_ref_outputs("standard", True),
+        **filter_sort_ref_outputs("standard"),
     conda:
         "../envs/utils.yml"
     log:
@@ -87,38 +82,37 @@ rule filter_sort_ref:
 
 
 use rule filter_sort_ref as filter_sort_split_ref with:
+    input:
+        lambda w: expand(
+            rules.download_ref.output,
+            allow_missing=True,
+            ref_src_key=(
+                strip_full_refkey(rk)
+                if config.refkey_is_split_dip1(rk := w["ref_final_key"])
+                else rk
+            ),
+        ),
     output:
-        **_filter_sort_ref_outputs("dip1_split", True),
+        **filter_sort_ref_outputs("dip1_split"),
     log:
         ref.inter.build.log / "filter_sort_split_ref.log",
 
 
 use rule filter_sort_ref as filter_sort_split_ref_nohap with:
+    input:
+        lambda w: expand(
+            rules.download_ref.output,
+            allow_missing=True,
+            ref_src_key=(
+                strip_full_refkey(rk)
+                if config.refkey_is_split_dip1_nohap(rk := w["ref_final_key"])
+                else rk
+            ),
+        ),
     output:
-        **_filter_sort_ref_outputs("dip1_split_nohap", True),
+        **filter_sort_ref_outputs("dip1_split_nohap"),
     log:
         ref.inter.build.log / "filter_sort_split_ref_nohap.log",
-
-
-use rule filter_sort_ref as filter_sort_ref_nozip with:
-    output:
-        **_filter_sort_ref_outputs("standard", False),
-    log:
-        ref.inter.build.log / "filter_sort_ref_nozip.log",
-
-
-use rule filter_sort_ref as filter_sort_split_ref_nozip with:
-    output:
-        **_filter_sort_ref_outputs("dip1_split", False),
-    log:
-        ref.inter.build.log / "filter_sort_split_ref_nozip.log",
-
-
-use rule filter_sort_ref as filter_sort_split_ref_nohap_nozip with:
-    output:
-        **_filter_sort_ref_outputs("dip1_split_nohap", False),
-    log:
-        ref.inter.build.log / "filter_sort_split_ref_nohap_nozip.log",
 
 
 use rule download_ref as download_gaps with:
@@ -159,10 +153,12 @@ def gapless_input(wildcards):
 rule get_gapless:
     input:
         unpack(gapless_input),
-        genome=rules.get_genome.output[0],
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         auto=ref.inter.build.data / "genome_gapless.bed.gz",
         parY=ref.inter.build.data / "genome_gapless_parY.bed.gz",
+    log:
+        ref.inter.build.log / "get_gapless.txt",
     conda:
         "../envs/bedtools.yml"
     script:
@@ -230,55 +226,15 @@ checkpoint normalize_bench_bed:
         "../scripts/python/bedtools/ref/normalize_bench_bed.py"
 
 
-# diploid-specific
+# misc
 
 
-# Split a single reference file into two haplotypes. Only valid for dip1
-# references; anything else will indicate an error by singing some lovely
-# emoprog
-
-
-rule split_ref:
-    input:
-        lambda w: expand(
-            rules.filter_sort_ref.output,
-            allow_missing=True,
-            ref_final_key=strip_full_refkey(w["ref_final_key"]),
-        ),
+# lots of things depend on PAR which is why this isn't part of the XY module
+rule write_PAR_intermediate:
     output:
-        ref.inter.build.data / "ref_split.fa.gz",
+        ref.inter.build.data / "chr{sex_chr}_PAR.bed.gz",
     conda:
         "../envs/bedtools.yml"
+    localrule: True
     script:
-        "../scripts/python/bedtools/ref/split_ref.py"
-
-
-use rule index_unzipped_ref as index_split_ref with:
-    input:
-        rules.split_ref.output,
-    output:
-        rules.split_ref.output[0] + ".fai",
-    log:
-        ref.inter.build.log / "index_ref.log",
-
-
-use rule get_genome as get_split_genome with:
-    input:
-        rules.split_ref.output,
-    output:
-        ref.inter.build.data / "split_genome.txt",
-    params:
-        allowed_refkeys="split",
-    log:
-        ref.inter.build.log / "get_split_genome.log",
-
-
-use rule get_genome as get_split_nohap_genome with:
-    input:
-        rules.split_ref.output,
-    output:
-        ref.inter.build.data / "split_genome.txt",
-    params:
-        allowed_refkeys="split_nohap",
-    log:
-        ref.inter.build.log / "get_split_nohap_genome.log",
+        "../scripts/python/bedtools/xy/write_par.py"

@@ -84,13 +84,14 @@ rule unit_test_strats:
         strats=rules.list_all_strats.output,
         gapless_auto=rules.get_gapless.output.auto,
         gapless_parY=rules.get_gapless.output.parY,
-        genome=rules.get_genome.output[0],
+        genome=rules.filter_sort_ref.output["genome"],
         strat_list=rules.generate_tsv_list.output[0],
         checksums=rules.generate_md5sums.output[0],
     output:
         touch(post_inter_dir / "unit_tests.done"),
     log:
-        post_log_dir / "unit_tests.log",
+        error=post_log_dir / "unit_tests_errors.log",
+        failed=post_log_dir / "failed_tests.log",
     benchmark:
         post_bench_dir / "unit_test_strats.txt"
     conda:
@@ -199,8 +200,7 @@ rule make_coverage_plots:
 rule run_happy:
     input:
         _test=rules.unit_test_strats.output,
-        refi=rules.index_unzipped_ref.output,
-        ref=rules.unzip_ref.output,
+        ref=rules.filter_sort_ref.output["fa"],
         bench_vcf=lambda w: expand_final_to_src(rules.download_bench_vcf.output, w),
         bench_bed=lambda w: read_checkpoint("normalize_bench_bed", w),
         query_vcf=lambda w: expand_final_to_src(rules.download_query_vcf.output, w),

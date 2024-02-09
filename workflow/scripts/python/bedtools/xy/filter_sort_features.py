@@ -1,20 +1,17 @@
 from pathlib import Path
 from typing import Any
 import common.config as cfg
-from common.bed import (
-    filter_sort_bed,
-    bed_to_stream,
-    intersectBed,
-    bgzip_file,
-)
+from common.bed import filter_sort_bed, bed_to_stream, intersectBed
+from common.io import bgzip_file, check_processes
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
     bed_input = Path(smk.input["bed"])
     gapless_input = Path(smk.input["gapless"])
-    genome_input = Path(smk.input["genome"][0])
-    bed_output = smk.output[0]
+    genome_input = Path(smk.input["genome"])
+    bed_output = Path(smk.output[0])
+    log = Path(smk.log[0])
 
     level = smk.params["level"]
     i = cfg.ChrIndex.from_name_unsafe(ws["sex_chr"])
@@ -34,8 +31,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     df_filtered = df_sorted[level_mask].drop(columns=[bf.level_col])
     # TODO put this in its own rule to simplify script?
     with bed_to_stream(df_filtered) as s:
-        _, o = intersectBed(s, gapless_input, genome_input)
+        p, o = intersectBed(s, gapless_input, genome_input)
         bgzip_file(o, bed_output)
+        check_processes([p], log)
 
 
 main(snakemake, snakemake.config)  # type: ignore

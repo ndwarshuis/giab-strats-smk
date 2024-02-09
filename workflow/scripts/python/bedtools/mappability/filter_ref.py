@@ -2,7 +2,7 @@ import re
 from typing import Any
 import common.config as cfg
 from pathlib import Path
-from common.samtools import filter_sort_fasta_nocompress
+from common.samtools import filter_sort_fasta
 
 # This is the one exception to the pattern wherein we filter all input data to
 # the chromosomes we actually care about. In the case of mappability, we want to
@@ -16,6 +16,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
     fa = Path(smk.input["fa"])
     idx = Path(smk.input["idx"])
+    log = Path(smk.log[0])
     out = Path(smk.output[0])
 
     # Parse the index file to get a list of all chromosomes in the FASTA
@@ -38,13 +39,15 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
         main_chrs = pat.to_names(bd.chr_indices)
         chrs = [c for c in all_chrs if c in main_chrs or any_map_pattern(c)]
-        filter_sort_fasta_nocompress(fa, out, chrs)
+        filter_sort_fasta(fa, out, log, chrs)
 
-    sconf.with_build_data_full(
+    sconf.with_build_data_split_full(
         cfg.wc_to_reffinalkey(ws),
         cfg.wc_to_buildkey(ws),
         lambda bd: run_samtools(bd, bd.refdata.ref.chr_pattern),
-        lambda bd: run_samtools(bd, bd.refdata.ref.chr_pattern),
+        lambda hap, bd: run_samtools(
+            bd, bd.refdata.ref.chr_pattern.to_hap_pattern(hap)
+        ),
         lambda hap, bd: run_samtools(bd, bd.refdata.ref.chr_pattern.from_either(hap)),
     )
 

@@ -21,7 +21,7 @@ rule write_PAR_final:
     input:
         bed=rules.write_PAR_intermediate.output,
         gapless=rules.get_gapless.output.parY,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         xy.final("chr{sex_chr}_PAR"),
     conda:
@@ -39,9 +39,11 @@ rule filter_XTR_features:
             rules.download_genome_features_bed.output, w
         )[0],
         gapless=rules.get_gapless.output.parY,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         xy.final("chr{sex_chr}_XTR"),
+    log:
+        xy.inter.postsort.log / "{sex_chr}_filter_XTR_features.txt",
     conda:
         "../envs/bedtools.yml"
     params:
@@ -53,6 +55,8 @@ rule filter_XTR_features:
 use rule filter_XTR_features as filter_ampliconic_features with:
     output:
         xy.final("chr{sex_chr}_ampliconic"),
+    log:
+        xy.inter.postsort.log / "{sex_chr}_filter_ampliconic_features.txt",
     params:
         level="Ampliconic",
 
@@ -69,7 +73,7 @@ use rule filter_XTR_features as filter_ampliconic_features with:
 rule invert_PAR:
     input:
         bed=rules.write_PAR_final.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.parY,
     output:
         xy.final("chr{sex_chr}_nonPAR"),
@@ -86,18 +90,15 @@ rule invert_PAR:
 
 rule filter_autosomes:
     input:
-        bed=rules.get_genome.output,
-        gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
+        rules.get_gapless.output.auto,
     output:
         xy.final("AllAutosomes"),
     conda:
         "../envs/bedtools.yml"
     shell:
         """
-        awk -v OFS='\t' {{'print $1,\"0\",$2'}} {input.bed} | \
+        gunzip -c {input} | \
         grep -v \"X\|Y\" | \
-        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
         bgzip -c > {output}
         """
 

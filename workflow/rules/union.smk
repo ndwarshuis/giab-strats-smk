@@ -28,7 +28,7 @@ rule invert_segdup_and_map:
     conda:
         "../envs/bedtools.yml"
     params:
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     shell:
         """

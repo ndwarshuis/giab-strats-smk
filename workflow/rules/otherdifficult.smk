@@ -6,7 +6,7 @@ odiff = config.to_bed_dirs(CoreLevel.OTHER_DIFFICULT)
 rule get_gaps:
     input:
         gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         odiff.final("gaps_slop15kb"),
     conda:
@@ -24,7 +24,7 @@ rule get_gaps:
 rule remove_vdj_gaps:
     input:
         bed=lambda w: read_named_checkpoint("normalize_cds", "vdj", w),
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         odiff.final("VDJ"),

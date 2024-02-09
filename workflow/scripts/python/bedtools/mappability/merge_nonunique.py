@@ -3,6 +3,7 @@ import pandas as pd
 from typing import Any, IO
 from pathlib import Path
 import common.config as cfg
+import subprocess as sp
 from common.bed import (
     read_bed,
     filter_sort_bed,
@@ -11,8 +12,8 @@ from common.bed import (
     intersectBed,
     complementBed,
     multiIntersectBed,
-    bgzip_file,
 )
+from common.io import bgzip_file, check_processes
 import json
 
 
@@ -25,8 +26,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     )
 
     inputs = smk.input["bed"]
-    genome = Path(smk.input["genome"][0])
+    genome = Path(smk.input["genome"])
     gapless = Path(smk.input["gapless"])
+    log = Path(smk.log[0])
 
     def final_path(name: str) -> Path:
         p = Path(str(smk.params.path_pattern).format(name))
@@ -46,16 +48,18 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             im, fm, read_bed(p, {0: str, 1: int, 2: int}, 0, "\t", [])
         )
 
-    def merge_bed(bed: IO[bytes], out: Path) -> None:
-        _, o1 = mergeBed(bed, ["-d", "100"])
-        _, o2 = intersectBed(o1, gapless, genome)
+    def merge_bed(bed: IO[bytes], out: Path) -> tuple[sp.Popen[bytes], sp.Popen[bytes]]:
+        p1, o1 = mergeBed(bed, ["-d", "100"])
+        p2, o2 = intersectBed(o1, gapless, genome)
         bgzip_file(o2, out)
+        return p1, p2
 
     def merge_single(i: Path, o: Path) -> None:
         bed = read_sort_bed(i)
         with bed_to_stream(bed) as s:
-            _, o1 = complementBed(s, genome)
-            merge_bed(o1, o)
+            p1, o1 = complementBed(s, genome)
+            p2, p3 = merge_bed(o1, o)
+            check_processes([p1, p2, p3], log)
 
     all_lowmap = final_path("lowmappabilityall")
     single_lowmap = []
@@ -72,8 +76,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             merge_single(i, o)
         # once all the single files are on disk, stream them together; this
         # allows us to avoid keeping multiple dataframes in memory at once
-        _, mi_out = multiIntersectBed(single_lowmap)
-        merge_bed(mi_out, all_lowmap)
+        p1, mi_out = multiIntersectBed(single_lowmap)
+        p2, p3 = merge_bed(mi_out, all_lowmap)
+        check_processes([p1, p2, p3], log)
 
     with open(smk.output[0], "w") as f:
         obj = {

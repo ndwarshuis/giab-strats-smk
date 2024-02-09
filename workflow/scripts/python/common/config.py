@@ -107,7 +107,7 @@ from pydantic.generics import GenericModel as GenericModel_
 from pydantic.generics import GenericModelT
 from pydantic import validator, HttpUrl, FilePath, NonNegativeInt, Field
 from dataclasses import dataclass
-from enum import Enum, unique
+from enum import unique, Enum
 from typing import (
     Union,
     NewType,
@@ -226,6 +226,10 @@ def choose_refkey_configuration(r: RefkeyConfiguration, a: X, b: X, c: X) -> X:
         return c
     else:
         assert_never(r)
+
+
+def sort_chr_indices(cs: set[ChrIndex]) -> list[ChrIndex]:
+    return [x for x, _ in sorted([(c, c.value) for c in cs], key=lambda x: x[1])]
 
 
 # type helpers
@@ -1172,7 +1176,7 @@ class HapChrPattern(BaseModel, ChrPattern):
     ) -> list[tuple[bed.InternalChrIndex, str]]:
         return [
             (c.to_internal_index(h), n)
-            for c in cs
+            for c in sort_chr_indices(cs)
             if (n := self.to_chr_name(c)) is not None
         ]
 
@@ -1236,10 +1240,14 @@ class DipChrPattern(BaseModel, ChrPattern):
             )
 
     def to_pairs(self, cs: set[ChrIndex]) -> list[tuple[bed.InternalChrIndex, str]]:
+        # order is really important here; we want to iterate through the first
+        # haplotype before the second so that the chromosome order is like
+        # chr1_mat, chr2_mat ... chr1_pat, chr2_pat rather than chr1_mat,
+        # chr1_pat ... etc
         return [
             (c.to_internal_index(h), n)
-            for c in cs
             for h in Haplotype
+            for c in sort_chr_indices(cs)
             if (n := self.to_chr_name(c, h)) is not None
         ]
 
@@ -3161,7 +3169,7 @@ class GiabStrats(BaseModel):
 
     # other nice functions
 
-    def refkey_is_dip1_or_dip2(self, rk: RefKeyFullS) -> bool:
+    def refkey_is_dip1_nohap(self, rk: RefKeyFullS) -> bool:
         """Test if refkey is dip1 or dip2.
 
         Return True if dip1, false if dip2, and error otherwise.
@@ -3181,7 +3189,7 @@ class GiabStrats(BaseModel):
             lambda _, __: False,
         )
 
-    def refkey_is_split_dip1_or_dip2(self, rk: RefKeyFullS) -> bool:
+    def refkey_is_split_dip1_nohap(self, rk: RefKeyFullS) -> bool:
         """Like 'refkey_is_dip1' but check if dip1 has a haplotype.
 
         dip1 is not supposed to have a haplotype normally, but will if we split
@@ -3193,7 +3201,7 @@ class GiabStrats(BaseModel):
             lambda _, __: False,
         )
 
-    def refkey_is_dip1_or_dip2_hap(self, rk: RefKeyFullS) -> bool:
+    def refkey_is_dip1(self, rk: RefKeyFullS) -> bool:
         """Like 'refkey_is_dip1' but treat hap as if it were dip2."""
         return self.with_ref_data_full(
             rk,
@@ -3202,7 +3210,7 @@ class GiabStrats(BaseModel):
             lambda _, __: False,
         )
 
-    def refkey_is_split_dip1_or_dip2_hap(self, rk: RefKeyFullS) -> bool:
+    def refkey_is_split_dip1(self, rk: RefKeyFullS) -> bool:
         """Like 'refkey_is_split_dip1_hap' but treat hap as if it were dip2."""
         return self.with_ref_data_split_full(
             rk,

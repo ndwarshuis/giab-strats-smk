@@ -65,33 +65,20 @@ rule unpack_gem:
 rule filter_mappability_ref:
     input:
         fa=lambda w: expand_final_to_src(rules.download_ref.output[0], w)[0],
-        idx=rules.index_ref.output[0],
+        idx=rules.index_full_ref.output[0],
     output:
         mlty.inter.postsort.data / "ref.fa",
+    log:
+        mlty.inter.postsort.log / "filter_mappability_ref.txt",
     conda:
         "../envs/bedtools.yml"
     script:
         "../scripts/python/bedtools/mappability/filter_ref.py"
 
 
-use rule split_ref as split_mappability_ref with:
-    input:
-        lambda w: expand(
-            rules.filter_mappability_ref.output,
-            allow_missing=True,
-            ref_final_key=strip_full_refkey(w["ref_final_key"]),
-        ),
-    output:
-        mlty.inter.postsort.data / "ref_split.fa",
-
-
 rule gem_index:
     input:
-        fa=lambda w: split_dip1_or_dip2_hap(
-            "split_mappability_ref",
-            "filter_mappability_ref",
-            w,
-        ),
+        fa=rules.filter_mappability_ref.output,
         bin=rules.unpack_gem.output.indexer,
     output:
         mlty.inter.postsort.data / "index.gem",
@@ -202,7 +189,7 @@ rule combine_dip1_nonunique_beds:
     input:
         unpack(lambda w: combine_dip_inputs("wig_to_bed", w)),
     output:
-        mlty.inter.postsort.data / "unique_l{l}_m{m}_e{e}.bed.gz",
+        mlty.inter.postsort.data / "combined_unique_l{l}_m{m}_e{e}.bed.gz",
     shell:
         """
         cat {input.hap1} {input.hap2} > {output}
@@ -218,7 +205,8 @@ def merge_nonunique_inputs(wildcards):
     rk = strip_full_refkey(rkf)
     bk = wildcards["build_key"]
     l, m, e = config.to_build_data(rk, bk).mappability_params
-    p = dip1_or_dip2_hap("combine_dip1_nonunique_beds", "wig_to_bed", rkf)
+    attr = "combine_dip1_nonunique_beds" if config.refkey_is_dip1(rkf) else "wig_to_bed"
+    p = getattr(rules, attr).output
     return expand(p, zip, allow_missing=True, l=l, m=m, e=e)
 
 
@@ -226,9 +214,11 @@ checkpoint merge_nonunique:
     input:
         bed=merge_nonunique_inputs,
         gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         mlty.inter.postsort.data / "nonunique_output.json",
+    log:
+        mlty.inter.postsort.log / "nonunique_output.txt",
     params:
         path_pattern=lambda w: expand(
             mlty.final("{{}}"),
@@ -263,7 +253,7 @@ rule invert_merged_nonunique:
     conda:
         "../envs/bedtools.yml"
     params:
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     shell:
         """

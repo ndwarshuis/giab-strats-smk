@@ -53,7 +53,7 @@ def spawn_stream(
     cmd: list[str],
     i: IO[bytes] | int,
 ) -> tuple[sp.Popen[bytes], IO[bytes]]:
-    p = sp.Popen(cmd, stdin=i, stdout=sp.PIPE)
+    p = sp.Popen(cmd, stdin=i, stdout=sp.PIPE, stderr=sp.PIPE)
     # ASSUME since we typed the inputs so that the stdin/stdout can only take
     # file descriptors or file streams, the return for each will never be
     # none
@@ -82,3 +82,24 @@ def gunzip(i: Path) -> tuple[sp.Popen[bytes], IO[bytes]]:
     """
     p = sp.Popen(["gunzip", "-c", i], stdout=sp.PIPE)
     return (p, not_none_unsafe(p.stdout, noop))
+
+
+def check_processes(ps: list[sp.Popen[bytes]], log: Path) -> None:
+    some_error = False
+    with open(log, "w") as lf:
+        for p in ps:
+            _, err = p.communicate()  # break deadlocks if there are any
+            if p.returncode != 0:
+                some_error = True
+
+                args = p.args
+                if isinstance(args, list):
+                    cmd = " ".join(args)
+                elif isinstance(args, bytes):
+                    cmd = args.decode()
+                else:
+                    cmd = str(args)
+                lf.write(f"{cmd}: {err.decode()}\n")
+
+    if some_error:
+        exit(1)

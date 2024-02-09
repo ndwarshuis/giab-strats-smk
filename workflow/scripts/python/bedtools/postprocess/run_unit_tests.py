@@ -4,11 +4,9 @@ from pathlib import Path
 from os.path import dirname, basename
 from os import scandir
 import common.config as cfg
-from common.io import setup_logging, is_bgzip
-from common.bed import InternalChrIndex, subtractBed, gunzip
+from common.io import is_bgzip, gunzip
+from common.bed import InternalChrIndex, subtractBed
 import subprocess as sp
-
-log = setup_logging(snakemake.log[0])  # type: ignore
 
 RevMapper = dict[str, InternalChrIndex]
 
@@ -17,6 +15,7 @@ class GaplessBT(NamedTuple):
     auto: Path
     parY: Path
     genome: Path
+    error_log: Path
 
 
 def test_bgzip(strat_file: Path) -> list[str]:
@@ -84,9 +83,20 @@ def test_bed_not_in_gaps(strat_file: Path, gapless: GaplessBT) -> bool:
         gapless_path = gapless.parY if isXY else gapless.auto
         # gunzip needed here because subtract bed will output gibberish if we
         # give it an empty gzip file
-        _, o = gunzip(strat_file)
-        p, _ = subtractBed(o, gapless_path, gapless.genome)
-        out, _ = p.communicate()
+        p1, o = gunzip(strat_file)
+        p2, _ = subtractBed(o, gapless_path, gapless.genome)
+        out, err = p2.communicate()
+        p1.wait()
+        with open(gapless.error_log, "a") as f:
+            haserror = False
+            if p1.returncode != 0:
+                f.write("gunzip error\n")
+                haserror = True
+            if p2.returncode != 0:
+                f.write(err.decode() + "\n")
+                haserror = True
+            if haserror:
+                exit(1)
         return len(out) == 0
 
 
@@ -164,14 +174,17 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     )[1]
     reverse_map = {v: k for k, v in fm.items()}
 
+    failed_tests = Path(smk.log["failed"])
+
     # check global stuff first (since this is faster)
 
     global_failures: list[str] = test_checksums(
         Path(smk.input["checksums"])
     ) + test_tsv_list(Path(smk.input["strat_list"]))
 
-    for j in global_failures:
-        log.error(j)
+    with open(failed_tests, "w") as f:
+        for j in global_failures:
+            f.write(j + "\n")
 
     if len(global_failures) > 0:
         exit(1)
@@ -182,6 +195,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         auto=Path(smk.input["gapless_auto"]),
         parY=Path(smk.input["gapless_parY"]),
         genome=Path(smk.input["genome"]),
+        error_log=Path(smk.log["error"]),
     )
 
     strat_failures = [
@@ -190,8 +204,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         for res in run_all_tests(p, reverse_map, gapless)
     ]
 
-    for i in strat_failures:
-        log.error("%s: %s" % i)
+    with open(failed_tests, "a") as f:
+        for i in strat_failures:
+            f.write("%s: %s" % i + "\n")
 
     if len(strat_failures) > 0:
         exit(1)

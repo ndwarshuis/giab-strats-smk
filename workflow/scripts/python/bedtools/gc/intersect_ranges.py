@@ -2,14 +2,13 @@ from pathlib import Path
 from typing import Any, NamedTuple, Callable
 import common.config as cfg
 from common.functional import DesignError
+from common.io import bgzip_file, gunzip, check_processes
 from common.bed import (
     complementBed,
     subtractBed,
     intersectBed,
-    bgzip_file,
     multiIntersectBed,
     mergeBed,
-    gunzip,
 )
 import json
 
@@ -25,6 +24,7 @@ def write_simple_range_beds(
     gs: list[GCInput],
     genome: Path,
     is_low: bool,
+    log: Path,
 ) -> list[str]:
     def fmt_out(bigger_frac: int, smaller_frac: int) -> Path:
         lower_frac, upper_frac = (
@@ -38,9 +38,10 @@ def write_simple_range_beds(
         for bigger, smaller in pairs
     ]
     for out, bigger, smaller in torun:
-        _, o1 = gunzip(bigger.bed)
-        _, o2 = subtractBed(o1, smaller.bed, genome)
+        p1, o1 = gunzip(bigger.bed)
+        p2, o2 = subtractBed(o1, smaller.bed, genome)
         bgzip_file(o2, out)
+        check_processes([p1, p2], log)
     return [str(t[0]) for t in torun]
 
 
@@ -50,13 +51,15 @@ def write_middle_range_bed(
     upper: GCInput,
     genome: Path,
     gapless: Path,
+    log: Path,
 ) -> str:
     out = final_path(f"gc{lower.fraction}to{upper.fraction}_slop50")
     with open(upper.bed, "rb") as i:
-        _, o0 = complementBed(i, genome)
-        _, o1 = subtractBed(o0, lower.bed, genome)
-        _, o2 = intersectBed(o1, gapless, genome)
+        p1, o0 = complementBed(i, genome)
+        p2, o1 = subtractBed(o0, lower.bed, genome)
+        p3, o2 = intersectBed(o1, gapless, genome)
         bgzip_file(o2, out)
+        check_processes([p1, p2, p3], log)
     return str(out)
 
 
@@ -64,6 +67,7 @@ def write_intersected_range_beds(
     final_path: Callable[[str], Path],
     low: list[GCInput],
     high: list[GCInput],
+    log: Path,
 ) -> list[str]:
     pairs = zip(
         [x for x in low if x.is_range_bound],
@@ -74,9 +78,10 @@ def write_intersected_range_beds(
         for i, (b1, b2) in enumerate(pairs)
     ]
     for i, bed_out, b1, b2 in torun:
-        _, o1 = multiIntersectBed([b1.bed, b2.bed])
-        _, o2 = mergeBed(o1, [])
+        p1, o1 = multiIntersectBed([b1.bed, b2.bed])
+        p2, o2 = mergeBed(o1, [])
         bgzip_file(o2, bed_out)
+        check_processes([p1, p2], log)
     return [str(t[1]) for t in torun]
 
 
@@ -93,25 +98,28 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     high = [GCInput(p, f, r) for p, (f, r) in zip(smk.input.high, gps.high)]
     genome = Path(smk.input.genome)
     gapless = Path(smk.input.gapless)
+    log = Path(smk.log[0])
 
     def final_path(name: str) -> Path:
         p = Path(str(smk.params.path_pattern).format(name))
         p.parent.mkdir(exist_ok=True, parents=True)
         return p
 
-    low_strats = write_simple_range_beds(final_path, low, genome, True)
-    high_strats = write_simple_range_beds(final_path, high, genome, False)
+    low_strats = write_simple_range_beds(final_path, low, genome, True, log)
+    high_strats = write_simple_range_beds(final_path, high, genome, False, log)
     range_strat = write_middle_range_bed(
         final_path,
         low[-1],
         high[0],
         genome,
         gapless,
+        log,
     )
     inter_strats = write_intersected_range_beds(
         final_path,
         low,
         high,
+        log,
     )
 
     with open(smk.output[0], "w") as f:

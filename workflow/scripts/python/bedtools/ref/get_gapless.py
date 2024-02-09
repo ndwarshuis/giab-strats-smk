@@ -9,6 +9,7 @@ from common.bed import (
     mergeBed,
     subtractBed,
 )
+from common.io import check_processes
 from common.functional import match1_unsafe, match2_unsafe
 import pandas as pd
 
@@ -28,6 +29,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     inputs = smk.input
     auto_out = Path(smk.output["auto"])
     parY_out = Path(smk.output["parY"])
+    log = Path(smk.log[0])
     ws: dict[str, Any] = smk.wildcards
 
     def go(
@@ -80,16 +82,12 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         )
 
         with bed_to_stream(gaps_df) as s:
-            _, o = mergeBed(s, ["-d", "100"])
+            p1, o = mergeBed(s, ["-d", "100"])
             gaps_bed = read_bed_default(o)
 
         with bed_to_stream(gaps_bed) as s:
-            _, o = complementBed(s, genome_path)
+            p2, o = complementBed(s, genome_path)
             gaps_with_parY = read_bed_default(o)
-
-        # gaps: pd.DataFrame = bt.from_dataframe(gaps_df).merge(d=100).to_dataframe()
-        # gaps_bed = bt().from_dataframe(gaps)
-        # gaps_with_parY = bt().from_dataframe(genome_bed).subtract(gaps_bed)
 
         # If we have a parY bed and chrY is included, subtract parY from the
         # gaps bed, otherwise just link them since we have nothing to subtract
@@ -97,12 +95,15 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         if hasattr(inputs, "parY") and bd.want_xy_y:
             parY_src = Path(inputs["parY"])
             with bed_to_stream(gaps_with_parY) as s:
-                _, o = subtractBed(s, parY_src, genome_path)
+                p3, o = subtractBed(s, parY_src, genome_path)
                 gaps_no_parY = read_bed_default(o)
+            check_processes([p1, p2, p3], log)
+
             write_bed(parY_out, gaps_with_parY)
             write_bed(auto_out, gaps_no_parY)
-
         else:
+            check_processes([p1, p2], log)
+
             write_bed(auto_out, gaps_bed)
             parY_out.symlink_to(auto_out.resolve())
 

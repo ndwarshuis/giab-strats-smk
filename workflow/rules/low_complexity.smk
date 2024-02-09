@@ -48,7 +48,7 @@ rule find_perfect_uniform_repeats:
         "../envs/bedtools.yml"
     shell:
         """
-        gunzip -c {input.ref} | \
+        cat {input.ref} | \
         sed 's/^[A-Za-z]\\+$/\\U&/' | \
         {input.bin} {wildcards.unit_len} {wildcards.total_len} - 2> {log} \
         > {output} 
@@ -178,7 +178,7 @@ rule slop_uniform_repeats:
         unit_name=unit_name_constraint,
         total_len="\d+",
     params:
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     shell:
         """
@@ -275,14 +275,14 @@ rule merge_imperfect_uniform_repeats:
     wildcard_constraints:
         merged_len="\d+",
     params:
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     shell:
         """
         multiIntersectBed -i {input} | \
         slopBed -i stdin -b 5 -g {params.genome} | \
         mergeBed -i stdin | \
-        intersectBed -a stdin -b {params.gapless} -sorted | \
+        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
         bgzip -c > {output}
         """
 
@@ -521,11 +521,13 @@ checkpoint normalize_censat:
 # bed file but add slop of their own, so this avoids adding slop twice
 rule merge_satellites_intermediate:
     input:
-        lambda w: read_checkpoint("normalize_censat", w)
-        if config.to_build_data(
-            strip_full_refkey(w.ref_final_key), w.build_key
-        ).refdata.has_low_complexity_censat
-        else all_rmsk_classes["Satellite"],
+        lambda w: (
+            read_checkpoint("normalize_censat", w)
+            if config.to_build_data(
+                strip_full_refkey(w.ref_final_key), w.build_key
+            ).refdata.has_low_complexity_censat
+            else all_rmsk_classes["Satellite"]
+        ),
     output:
         lc.inter.postsort.data / "merged_satellites.bed.gz",
     conda:
@@ -537,7 +539,7 @@ rule merge_satellites_intermediate:
 rule merge_satellites:
     input:
         bed=rules.merge_satellites_intermediate.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         lc.final("satellites_slop5"),
@@ -552,6 +554,7 @@ rule merge_satellites:
         """
 
 
+# TODO not DRY (we "invert" things all the time with this exact same rule)
 rule invert_satellites:
     input:
         bed=rules.merge_satellites.output,
@@ -563,11 +566,11 @@ rule invert_satellites:
     # when they never change
     params:
         gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     shell:
         """
         complementBed -i {input.bed} -g {params.genome} |
-        intersectBed -a stdin -b {params.gapless} -sorted | \
+        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
         bgzip -c > {output}
         """
 
@@ -580,7 +583,7 @@ rule merge_all_uniform_repeats:
     input:
         imperfect=rules.all_uniform_repeats.input.imperfect_ge11,
         perfect=rules.all_perfect_uniform_repeats.input.R1_T7,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         lc.final("AllHomopolymers_ge7bp_imperfectge11bp_slop5"),
@@ -614,7 +617,7 @@ rule merge_repeats:
         + rules.all_perfect_uniform_repeats.input.R3_T14
         + rules.all_perfect_uniform_repeats.input.R4_T19
         + rules.merge_satellites_intermediate.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         lc.inter.postsort.data / "AllTandemRepeats_intermediate.bed",
     conda:
@@ -641,7 +644,7 @@ rule filter_TRs:
     input:
         tr=rules.merge_repeats.output,
         hp=rules.merge_all_uniform_repeats.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         lc.final("AllTandemRepeats_{tr_bound}bp_slop5"),

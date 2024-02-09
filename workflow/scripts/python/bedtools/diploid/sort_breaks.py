@@ -3,11 +3,11 @@ from typing import Any
 import common.config as cfg
 from common.bed import (
     complementBed,
-    bgzip_file,
     read_bed_default,
     filter_sort_bed,
     bed_to_stream,
 )
+from common.io import bgzip_file, check_processes
 
 # a general bed-sorting script which will puke if the refkey is incorrect
 
@@ -16,7 +16,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
 
     bed_in = Path(smk.input["bed"][0])
-    genome_in = Path(smk.input["genome"][0])
+    log = Path(smk.log[0])
+    genome_in = Path(smk.input["genome"])
 
     m = sconf.with_build_data_split_full_nohap(
         cfg.wc_to_reffinalkey(ws),
@@ -31,8 +32,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     df = read_bed_default(bed_in)
     with bed_to_stream(filter_sort_bed(im, fm, df)) as s:
-        _, o = complementBed(s, genome_in)
+        p1, o = complementBed(s, genome_in)
         bgzip_file(o, smk.output[0])
+        check_processes([p1], log)
 
 
 main(snakemake, snakemake.config)  # type: ignore

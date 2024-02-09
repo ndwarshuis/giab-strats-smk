@@ -1,7 +1,7 @@
 from typing import Any
 from pathlib import Path
 import subprocess as sp
-from common.samtools import filter_sort_fasta
+from common.samtools import chr_filter_sort_fasta
 import common.config as cfg
 from common.functional import DesignError
 
@@ -9,7 +9,7 @@ from common.functional import DesignError
 # we want, write it either uncompressed or compressed, then index the output
 # fasta and write a genome file
 
-Finished = tuple[bytes, bytes, int]
+Finished = sp.CompletedProcess[bytes]
 
 
 def parse_refkeys_config(p: Path) -> cfg.RefkeyConfiguration:
@@ -24,15 +24,13 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     fa = Path(smk.input[0])
 
-    fa_out = Path(smk.output["fasta"])
+    fa_out = Path(smk.output["fa"])
+    index_out = Path(smk.output["index"])
     genome_out = Path(smk.output["genome"])
-    # NOTE: index output path not needed directly
     log = Path(smk.log[0])
 
-    bgzip = fa_out.name.endswith(".gz")
-
     def go(cs: set[cfg.ChrIndex], pat: cfg.ChrPattern) -> Finished:
-        return filter_sort_fasta(fa, fa_out, cs, pat, bgzip)
+        return chr_filter_sort_fasta(fa, fa_out, log, cs, pat)
 
     def hap1(bd: cfg.HapBuildData) -> Finished:
         return go(bd.chr_indices, bd.refdata.ref.chr_pattern)
@@ -63,28 +61,21 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         dip1_split,
         dip1_split_nohap,
     )
-    _, err, rc = f(cfg.wc_to_reffinalkey(ws), cfg.wc_to_buildkey(ws))
 
-    # If something goes wrong, write it down and bail
-    with open(log, "wb") as lf:
-        lf.write(err)
+    proc_fa = f(cfg.wc_to_reffinalkey(ws), cfg.wc_to_buildkey(ws))
 
-    if rc != 0:
-        exit(1)
-
-    # Write the index
-    sp.run(["samtools", "faidx", str(fa_out)])
-
-    # Write the genome. Note that we need to do this separately since I don't
-    # know how to stream a .gzi file in a format that would make this easy. The
-    # genome file is simply the first two columns of the .fai (uncompressed)
-    # index.
-    with open(genome_out, "w") as g:
+    # Write the index and genome. The genome file is simply the first two
+    # columns of the .fai (uncompressed) index.
+    with open(index_out, "w") as i, open(genome_out, "w") as g:
         cmd = ["samtools", "faidx", str(fa_out), "-o", "-"]
-        p = sp.run(cmd, stdout=sp.PIPE, text=True)
-        for x in p.stdout.splitlines():
-            xs = x.split("\t")
-            g.write("\t".join([xs[0], "0", xs[1]]) + "\n")
+        proc_idx = sp.run(cmd, stdout=sp.PIPE, text=True)
+        for x in proc_idx.stdout.splitlines():
+            i.write(x + "\n")
+            g.write("\t".join(x.split("\t")[0:2]) + "\n")
+
+    # TODO log errors here if the index step fails
+    if proc_fa.returncode != 0 or proc_idx.returncode != 0:
+        exit(1)
 
 
 main(snakemake, snakemake.config)  # type: ignore

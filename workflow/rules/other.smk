@@ -78,7 +78,7 @@ rule remove_gaps_other:
             w,
             ["other_level_key", "other_strat_key"],
         ),
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         config.build_final_strat_path("{other_level_key}", "{other_strat_key}"),

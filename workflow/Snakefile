@@ -24,6 +24,20 @@ def expand_final_to_src(paths, wildcards):
     return expand(paths, allow_missing=True, ref_src_key=wildcards.ref_final_key)
 
 
+def expand_split_final_to_src(paths, wildcards):
+    """Turn a final ref key into a source refkey.
+
+    This is only used in rules that are based directly on the reference, in
+    which case this is trivial because the final and source refkeys are always
+    the same. This rule is necessary because we make a distinction at the
+    wildcard level b/t source and final.
+
+    """
+    rk = wildcards.ref_final_key
+    rk_ = rk
+    return expand(paths, allow_missing=True, ref_src_key=rk)
+
+
 def to_output_pattern(dirs, name, wildcards):
     """Create and output pattern for a normalization rule."""
     return expand(
@@ -94,20 +108,20 @@ def _either_rule(f, left, right, wildcards):
     return (getattr(rules, left) if t else getattr(rules, right)).output
 
 
+def dip1_or_dip2_nohap(left, right, wildcards):
+    return _either_rule(config.refkey_is_dip1_nohap, left, right, wildcards)
+
+
+def split_dip1_or_dip2_nohap(left, right, wildcards):
+    return _either_rule(config.refkey_is_split_nohap, left, right, wildcards)
+
+
 def dip1_or_dip2(left, right, wildcards):
-    return _either_rule(config.refkey_is_dip1_or_dip2, left, right, wildcards)
+    return _either_rule(config.refkey_is_dip1, left, right, wildcards)
 
 
 def split_dip1_or_dip2(left, right, wildcards):
-    return _either_rule(config.refkey_is_split_dip1_or_dip2, left, right, wildcards)
-
-
-def dip1_or_dip2_hap(left, right, wildcards):
-    return _either_rule(config.refkey_is_dip1_or_dip2_hap, left, right, wildcards)
-
-
-def split_dip1_or_dip2_hap(left, right, wildcards):
-    return _either_rule(config.refkey_is_split_dip1_or_dip2_hap, left, right, wildcards)
+    return _either_rule(config.refkey_is_split_dip1, left, right, wildcards)
 
 
 _alphanumdash = "[A-Za-z0-9-]+"
