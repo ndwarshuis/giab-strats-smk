@@ -5,6 +5,7 @@ from common.config import (
     bd_to_query_vcf,
     strip_full_refkey,
 )
+from bedtools.ref.helpers import filter_sort_ref_outputs
 
 ref = config.ref_dirs
 
@@ -34,6 +35,8 @@ rule download_ref:
         "../scripts/python/bedtools/misc/get_file.py"
 
 
+# note this is only needed for mappability where we need all chromosome names;
+# for anything else we can get an index for the filtered and sorted FASTA
 rule index_ref:
     input:
         lambda w: expand_final_to_src(rules.download_ref.output, w),
@@ -56,6 +59,8 @@ rule get_genome:
         rules.index_ref.output,
     output:
         ref.inter.build.data / "genome.txt",
+    params:
+        allowed_refkeys="any",
     conda:
         "../envs/bedtools.yml"
     log:
@@ -64,47 +69,56 @@ rule get_genome:
         "../scripts/python/bedtools/ref/get_genome.py"
 
 
+def _filter_sort_ref_outputs(refkeys, bgzip):
+    return filter_sort_ref_outputs(refkeys, bgzip, ref.inter.build.data)
+
+
 rule filter_sort_ref:
     input:
-        fa=lambda w: expand_final_to_src(rules.download_ref.output, w),
-        genome=rules.get_genome.output,
+        lambda w: expand_final_to_src(rules.download_ref.output, w),
     output:
-        ref.inter.build.data / "ref_filtered.fa.gz",
+        **_filter_sort_ref_outputs("standard", True),
     conda:
         "../envs/utils.yml"
     log:
         ref.inter.build.log / "filter_sort_ref.log",
-    shell:
-        """
-        samtools faidx {input.fa} $(cut -f1 {input.genome} | tr '\n' ' ') 2> {log} | \
-        bgzip -c > {output}
-        """
+    script:
+        "../scripts/python/bedtools/ref/filter_sort_ref.py"
 
 
-# needed for some downstream rules that can't consume a bgzip'ed ref (htsbox and
-# happy)
-rule unzip_ref:
-    input:
-        rules.filter_sort_ref.output,
+use rule filter_sort_ref as filter_sort_split_ref with:
     output:
-        ref.inter.build.data / "ref_filtered.fa",
-    shell:
-        """
-        gunzip -c {input} > {output}
-        """
+        **_filter_sort_ref_outputs("dip1_split", True),
+    log:
+        ref.inter.build.log / "filter_sort_split_ref.log",
 
 
-rule index_unzipped_ref:
-    input:
-        rules.unzip_ref.output,
+use rule filter_sort_ref as filter_sort_split_ref_nohap with:
     output:
-        rules.unzip_ref.output[0] + ".fai",
-    conda:
-        "../envs/bedtools.yml"
-    shell:
-        """
-        samtools faidx {input}
-        """
+        **_filter_sort_ref_outputs("dip1_split_nohap", True),
+    log:
+        ref.inter.build.log / "filter_sort_split_ref_nohap.log",
+
+
+use rule filter_sort_ref as filter_sort_ref_nozip with:
+    output:
+        **_filter_sort_ref_outputs("standard", False),
+    log:
+        ref.inter.build.log / "filter_sort_ref_nozip.log",
+
+
+use rule filter_sort_ref as filter_sort_split_ref_nozip with:
+    output:
+        **_filter_sort_ref_outputs("dip1_split", False),
+    log:
+        ref.inter.build.log / "filter_sort_split_ref_nozip.log",
+
+
+use rule filter_sort_ref as filter_sort_split_ref_nohap_nozip with:
+    output:
+        **_filter_sort_ref_outputs("dip1_split_nohap", False),
+    log:
+        ref.inter.build.log / "filter_sort_split_ref_nohap_nozip.log",
 
 
 use rule download_ref as download_gaps with:
@@ -248,11 +262,23 @@ use rule index_unzipped_ref as index_split_ref with:
         ref.inter.build.log / "index_ref.log",
 
 
-# TODO this will fail since the refkey for dip1 will have a hap appended to it
 use rule get_genome as get_split_genome with:
     input:
         rules.split_ref.output,
     output:
         ref.inter.build.data / "split_genome.txt",
+    params:
+        allowed_refkeys="split",
     log:
         ref.inter.build.log / "get_split_genome.log",
+
+
+use rule get_genome as get_split_nohap_genome with:
+    input:
+        rules.split_ref.output,
+    output:
+        ref.inter.build.data / "split_genome.txt",
+    params:
+        allowed_refkeys="split_nohap",
+    log:
+        ref.inter.build.log / "get_split_nohap_genome.log",

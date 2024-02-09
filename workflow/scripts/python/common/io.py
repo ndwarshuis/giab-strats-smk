@@ -1,7 +1,10 @@
 import hashlib
 from logging import Logger
+from typing import IO
 from pathlib import Path
 from Bio import bgzf  # type: ignore
+import subprocess as sp
+from common.functional import not_none_unsafe, noop
 import gzip
 
 
@@ -44,3 +47,38 @@ def is_bgzip(p: Path) -> bool:
             return True
         except ValueError:
             return False
+
+
+def spawn_stream(
+    cmd: list[str],
+    i: IO[bytes] | int,
+) -> tuple[sp.Popen[bytes], IO[bytes]]:
+    p = sp.Popen(cmd, stdin=i, stdout=sp.PIPE)
+    # ASSUME since we typed the inputs so that the stdin/stdout can only take
+    # file descriptors or file streams, the return for each will never be
+    # none
+    return p, not_none_unsafe(p.stdout, noop)
+
+
+def bgzip_file(i: IO[bytes], p: Path) -> sp.CompletedProcess[bytes]:
+    with open(p, "wb") as f:
+        return bgzip(i, f)
+
+
+def bgzip(i: IO[bytes], o: IO[bytes]) -> sp.CompletedProcess[bytes]:
+    """Stream bgzip to endpoint.
+
+    NOTE: this will block since this is almost always going to be the
+    final step in a pipeline.
+    """
+    return sp.run(["bgzip", "-c"], stdin=i, stdout=o)
+
+
+def gunzip(i: Path) -> tuple[sp.Popen[bytes], IO[bytes]]:
+    """Stream bgzip to endpoint.
+
+    NOTE: this will block since this is almost always going to be the
+    final step in a pipeline.
+    """
+    p = sp.Popen(["gunzip", "-c", i], stdout=sp.PIPE)
+    return (p, not_none_unsafe(p.stdout, noop))

@@ -217,6 +217,17 @@ def choose_xy_unsafe(c: "ChrIndex", x_res: X, y_res: X) -> X:
         raise DesignError(f"I am not an X or Y, I am a {c}")
 
 
+def choose_refkey_configuration(r: RefkeyConfiguration, a: X, b: X, c: X) -> X:
+    if r is RefkeyConfiguration.STANDARD:
+        return a
+    elif r is RefkeyConfiguration.DIP1_SPLIT:
+        return b
+    elif r is RefkeyConfiguration.DIP1_SPLIT_NOHAP:
+        return c
+    else:
+        assert_never(r)
+
+
 # type helpers
 
 
@@ -303,6 +314,27 @@ def with_build_data(
         return dip2_f(bd)
     else:
         assert_never(bd)
+
+
+# noop conversion getters
+
+
+def hap_noop_conversion(bd: HapBuildData) -> HapToHapChrConversion:
+    return bd.refdata.ref.noop_conversion(bd.chr_indices)
+
+
+def dip1_noop_conversion(bd: Dip1BuildData) -> DipToDipChrConversion:
+    return bd.refdata.ref.noop_conversion(bd.chr_indices)
+
+
+def dip1_split_noop_conversion(
+    h: Haplotype, bd: Dip1BuildData
+) -> HapToHapChrConversion:
+    return bd.refdata.ref.noop_conversion(bd.chr_indices).split(h)
+
+
+def dip2_noop_conversion(h: Haplotype, bd: Dip2BuildData) -> HapToHapChrConversion:
+    return h.from_either(*bd.refdata.ref.noop_conversion(bd.chr_indices))
 
 
 # functions for dealing with 'dict[RefKey, X' type things
@@ -864,6 +896,28 @@ class CoreLevel(Enum):
     # the gaps strat will go
     OTHER_DIFFICULT = "OtherDifficult"
     DIPLOID = "Diploid"
+
+
+@unique
+class RefkeyConfiguration(Enum):
+    """Identifier to track which refkeys are allowed in a given rule/script.
+
+    Standard: dip1 doesn't have haplotype appended
+    DIP1_SPLIT: dip1 have haplotype appended
+    DIP1_SPLIT_NOHAP: dip1 have haplotype appended and hap is not allowed at all
+
+    In all cases hap does not have a haplotype appended and dip2 does have a
+    haplotype appended.
+
+    This is useful for places in the pipeline where we must split the dip1
+    fasta/bed files in order to operate on them separately (het regions,
+    mappability)
+
+    """
+
+    STANDARD = "standard"
+    DIP1_SPLIT = "dip1_split"
+    DIP1_SPLIT_NOHAP = "dip1_split_nohap"
 
 
 # chromosome name conversions
@@ -2483,11 +2537,32 @@ class GiabStrats(BaseModel):
         m = self.with_build_data_full(
             rk,
             bk,
-            lambda bd: bd.refdata.ref.noop_conversion(bd.chr_indices),
-            lambda bd: bd.refdata.ref.noop_conversion(bd.chr_indices),
-            lambda hap, bd: hap.from_either(
-                *bd.refdata.ref.noop_conversion(bd.chr_indices)
-            ),
+            hap_noop_conversion,
+            dip1_noop_conversion,
+            dip2_noop_conversion,
+        )
+        return (m.init_mapper, m.final_mapper)
+
+    def buildkey_to_ref_mappers_split(
+        self, rk: RefKeyFullS, bk: BuildKey
+    ) -> tuple[bed.InitMapper, bed.FinalMapper]:
+        m = self.with_build_data_split_full(
+            rk,
+            bk,
+            hap_noop_conversion,
+            dip1_split_noop_conversion,
+            dip2_noop_conversion,
+        )
+        return (m.init_mapper, m.final_mapper)
+
+    def buildkey_to_ref_mappers_split_nohap(
+        self, rk: RefKeyFullS, bk: BuildKey
+    ) -> tuple[bed.InitMapper, bed.FinalMapper]:
+        m = self.with_build_data_split_full_nohap(
+            rk,
+            bk,
+            dip1_split_noop_conversion,
+            dip2_noop_conversion,
         )
         return (m.init_mapper, m.final_mapper)
 

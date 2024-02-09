@@ -7,6 +7,7 @@ import subprocess as sp
 from typing import Type, NewType, IO, Generator
 from pathlib import Path
 from common.functional import not_none_unsafe, noop
+from common.io import spawn_stream
 from Bio import bgzf  # type: ignore
 import csv
 
@@ -142,17 +143,6 @@ def write_bed(path: Path, df: pd.DataFrame) -> None:
         write_bed_stream(f, df)
 
 
-def spawn_stream(
-    cmd: list[str],
-    i: IO[bytes] | int,
-) -> tuple[sp.Popen[bytes], IO[bytes]]:
-    p = sp.Popen(cmd, stdin=i, stdout=sp.PIPE)
-    # ASSUME since we typed the inputs so that the stdin/stdout can only take
-    # file descriptors or file streams, the return for each will never be
-    # none
-    return p, not_none_unsafe(p.stdout, noop)
-
-
 def complementBed(
     i: IO[bytes] | int,
     genome: Path,
@@ -190,30 +180,6 @@ def multiIntersectBed(ps: list[Path]) -> tuple[sp.Popen[bytes], IO[bytes]]:
     cmd = ["multiIntersectBed", "-i", *[str(p) for p in ps]]
     p = sp.Popen(cmd, stdout=sp.PIPE)
     return p, not_none_unsafe(p.stdout, noop)
-
-
-def bgzip_file(i: IO[bytes], p: Path) -> sp.CompletedProcess[bytes]:
-    with open(p, "wb") as f:
-        return bgzip(i, f)
-
-
-def bgzip(i: IO[bytes], o: IO[bytes]) -> sp.CompletedProcess[bytes]:
-    """Stream bgzip to endpoint.
-
-    NOTE: this will block since this is almost always going to be the
-    final step in a pipeline.
-    """
-    return sp.run(["bgzip", "-c"], stdin=i, stdout=o)
-
-
-def gunzip(i: Path) -> tuple[sp.Popen[bytes], IO[bytes]]:
-    """Stream bgzip to endpoint.
-
-    NOTE: this will block since this is almost always going to be the
-    final step in a pipeline.
-    """
-    p = sp.Popen(["gunzip", "-c", i], stdout=sp.PIPE)
-    return (p, not_none_unsafe(p.stdout, noop))
 
 
 def sort_bed_numerically(df: pd.DataFrame, n: int) -> pd.DataFrame:
