@@ -40,11 +40,11 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     # convert genome to bed file (where each region is just the length of
     # one chromosome)
     genome_path = Path(inputs["genome"])
-    genome_bed = read_genome_bed(genome_path)
 
     # If we have gap input, make the gapless file, otherwise just symlink to the
     # genome bed file (which just means the entire genome is gapless)
     if not hasattr(inputs, "gaps"):
+        genome_bed = read_genome_bed(genome_path)
         write_bed(auto_out, genome_bed)
         parY_out.symlink_to(auto_out.resolve())
     else:
@@ -82,12 +82,12 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         )
 
         with bed_to_stream(gaps_df) as s:
-            p1, o = mergeBed(s, ["-d", "100"])
-            gaps_bed = read_bed_default(o)
+            p1, o1 = mergeBed(s, ["-d", "100"])
+            gaps_bed = read_bed_default(o1)
 
         with bed_to_stream(gaps_bed) as s:
-            p2, o = complementBed(s, genome_path)
-            gaps_with_parY = read_bed_default(o)
+            p2, o2 = complementBed(s, genome_path)
+            gaps_with_parY = read_bed_default(o2)
 
         # If we have a parY bed and chrY is included, subtract parY from the
         # gaps bed, otherwise just link them since we have nothing to subtract
@@ -95,8 +95,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         if hasattr(inputs, "parY") and bd.want_xy_y:
             parY_src = Path(inputs["parY"])
             with bed_to_stream(gaps_with_parY) as s:
-                p3, o = subtractBed(s, parY_src, genome_path)
-                gaps_no_parY = read_bed_default(o)
+                p3, o3 = subtractBed(s, parY_src, genome_path)
+                gaps_no_parY = read_bed_default(o3)
             check_processes([p1, p2, p3], log)
 
             write_bed(parY_out, gaps_with_parY)
@@ -104,7 +104,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         else:
             check_processes([p1, p2], log)
 
-            write_bed(auto_out, gaps_bed)
+            write_bed(auto_out, gaps_with_parY)
             parY_out.symlink_to(auto_out.resolve())
 
 
