@@ -4,6 +4,6 @@ channels:
 dependencies:
   - curl=7.83.1
   - libarchive=3.5.2
-  - samtools=1.14
+  - samtools=1.19.2
   - gzip=1.12
   - sed=4.8
