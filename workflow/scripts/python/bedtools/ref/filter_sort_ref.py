@@ -64,6 +64,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     proc_fa = f(cfg.wc_to_reffinalkey(ws), cfg.wc_to_buildkey(ws))
 
+    if proc_fa.returncode != 0:
+        exit(1)
+
     # Write the index and genome. The genome file is simply the first two
     # columns of the .fai (uncompressed) index.
     with open(index_out, "w") as i, open(genome_out, "w") as g:
@@ -74,7 +77,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             g.write("\t".join(x.split("\t")[0:2]) + "\n")
 
     # TODO log errors here if the index step fails
-    if proc_fa.returncode != 0 or proc_idx.returncode != 0:
+    if proc_idx.returncode != 0:
         exit(1)
 
 
