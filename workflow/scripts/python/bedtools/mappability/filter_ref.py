@@ -3,6 +3,7 @@ from typing import Any
 import common.config as cfg
 from pathlib import Path
 from common.samtools import filter_sort_fasta
+from common.bed import ChrName
 
 # This is the one exception to the pattern wherein we filter all input data to
 # the chromosomes we actually care about. In the case of mappability, we want to
@@ -29,7 +30,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         all_chrs = [x.split("\t")[0] for x in f]
 
     def run_samtools(
-        bd: cfg.BuildData_[cfg.RefSourceT, cfg.AnyBedT, cfg.AnyBedT_, cfg.AnySrcT],
+        bd: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyBedT_, cfg.AnySrcT],
         pat: cfg.ChrPattern,
     ) -> None:
         def any_map_pattern(c: str) -> bool:
@@ -37,8 +38,10 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
                 [re.match(p, c) is not None for p in bd.refdata.mappability_patterns]
             )
 
-        main_chrs = pat.to_names(bd.chr_indices)
-        chrs = [c for c in all_chrs if c in main_chrs or any_map_pattern(c)]
+        main_chrs = pat.to_names(bd.build_chrs)
+        chrs = cfg.OrderedHapChrNames(
+            [ChrName(c) for c in all_chrs if c in main_chrs or any_map_pattern(c)]
+        )
         filter_sort_fasta(fa, out, log, chrs)
 
     sconf.with_build_data_split_full(
@@ -48,7 +51,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         lambda hap, bd: run_samtools(
             bd, bd.refdata.ref.chr_pattern.to_hap_pattern(hap)
         ),
-        lambda hap, bd: run_samtools(bd, bd.refdata.ref.chr_pattern.from_either(hap)),
+        lambda hap, bd: run_samtools(bd, bd.refdata.ref.chr_pattern.choose(hap)),
     )
 
 

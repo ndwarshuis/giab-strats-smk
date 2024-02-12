@@ -11,6 +11,9 @@ from common.io import spawn_stream
 from Bio import bgzf  # type: ignore
 import csv
 
+# A complete chromosome name like "chr1" or "chr21_PATERNAL"
+ChrName = NewType("ChrName", str)
+
 # An integer representing the order of a chromosome during the filter/sort
 # steps described below. Ranged 0-41 (all chromosomes for both haplotypes)
 InternalChrIndex = NewType("InternalChrIndex", int)
@@ -18,11 +21,11 @@ InternalChrIndex = NewType("InternalChrIndex", int)
 # A mapping b/t chromosome names found in a bed-like file or fasta file and the
 # internal sort order of each chromosome. Chromosomes that are not included here
 # correspond to those that are excluded from the build.
-InitMapper = dict[str, InternalChrIndex]
+InitMapper = dict[ChrName, InternalChrIndex]
 
 # A mapping b/t internal chromosome sort order and the chromosome names on the
 # target reference.
-FinalMapper = dict[InternalChrIndex, str]
+FinalMapper = dict[InternalChrIndex, ChrName]
 
 # A mapping b/t chromosome names and haplotype; used for splitting inputs that
 # contain both haplotypes into two files with one haplotype each. True =

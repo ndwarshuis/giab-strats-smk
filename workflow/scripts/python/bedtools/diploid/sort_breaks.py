@@ -22,10 +22,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     m = sconf.with_build_data_split_full_nohap(
         cfg.wc_to_reffinalkey(ws),
         cfg.wc_to_buildkey(ws),
-        lambda hap, bd: bd.refdata.ref.noop_conversion(bd.chr_indices).split(hap),
-        lambda hap, bd: hap.from_either(
-            *bd.refdata.ref.noop_conversion(bd.chr_indices)
-        ),
+        lambda hap, bd: bd.refdata.ref.noop_conversion(bd.build_chrs).split(hap),
+        lambda hap, bd: hap.choose(*bd.refdata.ref.noop_conversion(bd.build_chrs)),
     )
     im = m.init_mapper
     fm = m.final_mapper

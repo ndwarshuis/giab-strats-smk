@@ -29,31 +29,34 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     genome_out = Path(smk.output["genome"])
     log = Path(smk.log[0])
 
-    def go(cs: set[cfg.ChrIndex], pat: cfg.ChrPattern) -> Finished:
-        return chr_filter_sort_fasta(fa, fa_out, log, cs, pat)
+    rk = cfg.wc_to_reffinalkey(ws)
+    bk = cfg.wc_to_buildkey(ws)
 
-    def hap1(bd: cfg.HapBuildData) -> Finished:
-        return go(bd.chr_indices, bd.refdata.ref.chr_pattern)
+    cis = sconf.to_build_data(cfg.strip_full_refkey(rk), bk).build_chrs
 
-    def dip1(bd: cfg.Dip1BuildData) -> Finished:
-        return go(bd.chr_indices, bd.refdata.ref.chr_pattern)
+    def go(pat: cfg.ChrPattern) -> Finished:
+        return chr_filter_sort_fasta(fa, fa_out, log, pat.to_names(cis))
 
-    def _dip1_split(hap: cfg.Haplotype, bd: cfg.Dip1BuildData) -> Finished:
-        pat = bd.refdata.ref.chr_pattern.to_hap_pattern(hap)
-        return go(bd.chr_indices, pat)
+    def hap1(rd: cfg.HapRefData) -> Finished:
+        return go(rd.ref.chr_pattern)
 
-    def dip2(hap: cfg.Haplotype, bd: cfg.Dip2BuildData) -> Finished:
-        pat = bd.refdata.ref.chr_pattern.from_either(hap)
-        return go(bd.chr_indices, pat)
+    def dip1(rd: cfg.Dip1RefData) -> Finished:
+        return go(rd.ref.chr_pattern)
 
-    def standard(rk: cfg.RefKeyFullS, bk: cfg.BuildKey) -> Finished:
-        return sconf.with_build_data_full(rk, bk, hap1, dip1, dip2)
+    def _dip1_split(hap: cfg.Haplotype, rd: cfg.Dip1RefData) -> Finished:
+        return go(rd.ref.chr_pattern.to_hap_pattern(hap))
 
-    def dip1_split(rk: cfg.RefKeyFullS, bk: cfg.BuildKey) -> Finished:
-        return sconf.with_build_data_split_full(rk, bk, hap1, _dip1_split, dip2)
+    def dip2(hap: cfg.Haplotype, rd: cfg.Dip2RefData) -> Finished:
+        return go(rd.ref.chr_pattern.choose(hap))
 
-    def dip1_split_nohap(rk: cfg.RefKeyFullS, bk: cfg.BuildKey) -> Finished:
-        return sconf.with_build_data_split_full_nohap(rk, bk, _dip1_split, dip2)
+    def standard(rk: cfg.RefKeyFullS) -> Finished:
+        return sconf.with_ref_data_full(rk, hap1, dip1, dip2)
+
+    def dip1_split(rk: cfg.RefKeyFullS) -> Finished:
+        return sconf.with_ref_data_split_full(rk, hap1, _dip1_split, dip2)
+
+    def dip1_split_nohap(rk: cfg.RefKeyFullS) -> Finished:
+        return sconf.with_ref_data_split_full_nohap(rk, _dip1_split, dip2)
 
     f = cfg.choose_refkey_configuration(
         parse_refkeys_config(fa_out),
@@ -62,7 +65,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         dip1_split_nohap,
     )
 
-    proc_fa = f(cfg.wc_to_reffinalkey(ws), cfg.wc_to_buildkey(ws))
+    proc_fa = f(rk)
 
     if proc_fa.returncode != 0:
         exit(1)

@@ -4,29 +4,22 @@ from pathlib import Path
 from typing import Any
 import common.config as cfg
 from common.functional import not_none_unsafe
+from common.bed import ChrName
 
 
 def get_chr_paired_mapper(
     sconf: cfg.GiabStrats,
     rk: cfg.RefKeyFullS,
     bk: cfg.BuildKey,
-) -> dict[str, tuple[cfg.ChrIndex, cfg.Haplotype]]:
-    cis = sconf.to_build_data(cfg.strip_full_refkey(rk), bk).chr_indices
+) -> dict[ChrName, tuple[cfg.ShortChrName, cfg.Haplotype]]:
+    cis = sconf.to_build_data(cfg.strip_full_refkey(rk), bk).build_chrs
     xs = sconf.with_ref_data_full(
         rk,
-        lambda rd: [
-            (i, cfg.Haplotype.HAP1, rd.ref.chr_pattern.to_chr_name(i)) for i in cis
-        ],
-        lambda rd: [
-            (i, h, rd.ref.chr_pattern.to_chr_name(i, h))
-            for i in cis
-            for h in cfg.Haplotype
-        ],
-        lambda hap, rd: [
-            (i, hap, rd.ref.chr_pattern.from_either(hap).to_chr_name(i)) for i in cis
-        ],
+        lambda rd: rd.ref.chr_pattern.to_chr_data(cis, cfg.Haplotype.HAP1),
+        lambda rd: rd.ref.chr_pattern.to_chr_data(cis),
+        lambda hap, rd: rd.ref.chr_pattern.choose(hap).to_chr_data(cis, hap),
     )
-    return {n: (i, h) for i, h, n in xs if n is not None}
+    return {x.name: (x.shortname, x.haplotype) for x in xs}
 
 
 def sum_bed_file(path: Path) -> dict[str, int]:
@@ -68,7 +61,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             bp = Path(bedpath.strip())
             level_name, strat_name = bedpath_to_strat_names(bp)
             for chrom, bedtotal in sum_bed_file(bp).items():
-                chromIdx, hap = chr_hap_mapper[chrom]
+                shortChromName, hap = chr_hap_mapper[ChrName(chrom)]
                 fraction = bedtotal / gapless_sum[chrom]
                 fullkey = f"{rk}@{bk}-{hap.value + 1}"
                 newline = "\t".join(
@@ -76,7 +69,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
                         fullkey,
                         level_name,
                         strat_name,
-                        chromIdx.chr_name,
+                        shortChromName,
                         str(fraction),
                     ]
                 )

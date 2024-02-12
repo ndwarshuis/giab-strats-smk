@@ -5,6 +5,7 @@ from common.config import (
     bd_to_query_vcf,
     strip_full_refkey,
     RefkeyConfiguration,
+    ChrIndex,
 )
 
 ref = config.ref_dirs
@@ -127,27 +128,38 @@ use rule download_ref as download_gaps with:
 
 def gapless_input(wildcards):
     rk = wildcards.ref_final_key
-    si = config.to_ref_data(strip_full_refkey(rk)).strat_inputs
-    if si.gap is not None:
-        gaps = {
-            "gaps": expand(
-                rules.download_gaps.output,
-                ref_src_key=config.refkey_to_bed_refsrckeys(si_to_gaps, rk),
-            )
-        }
-        if si.xy.y_par is None:
-            return gaps
-        else:
-            return {
-                **gaps,
-                "parY": expand(
-                    rules.write_PAR_intermediate.output[0],
-                    allow_missing=True,
-                    sex_chr="Y",
-                )[0],
-            }
-    else:
-        return {}
+    bk = wildcards.build_key
+
+    bd = config.to_build_data(strip_full_refkey(rk), bk)
+    sex_chrs = config.buildkey_to_wanted_xy(rk, bk)
+
+    gaps_target = (
+        expand(
+            rules.download_gaps.output,
+            ref_src_key=config.refkey_to_bed_refsrckeys(si_to_gaps, rk),
+        )
+        if bd.want_gaps
+        else None
+    )
+
+    par_target = (
+        expand(
+            rules.write_PAR_intermediate.output[0],
+            allow_missing=True,
+            sex_chr="Y",
+        )[0]
+        if bd.want_y_PAR and ChrIndex.CHRY in sex_chrs
+        else None
+    )
+
+    return {
+        k: v
+        for k, v in [
+            ("gaps", gaps_target),
+            ("parY", par_target),
+        ]
+        if v is not None
+    }
 
 
 rule get_gapless:

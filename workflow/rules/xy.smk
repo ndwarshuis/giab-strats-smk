@@ -103,34 +103,37 @@ rule filter_autosomes:
         """
 
 
-# helper functions for build targets
+# helper functions for build targets; note that for each of these we need to
+# first get a list of the X/Y chromosomes required (in the case of dip2, for
+# the haplotype at hand)
 def all_xy_features(ref_final_key, build_key):
     bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
-    targets = [
+    sex_chrs = config.buildkey_to_wanted_xy_names(ref_final_key, build_key)
+    all_targets = [
         (rules.filter_XTR_features.output[0], bd.want_xy_XTR),
         (rules.filter_ampliconic_features.output[0], bd.want_xy_ampliconic),
     ]
-    return [
-        t
-        for p, test in targets
-        if test
-        for t in expand(
-            p,
-            allow_missing=True,
-            sex_chr=bd.wanted_xy_chr_names,
-            ref_final_key=ref_final_key,
-            build_key=build_key,
-        )
-    ]
+    targets = [x for x, y in all_targets if y]
+    return expand(
+        targets,
+        allow_missing=True,
+        sex_chr=sex_chrs,
+        ref_final_key=ref_final_key,
+        build_key=build_key,
+    )
 
 
 def all_xy_PAR(ref_final_key, build_key):
     bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
-    wanted_chrs = [c for (c, t) in [("X", bd.want_x_PAR), ("Y", bd.want_y_PAR)] if t]
+    sex_chrs = [
+        c
+        for c in config.buildkey_to_wanted_xy_names(ref_final_key, build_key)
+        if bd.want_xy_PAR(c)
+    ]
     return expand(
         rules.invert_PAR.output + rules.write_PAR_final.output,
         allow_missing=True,
-        sex_chr=wanted_chrs,
+        sex_chr=sex_chrs,
         ref_final_key=ref_final_key,
         build_key=build_key,
     )

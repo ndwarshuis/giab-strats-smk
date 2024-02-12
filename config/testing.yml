@@ -584,20 +584,25 @@ diploid1_stratifications:
           hets: []
           mappability:
             - {length: 50, mismatches: 0, indels: 0}
+      test-xy:
+        chr_filter: [23, 24]
+        include:
+          low_complexity: false
+          xy: false
+          gc: null
+          functional: false
+          telomeres: false
+          hets: []
+          mappability: []
 
 diploid2_stratifications:
   HG002:
     ref:
       src:
         hap1:
-          url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.mat.fasta.gz
-        hap2:
           url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.pat.fasta.gz
-      chr_pattern:
-        hap1:
-          template: 'chr%i_MATERNAL'
         hap2:
-          template: 'chr%i_PATERNAL'
+          url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.mat.fasta.gz
     strat_inputs:
       low_complexity:
         rmsk: null
@@ -631,6 +636,16 @@ diploid2_stratifications:
           hets: []
           mappability:
             - {length: 50, mismatches: 0, indels: 0}
+      test-xy:
+        chr_filter: [23, 24]
+        include:
+          low_complexity: false
+          xy: false
+          gc: null
+          functional: false
+          telomeres: false
+          hets: []
+          mappability: []
 
 comparison_strats:
   GRCh38_v33: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.3/genome-stratifications-GRCh38@all.tar.gz

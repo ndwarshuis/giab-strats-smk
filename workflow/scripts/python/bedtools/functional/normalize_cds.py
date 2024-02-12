@@ -72,7 +72,7 @@ def vdj_mask(df: pd.DataFrame) -> "pd.Series[bool]":
     return df[5].str.match(VDJ_PAT)
 
 
-def read_ftbl(path: Path, cis: set[cfg.ChrIndex], hap: cfg.Haplotype) -> FTBLMapper:
+def read_ftbl(path: Path, cis: cfg.BuildChrs, hap: cfg.Haplotype) -> FTBLMapper:
     filter_cols = ["assembly_unit", "seq_type"]
     map_cols = ["chromosome", "genomic_accession"]
     df = pd.read_table(path, header=0, usecols=filter_cols + map_cols, dtype=str)
@@ -141,9 +141,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         c = cfg.sub_output_path(cds_pattern, rk)
 
         def go(f: Path, g: Path) -> pd.DataFrame:
-            im = read_ftbl(f, bd.chr_indices, cfg.Haplotype.HAP1)
+            im = read_ftbl(f, bd.build_chrs, cfg.Haplotype.HAP1)
             fm = bd.refdata.ref.chr_pattern.final_mapper(
-                bd.chr_indices, cfg.Haplotype.HAP1
+                bd.build_chrs, cfg.Haplotype.HAP1
             )
             gff = read_gff(g)
             gff_ = filter_sort_bed(im, fm, gff)
@@ -159,7 +159,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         return [c], v
 
     def dip1(bd: cfg.Dip1BuildData) -> tuple[list[Path], list[Path]]:
-        fm = bd.refdata.ref.chr_pattern.final_mapper(bd.chr_indices)
+        fm = bd.refdata.ref.chr_pattern.final_mapper(bd.build_chrs)
         rd = bd.refdata
         rk = rd.ref.src.key(rd.refkey)
 
@@ -167,8 +167,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             ftbl_inputs,
             iamnotlivingimasleep,
             lambda f0, f1: {
-                **read_ftbl(f0, bd.chr_indices, cfg.Haplotype.HAP1),
-                **read_ftbl(f1, bd.chr_indices, cfg.Haplotype.HAP2),
+                **read_ftbl(f0, bd.build_chrs, cfg.Haplotype.HAP1),
+                **read_ftbl(f1, bd.build_chrs, cfg.Haplotype.HAP2),
             },
         )
 
@@ -190,14 +190,14 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def dip2(bd: cfg.Dip2BuildData) -> tuple[list[Path], list[Path]]:
         fm0, fm1 = bd.refdata.ref.chr_pattern.both(
-            lambda x, hap: x.final_mapper(bd.chr_indices, hap)
+            lambda x, hap: x.final_mapper(bd.build_chrs, hap)
         )
         im0, im1 = match12_unsafe(
             ftbl_inputs,
             iamnotlivingimasleep,
             lambda f0, f1: (
-                read_ftbl(f0, bd.chr_indices, cfg.Haplotype.HAP1),
-                read_ftbl(f1, bd.chr_indices, cfg.Haplotype.HAP2),
+                read_ftbl(f0, bd.build_chrs, cfg.Haplotype.HAP1),
+                read_ftbl(f1, bd.build_chrs, cfg.Haplotype.HAP2),
             ),
         )
         gffs = match12_unsafe(

@@ -23,7 +23,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     if hap is None:
         raise DesignError("Just between us did the typo maim you too?")
 
-    ns = bd.refdata.ref.chr_pattern.to_hap_pattern(hap).to_names(bd.chr_indices)
+    ns = bd.refdata.ref.chr_pattern.to_hap_pattern(hap).to_names(bd.build_chrs)
     sp.run(["samtools", "faidx", str(i), *ns, "-o", str(o)])
 
 

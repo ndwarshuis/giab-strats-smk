@@ -20,7 +20,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         cfg.wc_to_reffinalkey(ws),
         cfg.wc_to_buildkey(ws),
     )[1]
-    chr_names = list(fm.values())
+    chr_names = [str(s) for s in fm.values()]
 
     if comparison is None:
         raise DesignError("comparison should not be None")

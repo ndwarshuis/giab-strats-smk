@@ -5,10 +5,10 @@ from os.path import dirname, basename
 from os import scandir
 import common.config as cfg
 from common.io import is_bgzip, gunzip
-from common.bed import InternalChrIndex, subtractBed
+from common.bed import InternalChrIndex, subtractBed, ChrName
 import subprocess as sp
 
-RevMapper = dict[str, InternalChrIndex]
+RevMapper = dict[ChrName, InternalChrIndex]
 
 
 class GaplessBT(NamedTuple):
@@ -45,7 +45,7 @@ def test_bed_format(strat_file: Path, reverse_map: RevMapper) -> str | None:
 
             # chrom should be valid
             try:
-                chromIdx = reverse_map[chrom]
+                chromIdx = reverse_map[ChrName(chrom)]
             except KeyError:
                 return f"invalid chr: {chrom}"
 

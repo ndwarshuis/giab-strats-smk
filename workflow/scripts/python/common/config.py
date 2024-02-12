@@ -168,6 +168,22 @@ SmkWildcards = dict[str, Any]
 
 GCBound = tuple[Percent, bool]
 
+# a bare chromosome name (like "1" or "X")
+ShortChrName = NewType("ShortChrName", str)
+
+# the set chromosomes desired per build
+BuildChrs = NewType("BuildChrs", "set[ChrIndex]")
+
+# the set of chromosomes specific to a haplotype
+HapChrs = NewType("HapChrs", "set[ChrIndex]")
+
+# an ordered list of chromosomes specific to a haplotype (sorted numerically)
+OrderedHapChrs = NewType("OrderedHapChrs", "list[ChrIndex]")
+
+# an ordered list of chromosome names specific to a haplotype (sorted numerically)
+OrderedHapChrNames = NewType("OrderedHapChrNames", list[bed.ChrName])
+
+
 ################################################################################
 # Type variables
 
@@ -182,7 +198,7 @@ Z = TypeVar("Z")
 
 
 def flip_hap(h: Haplotype) -> Haplotype:
-    return h.from_either(Haplotype.HAP2, Haplotype.HAP1)
+    return h.choose(Haplotype.HAP2, Haplotype.HAP1)
 
 
 def parse_full_refkey_class(s: RefKeyFullS) -> RefKeyFull:
@@ -208,7 +224,7 @@ def flip_full_refkey(s: RefKeyFullS) -> RefKeyFullS:
     return flip_full_refkey_class(parse_full_refkey_class(s)).name
 
 
-def choose_xy_unsafe(c: "ChrIndex", x_res: X, y_res: X) -> X:
+def choose_xy_unsafe(c: ChrIndex, x_res: X, y_res: X) -> X:
     if c is ChrIndex.CHRX:
         return x_res
     elif c is ChrIndex.CHRY:
@@ -228,8 +244,10 @@ def choose_refkey_configuration(r: RefkeyConfiguration, a: X, b: X, c: X) -> X:
         assert_never(r)
 
 
-def sort_chr_indices(cs: set[ChrIndex]) -> list[ChrIndex]:
-    return [x for x, _ in sorted([(c, c.value) for c in cs], key=lambda x: x[1])]
+def sort_chr_indices(cs: HapChrs) -> OrderedHapChrs:
+    return OrderedHapChrs(
+        [x for x, _ in sorted([(c, c.value) for c in cs], key=lambda x: x[1])]
+    )
 
 
 # type helpers
@@ -284,7 +302,7 @@ def from_hap_or_dip(x: Haploid[X] | Diploid[X], hap: Haplotype | None) -> X:
     return with_hap_or_dip(
         x,
         lambda x: none_unsafe(hap, x.hap),
-        lambda x: not_none_unsafe(hap, lambda h: x.from_either(h)),
+        lambda x: not_none_unsafe(hap, lambda h: x.choose(h)),
     )
 
 
@@ -324,33 +342,33 @@ def with_build_data(
 
 
 def hap_noop_conversion(bd: HapBuildData) -> HapToHapChrConversion:
-    return bd.refdata.ref.noop_conversion(bd.chr_indices)
+    return bd.refdata.ref.noop_conversion(bd.build_chrs)
 
 
 def dip1_noop_conversion(bd: Dip1BuildData) -> DipToDipChrConversion:
-    return bd.refdata.ref.noop_conversion(bd.chr_indices)
+    return bd.refdata.ref.noop_conversion(bd.build_chrs)
 
 
 def dip1_split_noop_conversion(
     h: Haplotype, bd: Dip1BuildData
 ) -> HapToHapChrConversion:
-    return bd.refdata.ref.noop_conversion(bd.chr_indices).split(h)
+    return bd.refdata.ref.noop_conversion(bd.build_chrs).split(h)
 
 
 def dip2_noop_conversion(h: Haplotype, bd: Dip2BuildData) -> HapToHapChrConversion:
-    return h.from_either(*bd.refdata.ref.noop_conversion(bd.chr_indices))
+    return h.choose(*bd.refdata.ref.noop_conversion(bd.build_chrs))
 
 
-# functions for dealing with 'dict[RefKey, X' type things
+# functions for dealing with 'dict[RefKey, X]' type things
 
 
 def to_ref_data_unsafe(
     xs: dict[
         RefKey,
-        Stratification[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+        Stratification[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
     ],
     rk: RefKey,
-) -> RefData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]:
+) -> RefData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT]:
     try:
         s = xs[rk]
         return RefData_(rk, s.ref, s.strat_inputs, s.builds)
@@ -361,16 +379,16 @@ def to_ref_data_unsafe(
 def all_ref_data(
     xs: dict[
         RefKey,
-        Stratification[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+        Stratification[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
     ],
-) -> list[RefData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]]:
+) -> list[RefData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT]]:
     return [to_ref_data_unsafe(xs, rk) for rk in xs]
 
 
 def all_ref_refsrckeys(
     xs: dict[
         RefKey,
-        Stratification[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+        Stratification[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
     ],
 ) -> list[RefKeyFullS]:
     return [s for k, v in xs.items() for s in v.ref.src.to_str_refkeys(k)]
@@ -379,16 +397,16 @@ def all_ref_refsrckeys(
 def all_build_data(
     xs: dict[
         RefKey,
-        Stratification[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+        Stratification[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
     ],
-) -> list[BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]]:
+) -> list[BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT]]:
     return [r.to_build_data_unsafe(b) for r in all_ref_data(xs) for b in r.builds]
 
 
 def all_bed_build_and_refsrckeys(
     xs: dict[
         RefKey,
-        Stratification[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+        Stratification[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
     ],
     f: BuildDataToSrc,
 ) -> list[tuple[RefKeyFullS, BuildKey]]:
@@ -403,7 +421,7 @@ def all_bed_build_and_refsrckeys(
 def all_bed_refsrckeys(
     xs: dict[
         RefKey,
-        Stratification[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+        Stratification[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
     ],
     f: BuildDataToSrc,
 ) -> list[RefKeyFullS]:
@@ -413,7 +431,7 @@ def all_bed_refsrckeys(
 def all_build_keys(
     xs: dict[
         RefKey,
-        Stratification[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+        Stratification[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
     ],
 ) -> list[tuple[RefKey, BuildKey]]:
     return [(r.refdata.refkey, r.buildkey) for r in all_build_data(xs)]
@@ -422,7 +440,7 @@ def all_build_keys(
 def all_ref_build_keys(
     xs: dict[
         RefKey,
-        Stratification[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+        Stratification[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
     ],
 ) -> list[tuple[RefKeyFullS, BuildKey]]:
     return [
@@ -450,7 +468,7 @@ def prepare_output_path(path: Path) -> Path:
 
 def bd_to_si(
     f: StratInputToBed,
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> BedFile[AnyBedT] | None:
     return f(x.refdata.strat_inputs)
 
@@ -460,7 +478,7 @@ def si_to_simreps(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | None:
 
 
 def bd_to_simreps(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> BedFile[AnyBedT] | None:
     return si_to_simreps(x.refdata.strat_inputs) if x.want_low_complexity else None
 
@@ -470,7 +488,7 @@ def si_to_rmsk(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | None:
 
 
 def bd_to_rmsk(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> BedFile[AnyBedT] | None:
     return si_to_rmsk(x.refdata.strat_inputs) if x.want_low_complexity else None
 
@@ -480,7 +498,7 @@ def si_to_satellites(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | Non
 
 
 def bd_to_satellites(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> BedFile[AnyBedT] | None:
     return si_to_satellites(x.refdata.strat_inputs) if x.want_low_complexity else None
 
@@ -490,7 +508,7 @@ def si_to_superdups(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | None
 
 
 def bd_to_superdups(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> BedFile[AnyBedT] | None:
     return si_to_superdups(x.refdata.strat_inputs) if x.want_segdups else None
 
@@ -500,7 +518,7 @@ def si_to_gaps(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | None:
 
 
 def bd_to_gaps(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> BedFile[AnyBedT] | None:
     return si_to_gaps(x.refdata.strat_inputs) if x.want_gaps else None
 
@@ -508,25 +526,25 @@ def bd_to_gaps(
 def bd_to_other(
     lk: OtherLevelKey,
     sk: OtherStratKey,
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> OtherBedFile[AnyBedT] | None:
     return x.build.other_strats[lk][sk]
 
 
 def bd_to_bench_bed(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> BedFile[AnyBedT] | None:
     return fmap_maybe(lambda y: y.bench_bed, x.build.bench)
 
 
 def bd_to_bench_vcf(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> VCFFile[AnyBedT_] | None:
     return fmap_maybe(lambda y: y.bench_vcf, x.build.bench)
 
 
 def bd_to_query_vcf(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> VCFFile[AnyBedT_] | None:
     return fmap_maybe(lambda y: y.query_vcf, x.build.bench)
 
@@ -540,13 +558,13 @@ def si_to_gff(x: StratInputs[AnyBedT, AnySrcT]) -> AnySrcT | None:
 
 
 def bd_to_ftbl(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> AnySrcT | None:
     return si_to_ftbl(x.refdata.strat_inputs) if x.want_functional else None
 
 
 def bd_to_gff(
-    x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT],
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
 ) -> AnySrcT | None:
     return si_to_gff(x.refdata.strat_inputs) if x.want_functional else None
 
@@ -580,7 +598,7 @@ def read_filter_sort_hap_bed(
     bd: HapBuildData, bf: HapBedFile, ipath: Path
 ) -> pd.DataFrame:
     """Read a haploid bed file, sort it, and write it in bgzip format."""
-    conv = bd.refdata.ref.chr_conversion(bf.data.chr_pattern, bd.chr_indices)
+    conv = bd.refdata.ref.chr_conversion(bf.data.chr_pattern, bd.build_chrs)
     df = bf.read(ipath)
     return bed.filter_sort_bed(conv.init_mapper, conv.final_mapper, df)
 
@@ -603,7 +621,7 @@ def read_filter_sort_dip1to1_bed(
     ipath: Path,
 ) -> pd.DataFrame:
     """Read a diploid bed file, sort it, and write it in bgzip format."""
-    conv = bd.refdata.ref.dip_chr_conversion(bf.data.chr_pattern, bd.chr_indices)
+    conv = bd.refdata.ref.dip_chr_conversion(bf.data.chr_pattern, bd.build_chrs)
     df = bf.read(ipath)
     return bed.filter_sort_bed(conv.init_mapper, conv.final_mapper, df)
 
@@ -633,7 +651,7 @@ def read_filter_sort_dip2to1_bed(
         df = b.read(i)
         return bed.filter_sort_bed(imap, fmap, df)
 
-    conv = bd.refdata.ref.hap_chr_conversion(bf.data.chr_pattern, bd.chr_indices)
+    conv = bd.refdata.ref.hap_chr_conversion(bf.data.chr_pattern, bd.build_chrs)
     imap1, imap2 = conv.init_mapper
     fmap = conv.final_mapper
 
@@ -665,7 +683,7 @@ def read_filter_sort_dip1to2_bed(
     bf: Dip1BedFile,
     ipath: Path,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    conv = bd.refdata.ref.dip_chr_conversion(bf.data.chr_pattern, bd.chr_indices)
+    conv = bd.refdata.ref.dip_chr_conversion(bf.data.chr_pattern, bd.build_chrs)
     imap, splitter = conv.init_mapper
     fmap0, fmap1 = conv.final_mapper
 
@@ -697,9 +715,9 @@ def read_filter_sort_dip2to2_bed(
     ipath: Path,
     hap: Haplotype,
 ) -> pd.DataFrame:
-    conv = bd.refdata.ref.hap_chr_conversion(bf.data.chr_pattern, bd.chr_indices)
+    conv = bd.refdata.ref.hap_chr_conversion(bf.data.chr_pattern, bd.build_chrs)
     df = bf.read(ipath)
-    conv_ = hap.from_either(conv[0], conv[1])
+    conv_ = hap.choose(*conv)
     return bed.filter_sort_bed(conv_.init_mapper, conv_.final_mapper, df)
 
 
@@ -793,13 +811,13 @@ class Haplotype(Enum):
         try:
             return next(i for i in cls if i.name == n)
         except StopIteration:
-            raise ValueError(f"could make haplotype from name '{n}'")
+            raise ValueError(f"could not make haplotype from name '{n}'")
 
     @property
     def name(self) -> HaplotypeName:
         return HaplotypeName(f"hap{self.value + 1}")
 
-    def from_either(self, left: X, right: X) -> X:
+    def choose(self, left: X, right: X) -> X:
         "Do either left (pat) or right (mat) depending on the haplotype."
         if self is Haplotype.HAP1:
             return left
@@ -862,7 +880,7 @@ class ChrIndex(Enum):
 
     def __init__(self, i: int) -> None:
         "Build chr index from an integer (which must be in [1,24])"
-        self.chr_name: str = "X" if i == 23 else ("Y" if i == 24 else str(i))
+        self.chr_name = ShortChrName("X" if i == 23 else ("Y" if i == 24 else str(i)))
 
     def to_internal_index(self, hap: Haplotype) -> bed.InternalChrIndex:
         "Convert this index into an integer corresponding to sort order"
@@ -943,7 +961,7 @@ class _NonDivergentConversion:
 class HapToHapChrConversion(_NonDivergentConversion):
     fromPattern: HapChrPattern
     toPattern: HapChrPattern
-    indices: set[ChrIndex]
+    indices: BuildChrs
 
     @property
     def init_mapper(self) -> bed.InitMapper:
@@ -958,7 +976,7 @@ class HapToHapChrConversion(_NonDivergentConversion):
 class DipToDipChrConversion(_NonDivergentConversion):
     fromPattern: DipChrPattern
     toPattern: DipChrPattern
-    indices: set[ChrIndex]
+    indices: BuildChrs
 
     @property
     def init_mapper(self) -> bed.InitMapper:
@@ -980,7 +998,7 @@ class DipToDipChrConversion(_NonDivergentConversion):
 class HapToDipChrConversion:
     fromPattern: Diploid[HapChrPattern]
     toPattern: DipChrPattern
-    indices: set[ChrIndex]
+    indices: BuildChrs
 
     @property
     def init_mapper(self) -> tuple[bed.InitMapper, bed.InitMapper]:
@@ -995,7 +1013,7 @@ class HapToDipChrConversion:
 class DipToHapChrConversion:
     fromPattern: DipChrPattern
     toPattern: Diploid[HapChrPattern]
-    indices: set[ChrIndex]
+    indices: BuildChrs
 
     @property
     def init_mapper(self) -> tuple[bed.InitMapper, bed.SplitMapper]:
@@ -1006,6 +1024,13 @@ class DipToHapChrConversion:
     @property
     def final_mapper(self) -> tuple[bed.FinalMapper, bed.FinalMapper]:
         return self.toPattern.both(lambda p, h: p.final_mapper(self.indices, h))
+
+
+class ChrData(NamedTuple):
+    idx: bed.InternalChrIndex
+    name: bed.ChrName
+    shortname: ShortChrName
+    haplotype: Haplotype
 
 
 # tuples representing file paths for the pipeline
@@ -1119,8 +1144,8 @@ class Diploid(GenericModel, Generic[X], _Src):
     hap1: X
     hap2: X
 
-    def from_either(self, hap: Haplotype) -> X:
-        return hap.from_either(self.hap1, self.hap2)
+    def choose(self, hap: Haplotype) -> X:
+        return hap.choose(self.hap1, self.hap2)
 
     def both(self, f: Callable[[X, Haplotype], Y]) -> tuple[Y, Y]:
         return (f(self.hap1, Haplotype.HAP1), f(self.hap2, Haplotype.HAP2))
@@ -1142,7 +1167,7 @@ class ChrPattern:
     """A general chromosome pattern providing interface to convert indices to
     names."""
 
-    def to_names(self, cs: set[ChrIndex]) -> list[str]:
+    def to_names(self, cs: BuildChrs) -> OrderedHapChrNames:
         return NotImplemented
 
 
@@ -1153,43 +1178,52 @@ class HapChrPattern(BaseModel, ChrPattern):
     """
 
     template: str = "chr%i"
-    special: dict[ChrIndex, str] = {}
-    exclusions: list[ChrIndex] = []
+    special: dict[ChrIndex, bed.ChrName] = {}
+    exclusions: set[ChrIndex] = set()
 
     @validator("template")
     def is_valid_template(cls, v: str) -> str:
         assert v.count(CHR_INDEX_PLACEHOLDER) == 1, "chr template must have '%i' in it"
         return v
 
-    def to_chr_name(self, i: ChrIndex) -> str | None:
-        if i in self.exclusions:
+    def _is_excluded(self, i: ChrIndex) -> bool:
+        return i in self.exclusions
+
+    def filter_indices(self, cs: BuildChrs) -> HapChrs:
+        return HapChrs({i for i in cs if not self._is_excluded(i)})
+
+    def to_chr_name(self, i: ChrIndex) -> bed.ChrName | None:
+        if self._is_excluded(i):
             return None
         elif i in self.special:
             return self.special[i]
         else:
-            return self.template.replace(CHR_INDEX_PLACEHOLDER, i.chr_name)
+            return bed.ChrName(
+                self.template.replace(
+                    CHR_INDEX_PLACEHOLDER,
+                    str(i.chr_name),
+                )
+            )
 
-    def to_pairs(
-        self,
-        cs: set[ChrIndex],
-        h: Haplotype,
-    ) -> list[tuple[bed.InternalChrIndex, str]]:
+    def to_chr_data(self, cs: BuildChrs, h: Haplotype) -> list[ChrData]:
         return [
-            (c.to_internal_index(h), n)
-            for c in sort_chr_indices(cs)
+            ChrData(c.to_internal_index(h), n, c.chr_name, h)
+            for c in sort_chr_indices(self.filter_indices(cs))
             if (n := self.to_chr_name(c)) is not None
         ]
 
-    def to_names(self, cs: set[ChrIndex]) -> list[str]:
+    def to_names(self, cs: BuildChrs) -> OrderedHapChrNames:
         # NOTE: the haplotype argument is doing nothing since it is only
         # used to make the index which I remove before returning here
-        return [x[1] for x in self.to_pairs(cs, Haplotype.HAP1)]
+        return OrderedHapChrNames(
+            [bed.ChrName(x[1]) for x in self.to_chr_data(cs, Haplotype.HAP1)]
+        )
 
-    def init_mapper(self, cs: set[ChrIndex], hap: Haplotype) -> bed.InitMapper:
-        return {n: i for i, n in self.to_pairs(cs, hap)}
+    def init_mapper(self, cs: BuildChrs, hap: Haplotype) -> bed.InitMapper:
+        return {d.name: d.idx for d in self.to_chr_data(cs, hap)}
 
-    def final_mapper(self, cs: set[ChrIndex], hap: Haplotype) -> bed.FinalMapper:
-        return {i: n for i, n in self.to_pairs(cs, hap)}
+    def final_mapper(self, cs: BuildChrs, hap: Haplotype) -> bed.FinalMapper:
+        return {d.idx: d.name for d in self.to_chr_data(cs, hap)}
 
 
 class DipChrPattern(BaseModel, ChrPattern):
@@ -1200,15 +1234,15 @@ class DipChrPattern(BaseModel, ChrPattern):
     """
 
     template: str = "chr%i_%h"
-    special: dict[ChrIndex, str] = {}
+    special: dict[ChrIndex, bed.ChrName] = {}
     hapnames: Diploid[HaplotypeName] = Diploid(
-        hap1=HaplotypeName("PATERNAL"),
-        hap2=HaplotypeName("MATERNAL"),
+        hap1=HaplotypeName("MATERNAL"),
+        hap2=HaplotypeName("PATERNAL"),
     )
     # By default, paternal doesn't have X and maternal doesn't have Y
-    exclusions: Diploid[list[ChrIndex]] = Diploid(
-        hap1=[ChrIndex.CHRX],
-        hap2=[ChrIndex.CHRY],
+    exclusions: Diploid[set[ChrIndex]] = Diploid(
+        hap1={ChrIndex.CHRY},
+        hap2={ChrIndex.CHRX},
     )
 
     @validator("template")
@@ -1227,46 +1261,56 @@ class DipChrPattern(BaseModel, ChrPattern):
         v.both(is_valid)
         return v
 
-    def to_chr_name(self, i: ChrIndex, h: Haplotype) -> str | None:
-        exc = self.exclusions.from_either(h)
-        name = self.hapnames.from_either(h)
-        if i in exc:
+    def _is_excluded(self, i: ChrIndex, h: Haplotype) -> bool:
+        return i in self.exclusions.choose(h)
+
+    def filter_indices(self, cis: BuildChrs, h: Haplotype) -> HapChrs:
+        return HapChrs({i for i in cis if not self._is_excluded(i, h)})
+
+    def to_chr_name(self, i: ChrIndex, h: Haplotype) -> bed.ChrName | None:
+        if self._is_excluded(i, h):
             return None
         elif i in self.special:
             return self.special[i]
         else:
-            return self.template.replace(CHR_INDEX_PLACEHOLDER, i.chr_name).replace(
-                CHR_HAP_PLACEHOLDER, name
+            name = self.hapnames.choose(h)
+            return bed.ChrName(
+                self.template.replace(
+                    CHR_INDEX_PLACEHOLDER,
+                    str(i.chr_name),
+                ).replace(
+                    CHR_HAP_PLACEHOLDER,
+                    name,
+                )
             )
 
-    def to_pairs(self, cs: set[ChrIndex]) -> list[tuple[bed.InternalChrIndex, str]]:
+    def to_chr_data(self, cs: BuildChrs) -> list[ChrData]:
         # order is really important here; we want to iterate through the first
         # haplotype before the second so that the chromosome order is like
         # chr1_mat, chr2_mat ... chr1_pat, chr2_pat rather than chr1_mat,
         # chr1_pat ... etc
         return [
-            (c.to_internal_index(h), n)
+            ChrData(c.to_internal_index(h), n, c.chr_name, h)
             for h in Haplotype
-            for c in sort_chr_indices(cs)
+            for c in sort_chr_indices(self.filter_indices(cs, h))
             if (n := self.to_chr_name(c, h)) is not None
         ]
 
-    def to_names(self, cs: set[ChrIndex]) -> list[str]:
-        return [x[1] for x in self.to_pairs(cs)]
+    def to_names(self, cs: BuildChrs) -> OrderedHapChrNames:
+        return OrderedHapChrNames([bed.ChrName(x[1]) for x in self.to_chr_data(cs)])
 
-    def init_mapper(self, cs: set[ChrIndex]) -> bed.InitMapper:
-        return {n: i for i, n in self.to_pairs(cs)}
+    def init_mapper(self, cs: BuildChrs) -> bed.InitMapper:
+        return {d.name: d.idx for d in self.to_chr_data(cs)}
 
-    def final_mapper(self, cs: set[ChrIndex]) -> bed.FinalMapper:
-        return {i: n for i, n in self.to_pairs(cs)}
+    def final_mapper(self, cs: BuildChrs) -> bed.FinalMapper:
+        return {d.idx: d.name for d in self.to_chr_data(cs)}
 
     def to_hap_pattern(self, hap: Haplotype) -> HapChrPattern:
-        hs = self.hapnames.from_either(hap)
-        xs = self.exclusions.from_either(hap)
+        hs = self.hapnames.choose(hap)
         return HapChrPattern(
             template=self.template.replace(CHR_HAP_PLACEHOLDER, hs),
             special=self.special,
-            exclusions=xs,
+            exclusions=self.exclusions.choose(hap),
         )
 
 
@@ -1277,7 +1321,7 @@ class HapChrSrc(GenericModel, Generic[X]):
     chr_pattern: HapChrPattern = HapChrPattern()
 
     def chr_conversion(
-        self, fromChr: HapChrPattern, cis: set[ChrIndex]
+        self, fromChr: HapChrPattern, cis: BuildChrs
     ) -> HapToHapChrConversion:
         """Create a chromosome names conversion corresponding to 'fromChr'.
 
@@ -1286,13 +1330,16 @@ class HapChrSrc(GenericModel, Generic[X]):
         """
         return HapToHapChrConversion(fromChr, self.chr_pattern, cis)
 
-    def noop_conversion(self, cis: set[ChrIndex]) -> HapToHapChrConversion:
+    def noop_conversion(self, cis: BuildChrs) -> HapToHapChrConversion:
         """Create a chromosome conversion for this source itself.
 
         Useful for anything generated via the reference itself, since those
         will have chromosome names corresponding directly to the reference.
         """
         return self.chr_conversion(self.chr_pattern, cis)
+
+    def hap_chrs(self, cis: BuildChrs) -> HapChrs:
+        return self.chr_pattern.filter_indices(cis)
 
 
 class Dip1ChrSrc(GenericModel, Generic[X]):
@@ -1310,7 +1357,7 @@ class Dip1ChrSrc(GenericModel, Generic[X]):
     def hap_chr_conversion(
         self,
         fromChr: Diploid[HapChrPattern],
-        cis: set[ChrIndex],
+        cis: BuildChrs,
     ) -> HapToDipChrConversion:
         """Create a dip2->dip1 conversion corresponding to 'fromChr'.
 
@@ -1322,7 +1369,7 @@ class Dip1ChrSrc(GenericModel, Generic[X]):
     def dip_chr_conversion(
         self,
         fromChr: DipChrPattern,
-        cis: set[ChrIndex],
+        cis: BuildChrs,
     ) -> DipToDipChrConversion:
         """Create a dip1->dip1 conversion corresponding to 'fromChr'.
 
@@ -1331,13 +1378,21 @@ class Dip1ChrSrc(GenericModel, Generic[X]):
         """
         return DipToDipChrConversion(fromChr, self.chr_pattern, cis)
 
-    def noop_conversion(self, cis: set[ChrIndex]) -> DipToDipChrConversion:
+    def noop_conversion(self, cis: BuildChrs) -> DipToDipChrConversion:
         """Create a chromosome conversion for this source itself.
 
         Useful for anything generated via the reference itself, since those
         will have chromosome names corresponding directly to the reference.
         """
         return self.dip_chr_conversion(self.chr_pattern, cis)
+
+    def hap_chrs(self, cis: BuildChrs, h: Haplotype) -> HapChrs:
+        return self.chr_pattern.filter_indices(cis, h)
+
+    def all_chrs(self, cis: BuildChrs) -> HapChrs:
+        return HapChrs(
+            self.hap_chrs(cis, Haplotype.HAP1) | self.hap_chrs(cis, Haplotype.HAP2)
+        )
 
 
 class Dip2ChrSrc(GenericModel, Generic[X]):
@@ -1351,14 +1406,20 @@ class Dip2ChrSrc(GenericModel, Generic[X]):
 
     src: Diploid[X]
     chr_pattern: Diploid[HapChrPattern] = Diploid(
-        hap1=HapChrPattern(),
-        hap2=HapChrPattern(),
+        hap1=HapChrPattern(
+            template="chr%i_MATERNAL",
+            exclusions=[ChrIndex.CHRY],
+        ),
+        hap2=HapChrPattern(
+            template="chr%i_PATERNAL",
+            exclusions=[ChrIndex.CHRX],
+        ),
     )
 
     def hap_chr_conversion(
         self,
         fromChr: Diploid[HapChrPattern],
-        cis: set[ChrIndex],
+        cis: BuildChrs,
     ) -> tuple[HapToHapChrConversion, HapToHapChrConversion]:
         """Create a dip2->dip2 conversion corresponding to 'fromChr'.
 
@@ -1374,7 +1435,7 @@ class Dip2ChrSrc(GenericModel, Generic[X]):
     def dip_chr_conversion(
         self,
         fromChr: DipChrPattern,
-        cis: set[ChrIndex],
+        cis: BuildChrs,
     ) -> DipToHapChrConversion:
         """Create a dip1->dip2 conversion corresponding to 'fromChr'.
 
@@ -1384,7 +1445,7 @@ class Dip2ChrSrc(GenericModel, Generic[X]):
         return DipToHapChrConversion(fromChr, self.chr_pattern, cis)
 
     def noop_conversion(
-        self, cis: set[ChrIndex]
+        self, cis: BuildChrs
     ) -> tuple[HapToHapChrConversion, HapToHapChrConversion]:
         """Create a chromosome conversion for this source itself.
 
@@ -1392,6 +1453,9 @@ class Dip2ChrSrc(GenericModel, Generic[X]):
         will have chromosome names corresponding directly to the reference.
         """
         return self.hap_chr_conversion(self.chr_pattern, cis)
+
+    def hap_chrs(self, cis: BuildChrs, h: Haplotype) -> HapChrs:
+        return self.chr_pattern.choose(h).filter_indices(cis)
 
 
 class HashedSrc_(BaseModel):
@@ -1940,16 +2004,18 @@ DipStratInputs = StratInputs[Dip1ChrSrc[BedSrc] | Dip2ChrSrc[BedSrc], Diploid[Be
 
 StratInputT = TypeVar("StratInputT", HapStratInputs, DipStratInputs)
 
-RefSourceT = TypeVar(
-    "RefSourceT",
+RefSrcT = TypeVar(
+    "RefSrcT",
     HapChrSrc[RefSrc],
     Dip1ChrSrc[RefSrc],
     Dip2ChrSrc[RefSrc],
 )
 
+DipRefSrcT = TypeVar("DipRefSrcT", Dip1ChrSrc[RefSrc], Dip2ChrSrc[RefSrc])
+
 
 @dataclass(frozen=True)
-class RefData_(Generic[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]):
+class RefData_(Generic[RefSrcT, AnyBedT, AnyBedT_, AnySrcT]):
     """A helper class corresponding a given reference and its builds.
 
     This is primarily meant to provide a glue layer b/t the configuration
@@ -1962,7 +2028,7 @@ class RefData_(Generic[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]):
     """
 
     refkey: RefKey
-    ref: RefSourceT
+    ref: RefSrcT
     strat_inputs: StratInputs[AnyBedT, AnySrcT]
     builds: dict[BuildKey, Build[AnyBedT, AnyBedT_]]
 
@@ -1990,7 +2056,7 @@ class RefData_(Generic[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]):
     def to_build_data_unsafe(
         self,
         bk: BuildKey,
-    ) -> "BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]":
+    ) -> "BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT]":
         "Lookup a given build with a build key (and throw DesignError on fail)"
         bd = self.to_build_data(bk)
         if bd is None:
@@ -2000,7 +2066,7 @@ class RefData_(Generic[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]):
     def to_build_data(
         self,
         bk: BuildKey,
-    ) -> "BuildData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT] | None":
+    ) -> "BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT] | None":
         "Lookup a given build with a build key"
         try:
             return BuildData_(self, bk, self.builds[bk])
@@ -2051,58 +2117,31 @@ AnyRefData = HapRefData | Dip1RefData | Dip2RefData
 
 
 @dataclass(frozen=True)
-class BuildData_(Generic[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]):
+class BuildData_(Generic[RefSrcT, AnyBedT, AnyBedT_, AnySrcT]):
     """A helper class corresponding a given build.
 
     This follows a similar motivation as 'RefData_' above.
     """
 
-    refdata: RefData_[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]
+    refdata: RefData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT]
     buildkey: BuildKey
     build: Build[AnyBedT, AnyBedT_]
+
+    @property
+    def build_chrs(self) -> BuildChrs:
+        """Return a set of all desired chromosomes for this build.
+
+        NOTE: this is an unfiltered set, meaning that if the pattern for the
+        reference excludes a set of chromosomes on a haplotype (ie the X on
+        the paternal) this set will NOT reflect that exclusion.
+        """
+        cs = self.build.chr_filter
+        return BuildChrs(set([x for x in ChrIndex]) if len(cs) == 0 else cs)
 
     @property
     def chr_indices(self) -> set[ChrIndex]:
         cs = self.build.chr_filter
         return set([x for x in ChrIndex]) if len(cs) == 0 else cs
-
-    @property
-    def want_xy_x(self) -> bool:
-        return ChrIndex.CHRX in self.chr_indices and self.build.include.xy
-
-    @property
-    def want_xy_y(self) -> bool:
-        return ChrIndex.CHRY in self.chr_indices and self.build.include.xy
-
-    @property
-    def wanted_xy_chr_names(self) -> list[str]:
-        return [
-            i.chr_name for i in [ChrIndex.CHRX, ChrIndex.CHRY] if i in self.chr_indices
-        ]
-
-    @property
-    def want_x_PAR(self) -> bool:
-        return self.want_xy_x and self.refdata.strat_inputs.xy.x_par is not None
-
-    @property
-    def want_y_PAR(self) -> bool:
-        return self.want_xy_y and self.refdata.strat_inputs.xy.y_par is not None
-
-    @property
-    def want_xy_auto(self) -> bool:
-        return len(self.chr_indices - set([ChrIndex.CHRX, ChrIndex.CHRY])) > 0
-
-    @property
-    def want_xy_XTR(self) -> bool:
-        return fmap_maybe_def(
-            False, lambda x: x.xtr, self.refdata.strat_inputs.xy.features
-        )
-
-    @property
-    def want_xy_ampliconic(self) -> bool:
-        return fmap_maybe_def(
-            False, lambda x: x.ampliconic, self.refdata.strat_inputs.xy.features
-        )
 
     @property
     def want_low_complexity(self) -> bool:
@@ -2157,13 +2196,15 @@ class BuildData_(Generic[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]):
     def want_gaps(self) -> bool:
         return self.refdata.strat_inputs.gap is not None
 
+    # TODO this is technically haplotype specific but probably won't matter in
+    # the long run because both haps should always have 2, 7, 14, and 22
     @property
     def want_vdj(self) -> bool:
         vdj_chrs = {ChrIndex(i) for i in [2, 7, 14, 22]}
         return (
             self.build.include.vdj
             and self.refdata.strat_inputs.functional is not None
-            and len(self.chr_indices & vdj_chrs) > 0
+            and len(self.build_chrs & vdj_chrs) > 0
         )
 
     @property
@@ -2183,11 +2224,54 @@ class BuildData_(Generic[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]):
         ms = self.build.include.mappability
         return unzip3([(m.length, m.mismatches, m.indels) for m in ms])
 
+    # this is the only xy-ish flag that's here since this won't depend on the
+    # haplotype (just remove X and Y from whatever filter we set)
+    #
+    # TODO technically this isn't true because the autosomes could in theory be
+    # excluded for each haplotype separately, but this should almost never happen
+    # in real life (see vdj below)
+    @property
+    def want_xy_auto(self) -> bool:
+        return len(self.build_chrs - set([ChrIndex.CHRX, ChrIndex.CHRY])) > 0
 
-class Stratification(GenericModel, Generic[RefSourceT, AnyBedT, AnyBedT_, AnySrcT]):
+    # For each of these we could check if the X or Y chromosome(s) is/are
+    # present in the chr filter. However, this would require
+    # hap/dip1/dip2-specific subclasses which I don't feel like making. Instead
+    # it is much easier to query the refkey and buildkey for the desired xy
+    # chromosomes, inherit rules based on this, and then filter those rules
+    # based on the following functions.
+    @property
+    def want_x_PAR(self) -> bool:
+        return self.refdata.strat_inputs.xy.x_par is not None
+
+    @property
+    def want_y_PAR(self) -> bool:
+        return self.refdata.strat_inputs.xy.y_par is not None
+
+    def want_xy_PAR(self, s: str) -> bool:
+        return choose_xy_unsafe(
+            ChrIndex.from_name(s),
+            self.want_x_PAR,
+            self.want_y_PAR,
+        )
+
+    @property
+    def want_xy_XTR(self) -> bool:
+        return fmap_maybe_def(
+            False, lambda x: x.xtr, self.refdata.strat_inputs.xy.features
+        )
+
+    @property
+    def want_xy_ampliconic(self) -> bool:
+        return fmap_maybe_def(
+            False, lambda x: x.ampliconic, self.refdata.strat_inputs.xy.features
+        )
+
+
+class Stratification(GenericModel, Generic[RefSrcT, AnyBedT, AnyBedT_, AnySrcT]):
     """Configuration for stratifications for a given reference."""
 
-    ref: RefSourceT
+    ref: RefSrcT
     strat_inputs: StratInputs[AnyBedT, AnySrcT]
     builds: dict[BuildKey, Build[AnyBedT, AnyBedT_]]
 
@@ -2522,6 +2606,27 @@ class GiabStrats(BaseModel):
 
     # general accessors
 
+    def buildkey_to_wanted_xy(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+    ) -> HapChrs:
+        cis = self.with_build_data_full(
+            rk,
+            bk,
+            lambda bd: bd.refdata.ref.hap_chrs(bd.build_chrs),
+            lambda bd: bd.refdata.ref.all_chrs(bd.build_chrs),
+            lambda hap, bd: bd.refdata.ref.hap_chrs(bd.build_chrs, hap),
+        )
+        return HapChrs({i for i in [ChrIndex.CHRX, ChrIndex.CHRY] if i in cis})
+
+    def buildkey_to_wanted_xy_names(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+    ) -> set[ShortChrName]:
+        return {c.chr_name for c in self.buildkey_to_wanted_xy(rk, bk)}
+
     def buildkey_to_malloc(
         self,
         rk: RefKeyFullS,
@@ -2646,7 +2751,7 @@ class GiabStrats(BaseModel):
             rk,
             lambda rd: rd.ref.chr_pattern,
             lambda rd: rd.ref.chr_pattern.to_hap_pattern(i.xy_to_hap_unsafe),
-            lambda hap, rd: rd.ref.chr_pattern.from_either(hap),
+            lambda hap, rd: rd.ref.chr_pattern.choose(hap),
         )
 
     def buildkey_to_bed_refsrckeys(
@@ -3228,7 +3333,7 @@ class GiabStrats(BaseModel):
     #     return left if self.refkey_is_dip1_hap(rk) else right
 
     def thread_per_chromosome(self, rk: RefKeyFullS, bk: BuildKey, n: int) -> int:
-        cis = self.to_build_data(strip_full_refkey(rk), bk).chr_indices
+        cis = self.to_build_data(strip_full_refkey(rk), bk).build_chrs
         return min(n, len(cis))
 
 
@@ -3243,7 +3348,7 @@ class RefDataToBed(Protocol):
 
     def __call__(
         self,
-        __x: RefData_[RefSourceT, A, AnyBedT_, AnySrcT],
+        __x: RefData_[RefSrcT, A, AnyBedT_, AnySrcT],
     ) -> BedFile[A] | None:
         pass
 
@@ -3253,7 +3358,7 @@ class RefDataToSrc(Protocol):
 
     def __call__(
         self,
-        __x: RefData_[RefSourceT, AnyBedT, AnyBedT_, A],
+        __x: RefData_[RefSrcT, AnyBedT, AnyBedT_, A],
     ) -> A | None:
         pass
 
@@ -3277,7 +3382,7 @@ class BuildDataToBed(Protocol):
 
     def __call__(
         self,
-        __x: BuildData_[RefSourceT, A, AnyBedT_, AnySrcT],
+        __x: BuildData_[RefSrcT, A, AnyBedT_, AnySrcT],
     ) -> BedFile[A] | None:
         pass
 
@@ -3287,7 +3392,7 @@ class BuildDataToVCF(Protocol):
 
     def __call__(
         self,
-        __x: BuildData_[RefSourceT, AnyBedT, A, AnySrcT],
+        __x: BuildData_[RefSrcT, AnyBedT, A, AnySrcT],
     ) -> BedFile[A] | None:
         pass
 
@@ -3297,6 +3402,6 @@ class BuildDataToSrc(Protocol):
 
     def __call__(
         self,
-        __x: BuildData_[RefSourceT, AnyBedT, AnyBedT_, A],
+        __x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, A],
     ) -> A | None:
         pass

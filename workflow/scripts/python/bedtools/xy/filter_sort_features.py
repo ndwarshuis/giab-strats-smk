@@ -23,7 +23,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     bd = sconf.to_build_data(rk, cfg.wc_to_buildkey(ws))
     bf = bd.refdata.strat_inputs.xy_feature_bed_unsafe(i)
-    conv = cfg.HapToHapChrConversion(bf.data.chr_pattern, pat, bd.chr_indices)
+    conv = cfg.HapToHapChrConversion(bf.data.chr_pattern, pat, bd.build_chrs)
 
     df = bf.read(bed_input)
     df_sorted = filter_sort_bed(conv.init_mapper, conv.final_mapper, df)

@@ -33,7 +33,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, Any] = smk.wildcards
 
     def go(
-        x: cfg.BuildData_[cfg.RefSourceT, cfg.AnyBedT, cfg.AnyBedT_, cfg.AnySrcT]
+        x: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyBedT_, cfg.AnySrcT]
     ) -> cfg.BedFile[cfg.AnyBedT] | None:
         return x.refdata.strat_inputs.gap
 
@@ -52,7 +52,6 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         rk = cfg.wc_to_reffinalkey(ws)
         bk = cfg.wc_to_buildkey(ws)
 
-        bd = sconf.to_build_data(cfg.strip_full_refkey(rk), bk)
         gaps_df = sconf.with_build_data_and_bed_full(
             rk,
             bk,
@@ -65,7 +64,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             ),
             lambda hap, bd, bf: match1_unsafe(
                 gap_inputs,
-                lambda i: hap.from_either(*cfg.read_filter_sort_dip1to2_bed(bd, bf, i)),
+                lambda i: hap.choose(*cfg.read_filter_sort_dip1to2_bed(bd, bf, i)),
             ),
             lambda bd, bf: match2_unsafe(
                 gap_inputs,
@@ -76,7 +75,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
                 lambda i0, i1: cfg.read_filter_sort_dip2to2_bed(
                     bd,
                     bf,
-                    *hap.from_either((i0, cfg.Haplotype.HAP1), (i1, cfg.Haplotype.HAP2))
+                    *hap.choose((i0, cfg.Haplotype.HAP1), (i1, cfg.Haplotype.HAP2))
                 ),
             ),
         )
@@ -89,10 +88,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             p2, o2 = complementBed(s, genome_path)
             gaps_with_parY = read_bed_default(o2)
 
-        # If we have a parY bed and chrY is included, subtract parY from the
-        # gaps bed, otherwise just link them since we have nothing to subtract
-        # off
-        if hasattr(inputs, "parY") and bd.want_xy_y:
+        # If we have a parY bed, subtract parY from the gaps bed, otherwise just
+        # link them since we have nothing to subtract off
+        if hasattr(inputs, "parY"):
             parY_src = Path(inputs["parY"])
             with bed_to_stream(gaps_with_parY) as s:
                 p3, o3 = subtractBed(s, parY_src, genome_path)
