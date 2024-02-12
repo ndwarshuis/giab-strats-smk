@@ -2606,18 +2606,25 @@ class GiabStrats(BaseModel):
 
     # general accessors
 
-    def buildkey_to_wanted_xy(
+    def buildkey_to_chrs(
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
     ) -> HapChrs:
-        cis = self.with_build_data_full(
+        return self.with_build_data_full(
             rk,
             bk,
             lambda bd: bd.refdata.ref.hap_chrs(bd.build_chrs),
             lambda bd: bd.refdata.ref.all_chrs(bd.build_chrs),
             lambda hap, bd: bd.refdata.ref.hap_chrs(bd.build_chrs, hap),
         )
+
+    def buildkey_to_wanted_xy(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+    ) -> HapChrs:
+        cis = self.buildkey_to_chrs(rk, bk)
         return HapChrs({i for i in [ChrIndex.CHRX, ChrIndex.CHRY] if i in cis})
 
     def buildkey_to_wanted_xy_names(
@@ -3333,8 +3340,7 @@ class GiabStrats(BaseModel):
     #     return left if self.refkey_is_dip1_hap(rk) else right
 
     def thread_per_chromosome(self, rk: RefKeyFullS, bk: BuildKey, n: int) -> int:
-        cis = self.to_build_data(strip_full_refkey(rk), bk).build_chrs
-        return min(n, len(cis))
+        return min(n, len(self.buildkey_to_chrs(rk, bk)))
 
 
 ################################################################################
