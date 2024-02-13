@@ -75,7 +75,7 @@ def plaid_mode(wildcards):
 
 def filter_mappability_ref_inputs(wildcards):
     rk = wildcards["ref_final_key"]
-    rk_ = strip_full_refkey(rk) if config.refkey_is_split_dip1(rk) else rk
+    rk_ = strip_full_refkey(rk) if config.refkey_is_dip1(rk, True, False) else rk
     return {
         "fa": expand(
             rules.download_ref.output,
@@ -232,9 +232,10 @@ def merge_nonunique_inputs(wildcards):
     rk = strip_full_refkey(rkf)
     bk = wildcards["build_key"]
     l, m, e = config.to_build_data(rk, bk).mappability_params
-    attr = "combine_dip1_nonunique_beds" if config.refkey_is_dip1(rkf) else "wig_to_bed"
-    p = getattr(rules, attr).output
-    return expand(p, zip, allow_missing=True, l=l, m=m, e=e)
+    out = if_dip1_else(
+        False, False, "combine_dip1_nonunique_beds", "wig_to_bed", wildcards
+    )
+    return expand(out, zip, allow_missing=True, l=l, m=m, e=e)
 
 
 checkpoint merge_nonunique:

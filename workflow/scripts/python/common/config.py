@@ -3415,63 +3415,26 @@ class GiabStrats(BaseModel):
 
     # other nice functions
 
-    def refkey_is_dip1_nohap(self, rk: RefKeyFullS) -> bool:
+    def refkey_is_dip1(self, rk: RefKeyFullS, split: bool, nohap: bool) -> bool:
         """Test if refkey is dip1 or dip2.
 
-        Return True if dip1, false if dip2, and error otherwise.
+        Return True if dip1, false if dip2.
 
-        This function is useful for cases where dip1 rules need to be "split"
-        into component haplotypes. Normally each rule for a dip1 configuration
-        is denoted by only the refkey (since both haplotypes are in each file).
-        However, if split in the manner above we need to disambiguate by
-        appending the haplotype, in which case the key become indistinguishable
-        from a dip2 key unless we run the logic of checking the het1/dip1/dip2
-        refkey maps (which is what this function does).
+        If split is True, requrie haplotype to dip1 case and error otherwise.
+        The reverse is True is split is False.
+
+        If nohap is True, throw error if refkey is hap. If False permit the hap
+        case and return False.
         """
-        return self.with_ref_data_full(
+        return self.with_ref_data_full_rconf(
             rk,
-            lambda _: raise_inline(f"hap1 refkey not allowed: {rk}"),
+            split,
+            nohap,
+            lambda _: False,
             lambda _: True,
-            lambda _, __: False,
-        )
-
-    def refkey_is_split_dip1_nohap(self, rk: RefKeyFullS) -> bool:
-        """Like 'refkey_is_dip1' but check if dip1 has a haplotype.
-
-        dip1 is not supposed to have a haplotype normally, but will if we split
-        it into two haplotype streams which happens in mappability for example.
-        """
-        return self.with_ref_data_split_full_nohap(
-            rk,
             lambda _, __: True,
             lambda _, __: False,
         )
-
-    def refkey_is_dip1(self, rk: RefKeyFullS) -> bool:
-        """Like 'refkey_is_dip1' but treat hap as if it were dip2."""
-        return self.with_ref_data_full(
-            rk,
-            lambda _: False,
-            lambda _: True,
-            lambda _, __: False,
-        )
-
-    def refkey_is_split_dip1(self, rk: RefKeyFullS) -> bool:
-        """Like 'refkey_is_split_dip1_hap' but treat hap as if it were dip2."""
-        return self.with_ref_data_split_full(
-            rk,
-            lambda _: False,
-            lambda _, __: True,
-            lambda _, __: False,
-        )
-
-    # def dip1_either(self, left: X, right: X, rk: RefKeyFullS) -> X:
-    #     """Return left if dip1, right if dip2, and error otherwise."""
-    #     return left if self.refkey_is_dip1(rk) else right
-
-    # def dip1_hap_either(self, left: X, right: X, rk: RefKeyFullS) -> X:
-    #     """Return left if dip1, right if dip2 or hap."""
-    #     return left if self.refkey_is_dip1_hap(rk) else right
 
     def thread_per_chromosome(
         self,

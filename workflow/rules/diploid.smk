@@ -14,9 +14,9 @@ dip = config.to_bed_dirs(CoreLevel.DIPLOID)
 def minimap_inputs(wildcards):
     rk = wildcards["ref_final_key"]
     other_rk = flip_full_refkey(rk)
-    isdip1 = config.refkey_is_split_dip1_nohap(rk)
-    attr = "filter_sort_split_ref" if isdip1 else "filter_sort_ref"
-    out = getattr(rules, attr).output
+    out = if_dip1_else(
+        True, True, "filter_sort_split_ref", "filter_sort_ref", wildcards
+    )
     fa = out["fa"]
     idx = out["index"]
 
@@ -93,11 +93,9 @@ rule breaks_cross_alignment_to_bed:
 rule sort_breaks_bed:
     input:
         bed=rules.cross_align_breaks.output,
-        genome=lambda w: (
-            rules.filter_sort_split_ref.output["genome"]
-            if config.refkey_is_split_dip1_nohap(w["ref_final_key"])
-            else rules.filter_sort_ref.output["genome"]
-        ),
+        genome=lambda w: id_dip1_else(
+            True, True, "filter_sort_split_ref", "filter_sort_ref", w
+        )["genome"],
     output:
         dip.inter.postsort.data / "sorted_breaks_cross_align.bed.gz",
     log:
@@ -173,10 +171,8 @@ rule filter_sort_variant_cross_alignment:
 rule variant_cross_alignment_to_bed:
     input:
         bam=rules.filter_sort_variant_cross_alignment.output,
-        hap=lambda w: (
-            rules.filter_sort_split_ref.output
-            if config.refkey_is_split_dip1_nohap(w["ref_final_key"])
-            else rules.filter_sort_ref.output
+        hap=lambda w: if_dip1_else(
+            True, True, "filter_sort_split_ref", "filter_sort_ref", w
         )["fa"],
     output:
         dip.inter.postsort.data / "variant_cross_align.bed.gz",
@@ -261,7 +257,7 @@ use rule combine_dip1_hets as combine_SNVorSV_dip1_hets with:
 
 rule merge_het_regions:
     input:
-        lambda w: dip1_or_dip2("combine_dip1_hets", "merge_all_hets", w),
+        lambda w: if_dip1_else(False, True, "combine_dip1_hets", "merge_all_hets", w),
     output:
         dip.final("het_regions_{merge_len}k"),
     conda:
@@ -281,7 +277,9 @@ rule merge_het_regions:
 
 use rule merge_het_regions as merge_het_SNVorSV_regions with:
     input:
-        lambda w: dip1_or_dip2("combine_SNVorSV_dip1_hets", "merge_SNVorSV_hets", w),
+        lambda w: if_dip1_else(
+            False, True, "combine_SNVorSV_dip1_hets", "merge_SNVorSV_hets", w
+        ),
     output:
         dip.final("het_SNVorSV_regions_{merge_len}k"),
     wildcard_constraints:
