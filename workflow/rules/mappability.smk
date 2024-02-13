@@ -1,6 +1,6 @@
 from os.path import splitext, basename
 from pathlib import Path
-from common.config import CoreLevel, strip_full_refkey
+from common.config import CoreLevel, strip_full_refkey, RefkeyConfiguration
 
 mlty = config.to_bed_dirs(CoreLevel.MAPPABILITY)
 
@@ -62,6 +62,16 @@ rule unpack_gem:
 # index/align
 
 
+def plaid_mode(wildcards):
+    t = config.thread_per_chromosome(
+        wildcards.ref_final_key,
+        wildcards.build_key,
+        4,
+        RefkeyConfiguration.DIP1_SPLIT,
+    )
+    return t * 1.5
+
+
 def filter_mappability_ref_inputs(wildcards):
     rk = wildcards["ref_final_key"]
     rk_ = strip_full_refkey(rk) if config.refkey_is_split_dip1(rk) else rk
@@ -100,7 +110,7 @@ rule gem_index:
         mlty.inter.postsort.data / "index.gem",
     params:
         base=lambda wildcards, output: splitext(output[0])[0],
-    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 4) * 1.5
+    threads: plaid_mode
     resources:
         mem_mb=lambda w: config.buildkey_to_malloc(
             w.ref_final_key, w.build_key, lambda m: m.gemIndex
@@ -128,7 +138,7 @@ rule gem_mappability:
         mlty.inter.postsort.data / "unique_l{l}_m{m}_e{e}.mappability",
     params:
         base=lambda wildcards, output: splitext(output[0])[0],
-    threads: lambda w: int(config.thread_per_chromosome(w.ref_final_key, w.build_key, 4) * 1.5)
+    threads: plaid_mode
     resources:
         mem_mb=lambda w: config.buildkey_to_malloc(
             w.ref_final_key, w.build_key, lambda m: m.gemMappability

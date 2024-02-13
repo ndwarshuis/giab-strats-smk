@@ -2610,12 +2610,15 @@ class GiabStrats(BaseModel):
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
+        rconf: RefkeyConfiguration,
     ) -> HapChrs:
-        return self.with_build_data_full(
+        return self.with_build_data_full_rconf(
             rk,
             bk,
+            rconf,
             lambda bd: bd.refdata.ref.hap_chrs(bd.build_chrs),
             lambda bd: bd.refdata.ref.all_chrs(bd.build_chrs),
+            lambda hap, bd: bd.refdata.ref.hap_chrs(bd.build_chrs, hap),
             lambda hap, bd: bd.refdata.ref.hap_chrs(bd.build_chrs, hap),
         )
 
@@ -2624,7 +2627,7 @@ class GiabStrats(BaseModel):
         rk: RefKeyFullS,
         bk: BuildKey,
     ) -> HapChrs:
-        cis = self.buildkey_to_chrs(rk, bk)
+        cis = self.buildkey_to_chrs(rk, bk, RefkeyConfiguration.STANDARD)
         return HapChrs({i for i in [ChrIndex.CHRX, ChrIndex.CHRY] if i in cis})
 
     def buildkey_to_wanted_xy_names(
@@ -2901,6 +2904,41 @@ class GiabStrats(BaseModel):
             dip2_f,
         )
 
+    def with_ref_data_full_rconf(
+        self,
+        rk: RefKeyFullS,
+        rconf: RefkeyConfiguration,
+        hap_f: Callable[[HapRefData], X],
+        dip1_f: Callable[[Dip1RefData], X],
+        split_dip1_f: Callable[[Haplotype, Dip1RefData], X],
+        dip2_f: Callable[[Haplotype, Dip2RefData], X],
+    ) -> X:
+        """Apply functions to ref data depending on if they are dip1/2/hap and
+        depending on the refkey configuration (standard/split/nohap)
+        """
+        if rconf is RefkeyConfiguration.STANDARD:
+            return self.with_ref_data_full(
+                rk,
+                hap_f,
+                dip1_f,
+                dip2_f,
+            )
+        elif rconf is RefkeyConfiguration.DIP1_SPLIT:
+            return self.with_ref_data_split_full(
+                rk,
+                hap_f,
+                split_dip1_f,
+                dip2_f,
+            )
+        elif rconf is RefkeyConfiguration.DIP1_SPLIT_NOHAP:
+            return self.with_ref_data_split_full_nohap(
+                rk,
+                split_dip1_f,
+                dip2_f,
+            )
+        else:
+            assert_never(rconf)
+
     def with_build_data(
         self,
         rk: RefKey,
@@ -2963,6 +3001,45 @@ class GiabStrats(BaseModel):
             dip1_f,
             dip2_f,
         )
+
+    def with_build_data_full_rconf(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        rconf: RefkeyConfiguration,
+        hap_f: Callable[[HapBuildData], X],
+        dip1_f: Callable[[Dip1BuildData], X],
+        split_dip1_f: Callable[[Haplotype, Dip1BuildData], X],
+        dip2_f: Callable[[Haplotype, Dip2BuildData], X],
+    ) -> X:
+        """Apply functions to build data depending on if they are dip1/2/hap and
+        depending on the refkey configuration (standard/split/nohap)
+        """
+        if rconf is RefkeyConfiguration.STANDARD:
+            return self.with_build_data_full(
+                rk,
+                bk,
+                hap_f,
+                dip1_f,
+                dip2_f,
+            )
+        elif rconf is RefkeyConfiguration.DIP1_SPLIT:
+            return self.with_build_data_split_full(
+                rk,
+                bk,
+                hap_f,
+                split_dip1_f,
+                dip2_f,
+            )
+        elif rconf is RefkeyConfiguration.DIP1_SPLIT_NOHAP:
+            return self.with_build_data_split_full_nohap(
+                rk,
+                bk,
+                split_dip1_f,
+                dip2_f,
+            )
+        else:
+            assert_never(rconf)
 
     def with_ref_data_and_bed(
         self,
@@ -3339,8 +3416,14 @@ class GiabStrats(BaseModel):
     #     """Return left if dip1, right if dip2 or hap."""
     #     return left if self.refkey_is_dip1_hap(rk) else right
 
-    def thread_per_chromosome(self, rk: RefKeyFullS, bk: BuildKey, n: int) -> int:
-        return min(n, len(self.buildkey_to_chrs(rk, bk)))
+    def thread_per_chromosome(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        n: int,
+        rconf: RefkeyConfiguration,
+    ) -> int:
+        return min(n, len(self.buildkey_to_chrs(rk, bk, rconf)))
 
 
 ################################################################################
