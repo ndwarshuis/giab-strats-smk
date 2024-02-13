@@ -64,28 +64,16 @@ rule filter_long_superdups:
         """
 
 
-rule notin_superdups:
+use rule _invert_autosomal_regions as notin_superdups with:
     input:
-        bed=rules.merge_superdups.output,
-        genome=rules.filter_sort_ref.output["genome"],
-        gapless=rules.get_gapless.output.auto,
+        rules.merge_superdups.output,
     output:
         segdup.final("notinsegdups"),
-    conda:
-        "../envs/bedtools.yml"
-    shell:
-        """
-        complementBed -i {input.bed} -g {input.genome} | \
-        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
-        bgzip -c > {output}
-        """
 
 
 use rule notin_superdups as notin_long_superdups with:
     input:
-        bed=rules.filter_long_superdups.output,
-        genome=rules.filter_sort_ref.output["genome"],
-        gapless=rules.get_gapless.output.auto,
+        rules.filter_long_superdups.output,
     output:
         segdup.final("notinsegdups_gt10kb"),
 

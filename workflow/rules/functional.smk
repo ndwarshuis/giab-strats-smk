@@ -72,21 +72,11 @@ rule merge_functional:
         """
 
 
-rule invert_functional:
+use rule _invert_autosomal_regions as invert_functional with:
     input:
-        bed=rules.merge_functional.output,
-        genome=rules.filter_sort_ref.output["genome"],
-        gapless=rules.get_gapless.output.auto,
+        rules.merge_functional.output,
     output:
         func.final("notinrefseq_cds"),
-    conda:
-        "../envs/bedtools.yml"
-    shell:
-        """
-        complementBed -i {input.bed} -g {input.genome} | \
-        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
-        bgzip -c > {output}
-        """
 
 
 rule all_functional:

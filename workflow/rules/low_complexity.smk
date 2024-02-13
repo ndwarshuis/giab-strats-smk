@@ -550,24 +550,11 @@ rule merge_satellites:
 
 
 # TODO not DRY (we "invert" things all the time with this exact same rule)
-rule invert_satellites:
+use rule _invert_autosomal_regions as invert_satellites with:
     input:
-        bed=rules.merge_satellites.output,
+        rules.merge_satellites.output,
     output:
         lc.final("notinsatellites_slop5"),
-    conda:
-        "../envs/bedtools.yml"
-    # this is a nice trick to avoid specifying input files for rule overrides
-    # when they never change
-    params:
-        gapless=rules.get_gapless.output.auto,
-        genome=rules.filter_sort_ref.output["genome"],
-    shell:
-        """
-        complementBed -i {input.bed} -g {params.genome} |
-        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
-        bgzip -c > {output}
-        """
 
 
 ################################################################################
@@ -598,7 +585,7 @@ rule merge_all_uniform_repeats:
 
 use rule invert_satellites as invert_all_uniform_repeats with:
     input:
-        bed=rules.merge_all_uniform_repeats.output,
+        rules.merge_all_uniform_repeats.output,
     output:
         lc.final("notinAllHomopolymers_ge7bp_imperfectge11bp_slop5"),
 
@@ -694,7 +681,7 @@ rule merge_filtered_TRs:
 
 use rule invert_satellites as invert_TRs with:
     input:
-        bed=rules.merge_filtered_TRs.output,
+        rules.merge_filtered_TRs.output,
     output:
         lc.final("notinallTandemRepeats"),
 
@@ -713,7 +700,7 @@ use rule merge_filtered_TRs as merge_HPs_and_TRs with:
 
 use rule invert_satellites as invert_HPs_and_TRs with:
     input:
-        bed=rules.merge_HPs_and_TRs.output,
+        rules.merge_HPs_and_TRs.output,
     output:
         lc.final("notinAllTandemRepeatsandHomopolymers_slop5"),
 

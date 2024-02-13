@@ -241,3 +241,22 @@ rule write_PAR_intermediate:
     localrule: True
     script:
         "../scripts/python/bedtools/xy/write_par.py"
+
+
+# skeleton rules (meant to be overridden elsewhere)
+
+
+rule _invert_autosomal_regions:
+    # this is a nice trick to avoid specifying input files for rule overrides
+    # when they never change
+    params:
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+    conda:
+        "../envs/bedtools.yml"
+    shell:
+        """
+        complementBed -i {input} -g {params.genome} | \
+        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
+        bgzip -c > {output}
+        """

@@ -286,24 +286,13 @@ use rule merge_het_regions as merge_het_SNVorSV_regions with:
         merge_len=f"\d+",
 
 
-rule invert_het_regions:
+use rule _invert_autosomal_regions as invert_het_regions with:
     input:
         rules.merge_het_regions.output,
-    params:
-        gapless=rules.get_gapless.output.auto,
-        genome=rules.filter_sort_ref.output["genome"],
-    conda:
-        "../envs/bedtools.yml"
     output:
         dip.final("hom_regions_{merge_len}k"),
     wildcard_constraints:
         merge_len=f"\d+",
-    shell:
-        """
-        complementBed -i {input} -g {params.genome} | \
-        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
-        bgzip -c > {output}
-        """
 
 
 use rule invert_het_regions as invert_het_SNVorSV_regions with:

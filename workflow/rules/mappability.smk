@@ -271,22 +271,11 @@ def nonunique_inputs(ref_final_key, build_key):
         return json.load(f)
 
 
-rule invert_merged_nonunique:
+use rule _invert_autosomal_regions as invert_merged_nonunique with:
     input:
         lambda w: nonunique_inputs(w.ref_final_key, w.build_key)["all_lowmap"],
     output:
         mlty.final("notinlowmappabilityall"),
-    conda:
-        "../envs/bedtools.yml"
-    params:
-        genome=rules.filter_sort_ref.output["genome"],
-        gapless=rules.get_gapless.output.auto,
-    shell:
-        """
-        complementBed -i {input} -g {params.genome} | \
-        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
-        bgzip -c > {output}
-        """
 
 
 def nonunique_inputs_flat(ref_final_key, build_key):
