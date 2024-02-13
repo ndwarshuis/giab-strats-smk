@@ -1,4 +1,4 @@
-from common.config import CoreLevel, strip_full_refkey
+from common.config import CoreLevel
 
 xy = config.to_bed_dirs(CoreLevel.XY)
 
