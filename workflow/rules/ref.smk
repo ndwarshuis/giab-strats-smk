@@ -58,7 +58,7 @@ rule index_full_ref:
 
 
 def filter_sort_ref_outputs(split, nohap):
-    sp = "split" if split else "nosplit"
+    sp = "withsplit" if split else "nosplit"
     hp = "nohap" if nohap else "withhap"
     fa = f"{sp}_{hp}_filtered_ref.fa"
     prefix = ref.inter.build.data

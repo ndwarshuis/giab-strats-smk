@@ -1,3 +1,4 @@
+import re
 from typing import Any
 from pathlib import Path
 import subprocess as sp
@@ -12,11 +13,28 @@ from common.functional import DesignError
 Finished = sp.CompletedProcess[bytes]
 
 
-def parse_refkeys_config(p: Path) -> cfg.RefkeyConfiguration:
-    try:
-        return next(c for c in cfg.RefkeyConfiguration if p.name.startswith(c.value))
-    except StopIteration:
+def parse_refkeys_config(p: Path) -> tuple[bool, bool]:
+    m = re.match("^([^_]+)_([^_]+)", p.name)
+    if m is None:
         raise DesignError(f"could not parse refkeys config from path: {p}")
+
+    match m[1]:
+        case "split":
+            split = True
+        case "nosplit":
+            split = False
+        case _ as e:
+            raise DesignError(f"unknown split {e}")
+
+    match m[2]:
+        case "withhap":
+            nohap = False
+        case "nohap":
+            nohap = True
+        case _ as e:
+            raise DesignError(f"unknown split {e}")
+
+    return split, nohap
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
@@ -32,6 +50,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     rk = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)
 
+    split, nohap = parse_refkeys_config(fa_out)
+
     cis = sconf.to_build_data(cfg.strip_full_refkey(rk), bk).build_chrs
 
     def go(pat: cfg.ChrPattern) -> Finished:
@@ -43,29 +63,21 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     def dip1(rd: cfg.Dip1RefData) -> Finished:
         return go(rd.ref.chr_pattern)
 
-    def _dip1_split(hap: cfg.Haplotype, rd: cfg.Dip1RefData) -> Finished:
+    def dip1_split(hap: cfg.Haplotype, rd: cfg.Dip1RefData) -> Finished:
         return go(rd.ref.chr_pattern.to_hap_pattern(hap))
 
     def dip2(hap: cfg.Haplotype, rd: cfg.Dip2RefData) -> Finished:
         return go(rd.ref.chr_pattern.choose(hap))
 
-    def standard(rk: cfg.RefKeyFullS) -> Finished:
-        return sconf.with_ref_data_full(rk, hap1, dip1, dip2)
-
-    def dip1_split(rk: cfg.RefKeyFullS) -> Finished:
-        return sconf.with_ref_data_split_full(rk, hap1, _dip1_split, dip2)
-
-    def dip1_split_nohap(rk: cfg.RefKeyFullS) -> Finished:
-        return sconf.with_ref_data_split_full_nohap(rk, _dip1_split, dip2)
-
-    f = cfg.choose_refkey_configuration(
-        parse_refkeys_config(fa_out),
-        standard,
+    proc_fa = sconf.with_ref_data_full_rconf(
+        rk,
+        split,
+        nohap,
+        hap1,
+        dip1,
         dip1_split,
-        dip1_split_nohap,
+        dip2,
     )
-
-    proc_fa = f(rk)
 
     if proc_fa.returncode != 0:
         exit(1)
