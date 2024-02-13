@@ -1236,13 +1236,13 @@ class DipChrPattern(BaseModel, ChrPattern):
     template: str = "chr%i_%h"
     special: dict[ChrIndex, bed.ChrName] = {}
     hapnames: Diploid[HaplotypeName] = Diploid(
-        hap1=HaplotypeName("MATERNAL"),
-        hap2=HaplotypeName("PATERNAL"),
+        hap1=HaplotypeName("PATERNAL"),
+        hap2=HaplotypeName("MATERNAL"),
     )
     # By default, paternal doesn't have X and maternal doesn't have Y
     exclusions: Diploid[set[ChrIndex]] = Diploid(
-        hap1={ChrIndex.CHRY},
-        hap2={ChrIndex.CHRX},
+        hap1={ChrIndex.CHRX},
+        hap2={ChrIndex.CHRY},
     )
 
     @validator("template")
@@ -1407,12 +1407,12 @@ class Dip2ChrSrc(GenericModel, Generic[X]):
     src: Diploid[X]
     chr_pattern: Diploid[HapChrPattern] = Diploid(
         hap1=HapChrPattern(
-            template="chr%i_MATERNAL",
-            exclusions=[ChrIndex.CHRY],
-        ),
-        hap2=HapChrPattern(
             template="chr%i_PATERNAL",
             exclusions=[ChrIndex.CHRX],
+        ),
+        hap2=HapChrPattern(
+            template="chr%i_MATERNAL",
+            exclusions=[ChrIndex.CHRY],
         ),
     )
 
