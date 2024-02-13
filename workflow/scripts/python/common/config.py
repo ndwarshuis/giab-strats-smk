@@ -233,15 +233,15 @@ def choose_xy_unsafe(c: ChrIndex, x_res: X, y_res: X) -> X:
         raise DesignError(f"I am not an X or Y, I am a {c}")
 
 
-def choose_refkey_configuration(r: RefkeyConfiguration, a: X, b: X, c: X) -> X:
-    if r is RefkeyConfiguration.STANDARD:
-        return a
-    elif r is RefkeyConfiguration.DIP1_SPLIT:
-        return b
-    elif r is RefkeyConfiguration.DIP1_SPLIT_NOHAP:
-        return c
-    else:
-        assert_never(r)
+# def choose_refkey_configuration(r: RefkeyConfiguration, a: X, b: X, c: X) -> X:
+#     if r is RefkeyConfiguration.STANDARD:
+#         return a
+#     elif r is RefkeyConfiguration.DIP1_SPLIT:
+#         return b
+#     elif r is RefkeyConfiguration.DIP1_SPLIT_NOHAP:
+#         return c
+#     else:
+#         assert_never(r)
 
 
 def sort_chr_indices(cs: HapChrs) -> OrderedHapChrs:
@@ -920,26 +920,26 @@ class CoreLevel(Enum):
     DIPLOID = "Diploid"
 
 
-@unique
-class RefkeyConfiguration(Enum):
-    """Identifier to track which refkeys are allowed in a given rule/script.
+# @unique
+# class RefkeyConfiguration(Enum):
+#     """Identifier to track which refkeys are allowed in a given rule/script.
 
-    Standard: dip1 doesn't have haplotype appended
-    DIP1_SPLIT: dip1 have haplotype appended
-    DIP1_SPLIT_NOHAP: dip1 have haplotype appended and hap is not allowed at all
+#     Standard: dip1 doesn't have haplotype appended
+#     DIP1_SPLIT: dip1 have haplotype appended
+#     DIP1_SPLIT_NOHAP: dip1 have haplotype appended and hap is not allowed at all
 
-    In all cases hap does not have a haplotype appended and dip2 does have a
-    haplotype appended.
+#     In all cases hap does not have a haplotype appended and dip2 does have a
+#     haplotype appended.
 
-    This is useful for places in the pipeline where we must split the dip1
-    fasta/bed files in order to operate on them separately (het regions,
-    mappability)
+#     This is useful for places in the pipeline where we must split the dip1
+#     fasta/bed files in order to operate on them separately (het regions,
+#     mappability)
 
-    """
+#     """
 
-    STANDARD = "standard"
-    DIP1_SPLIT = "dip1_split"
-    DIP1_SPLIT_NOHAP = "dip1_split_nohap"
+#     STANDARD = "standard"
+#     DIP1_SPLIT = "dip1_split"
+#     DIP1_SPLIT_NOHAP = "dip1_split_nohap"
 
 
 # chromosome name conversions
@@ -2610,12 +2610,14 @@ class GiabStrats(BaseModel):
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
-        rconf: RefkeyConfiguration,
+        split: bool,
+        nohap: bool,
     ) -> HapChrs:
         return self.with_build_data_full_rconf(
             rk,
             bk,
-            rconf,
+            split,
+            nohap,
             lambda bd: bd.refdata.ref.hap_chrs(bd.build_chrs),
             lambda bd: bd.refdata.ref.all_chrs(bd.build_chrs),
             lambda hap, bd: bd.refdata.ref.hap_chrs(bd.build_chrs, hap),
@@ -2627,7 +2629,7 @@ class GiabStrats(BaseModel):
         rk: RefKeyFullS,
         bk: BuildKey,
     ) -> HapChrs:
-        cis = self.buildkey_to_chrs(rk, bk, RefkeyConfiguration.STANDARD)
+        cis = self.buildkey_to_chrs(rk, bk, False, False)
         return HapChrs({i for i in [ChrIndex.CHRX, ChrIndex.CHRY] if i in cis})
 
     def buildkey_to_wanted_xy_names(
@@ -2870,6 +2872,22 @@ class GiabStrats(BaseModel):
             lambda rd: not_none_unsafe(hap, lambda hap: dip2_f(hap, rd)),
         )
 
+    def with_ref_data_full_nohap(
+        self,
+        rk: RefKeyFullS,
+        dip1_f: Callable[[Dip1RefData], X],
+        dip2_f: Callable[[Haplotype, Dip2RefData], X],
+    ) -> X:
+        """Like 'with_ref_data_split_full' but forbids the hap1 case (ie
+        for diploid only rules/scripts)
+        """
+        return self.with_ref_data_full(
+            rk,
+            lambda _: raise_inline(f"hap1 refkey not allowed: {rk}"),
+            dip1_f,
+            dip2_f,
+        )
+
     def with_ref_data_split_full(
         self,
         rk: RefKeyFullS,
@@ -2907,7 +2925,8 @@ class GiabStrats(BaseModel):
     def with_ref_data_full_rconf(
         self,
         rk: RefKeyFullS,
-        rconf: RefkeyConfiguration,
+        split: bool,
+        nohap: bool,
         hap_f: Callable[[HapRefData], X],
         dip1_f: Callable[[Dip1RefData], X],
         split_dip1_f: Callable[[Haplotype, Dip1RefData], X],
@@ -2916,28 +2935,38 @@ class GiabStrats(BaseModel):
         """Apply functions to ref data depending on if they are dip1/2/hap and
         depending on the refkey configuration (standard/split/nohap)
         """
-        if rconf is RefkeyConfiguration.STANDARD:
-            return self.with_ref_data_full(
-                rk,
-                hap_f,
-                dip1_f,
-                dip2_f,
-            )
-        elif rconf is RefkeyConfiguration.DIP1_SPLIT:
-            return self.with_ref_data_split_full(
-                rk,
-                hap_f,
-                split_dip1_f,
-                dip2_f,
-            )
-        elif rconf is RefkeyConfiguration.DIP1_SPLIT_NOHAP:
-            return self.with_ref_data_split_full_nohap(
-                rk,
-                split_dip1_f,
-                dip2_f,
-            )
-        else:
-            assert_never(rconf)
+        match (split, nohap):
+            case (False, False):
+                return self.with_ref_data_full(
+                    rk,
+                    hap_f,
+                    dip1_f,
+                    dip2_f,
+                )
+            case (False, True):
+                return self.with_ref_data_full_nohap(
+                    rk,
+                    dip1_f,
+                    dip2_f,
+                )
+            case (True, False):
+                return self.with_ref_data_split_full(
+                    rk,
+                    hap_f,
+                    split_dip1_f,
+                    dip2_f,
+                )
+            case (True, True):
+                return self.with_ref_data_split_full_nohap(
+                    rk,
+                    split_dip1_f,
+                    dip2_f,
+                )
+            case _:
+                # TODO indeed this should never happen, and mypy currently is
+                # not smart enough to validate that this is the case:
+                # https://github.com/python/mypy/issues/16722
+                raise DesignError("This should never happen")
 
     def with_build_data(
         self,
@@ -2966,6 +2995,22 @@ class GiabStrats(BaseModel):
             lambda bd: none_unsafe(hap, hap_f(bd)),
             lambda bd: none_unsafe(hap, dip1_f(bd)),
             lambda bd: not_none_unsafe(hap, lambda hap: dip2_f(hap, bd)),
+        )
+
+    def with_build_data_full_nohap(
+        self,
+        rfk: RefKeyFullS,
+        bk: BuildKey,
+        dip1_f: Callable[[Dip1BuildData], X],
+        dip2_f: Callable[[Haplotype, Dip2BuildData], X],
+    ) -> X:
+        """Like 'with_ref_data_full' but doesn't allow hap case"""
+        return self.with_build_data_full(
+            rfk,
+            bk,
+            lambda _: raise_inline(f"hap1 refkey not allowed: {rfk}"),
+            dip1_f,
+            dip2_f,
         )
 
     def with_build_data_split_full(
@@ -3006,7 +3051,8 @@ class GiabStrats(BaseModel):
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
-        rconf: RefkeyConfiguration,
+        split: bool,
+        nohap: bool,
         hap_f: Callable[[HapBuildData], X],
         dip1_f: Callable[[Dip1BuildData], X],
         split_dip1_f: Callable[[Haplotype, Dip1BuildData], X],
@@ -3015,31 +3061,42 @@ class GiabStrats(BaseModel):
         """Apply functions to build data depending on if they are dip1/2/hap and
         depending on the refkey configuration (standard/split/nohap)
         """
-        if rconf is RefkeyConfiguration.STANDARD:
-            return self.with_build_data_full(
-                rk,
-                bk,
-                hap_f,
-                dip1_f,
-                dip2_f,
-            )
-        elif rconf is RefkeyConfiguration.DIP1_SPLIT:
-            return self.with_build_data_split_full(
-                rk,
-                bk,
-                hap_f,
-                split_dip1_f,
-                dip2_f,
-            )
-        elif rconf is RefkeyConfiguration.DIP1_SPLIT_NOHAP:
-            return self.with_build_data_split_full_nohap(
-                rk,
-                bk,
-                split_dip1_f,
-                dip2_f,
-            )
-        else:
-            assert_never(rconf)
+        match (split, nohap):
+            case (False, False):
+                return self.with_build_data_full(
+                    rk,
+                    bk,
+                    hap_f,
+                    dip1_f,
+                    dip2_f,
+                )
+            case (False, True):
+                return self.with_build_data_full_nohap(
+                    rk,
+                    bk,
+                    dip1_f,
+                    dip2_f,
+                )
+            case (True, False):
+                return self.with_build_data_split_full(
+                    rk,
+                    bk,
+                    hap_f,
+                    split_dip1_f,
+                    dip2_f,
+                )
+            case (True, True):
+                return self.with_build_data_split_full_nohap(
+                    rk,
+                    bk,
+                    split_dip1_f,
+                    dip2_f,
+                )
+            case _:
+                # TODO indeed this should never happen, and mypy currently is
+                # not smart enough to validate that this is the case:
+                # https://github.com/python/mypy/issues/16722
+                raise DesignError("This should never happen")
 
     def with_ref_data_and_bed(
         self,
@@ -3421,9 +3478,10 @@ class GiabStrats(BaseModel):
         rk: RefKeyFullS,
         bk: BuildKey,
         n: int,
-        rconf: RefkeyConfiguration,
+        split: bool,
+        nohap: bool,
     ) -> int:
-        return min(n, len(self.buildkey_to_chrs(rk, bk, rconf)))
+        return min(n, len(self.buildkey_to_chrs(rk, bk, split, nohap)))
 
 
 ################################################################################

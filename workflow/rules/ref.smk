@@ -4,7 +4,6 @@ from common.config import (
     bd_to_bench_vcf,
     bd_to_query_vcf,
     strip_full_refkey,
-    RefkeyConfiguration,
     ChrIndex,
 )
 
@@ -58,14 +57,15 @@ rule index_full_ref:
 # references. Encode these three possibilities here
 
 
-def filter_sort_ref_outputs(refkeys):
-    r = RefkeyConfiguration(refkeys)
-    fa = r.value + "_filtered_ref.fa"
+def filter_sort_ref_outputs(split, nohap):
+    sp = "split" if split else "nosplit"
+    hp = "nohap" if nohap else "withhap"
+    fa = f"{sp}_{hp}_filtered_ref.fa"
     prefix = ref.inter.build.data
     return {
         "fa": prefix / fa,
         "index": prefix / (fa + ".fai"),
-        "genome": prefix / (r.value + "_genome.txt"),
+        "genome": prefix / f"{sp}_{hp}_genome.txt",
     }
 
 
@@ -73,7 +73,7 @@ rule filter_sort_ref:
     input:
         lambda w: expand_final_to_src(rules.download_ref.output, w),
     output:
-        **filter_sort_ref_outputs("standard"),
+        **filter_sort_ref_outputs(False, False),
     conda:
         "../envs/utils.yml"
     log:
@@ -94,7 +94,7 @@ use rule filter_sort_ref as filter_sort_split_ref with:
             ),
         ),
     output:
-        **filter_sort_ref_outputs("dip1_split"),
+        **filter_sort_ref_outputs(True, False),
     log:
         ref.inter.build.log / "filter_sort_split_ref.log",
 
@@ -111,7 +111,7 @@ use rule filter_sort_ref as filter_sort_split_ref_nohap with:
             ),
         ),
     output:
-        **filter_sort_ref_outputs("dip1_split_nohap"),
+        **filter_sort_ref_outputs(True, True),
     log:
         ref.inter.build.log / "filter_sort_split_ref_nohap.log",
 

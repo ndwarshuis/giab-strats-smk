@@ -1,6 +1,6 @@
 from os.path import splitext, basename
 from pathlib import Path
-from common.config import CoreLevel, strip_full_refkey, RefkeyConfiguration
+from common.config import CoreLevel, strip_full_refkey
 
 mlty = config.to_bed_dirs(CoreLevel.MAPPABILITY)
 
@@ -67,7 +67,8 @@ def plaid_mode(wildcards):
         wildcards.ref_final_key,
         wildcards.build_key,
         4,
-        RefkeyConfiguration.DIP1_SPLIT,
+        True,
+        False,
     )
     return t * 1.5
 
