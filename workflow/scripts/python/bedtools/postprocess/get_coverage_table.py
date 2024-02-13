@@ -4,14 +4,14 @@ from pathlib import Path
 from typing import Any
 import common.config as cfg
 from common.functional import not_none_unsafe
-from common.bed import ChrName
+from common.bed import ChrName, InternalChrIndex
 
 
 def get_chr_paired_mapper(
     sconf: cfg.GiabStrats,
     rk: cfg.RefKeyFullS,
     bk: cfg.BuildKey,
-) -> dict[ChrName, tuple[cfg.ShortChrName, cfg.Haplotype]]:
+) -> dict[ChrName, tuple[cfg.ShortChrName, cfg.Haplotype, InternalChrIndex]]:
     cis = sconf.to_build_data(cfg.strip_full_refkey(rk), bk).build_chrs
     xs = sconf.with_ref_data_full(
         rk,
@@ -19,7 +19,7 @@ def get_chr_paired_mapper(
         lambda rd: rd.ref.chr_pattern.to_chr_data(cis),
         lambda hap, rd: rd.ref.chr_pattern.choose(hap).to_chr_data(cis, hap),
     )
-    return {x.name: (x.shortname, x.haplotype) for x in xs}
+    return {x.name: (x.shortname, x.haplotype, x.idx) for x in xs}
 
 
 def sum_bed_file(path: Path) -> dict[str, int]:
@@ -61,7 +61,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             bp = Path(bedpath.strip())
             level_name, strat_name = bedpath_to_strat_names(bp)
             for chrom, bedtotal in sum_bed_file(bp).items():
-                shortChromName, hap = chr_hap_mapper[ChrName(chrom)]
+                shortChromName, hap, idx = chr_hap_mapper[ChrName(chrom)]
                 fraction = bedtotal / gapless_sum[chrom]
                 fullkey = f"{rk}@{bk}-{hap.value + 1}"
                 newline = "\t".join(
@@ -70,6 +70,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
                         level_name,
                         strat_name,
                         shortChromName,
+                        str(idx),
                         str(fraction),
                     ]
                 )
