@@ -3,7 +3,6 @@ from common.config import (
     bd_to_bench_bed,
     bd_to_bench_vcf,
     bd_to_query_vcf,
-    strip_full_refkey,
     refkey_config_to_prefix,
     ChrIndex,
 )
@@ -87,11 +86,7 @@ use rule filter_sort_ref as filter_sort_split_ref with:
         lambda w: expand(
             rules.download_ref.output,
             allow_missing=True,
-            ref_src_key=(
-                strip_full_refkey(rk)
-                if config.refkey_is_split_dip1(rk := w["ref_final_key"])
-                else rk
-            ),
+            ref_src_key=config.refkey_strip_if_dip1(w["ref_final_key"], False),
         ),
     output:
         **filter_sort_ref_outputs(True, False),
@@ -104,11 +99,7 @@ use rule filter_sort_ref as filter_sort_split_ref_nohap with:
         lambda w: expand(
             rules.download_ref.output,
             allow_missing=True,
-            ref_src_key=(
-                strip_full_refkey(rk)
-                if config.refkey_is_split_dip1_nohap(rk := w["ref_final_key"])
-                else rk
-            ),
+            ref_src_key=config.refkey_strip_if_dip1(w["ref_final_key"], True),
         ),
     output:
         **filter_sort_ref_outputs(True, True),
@@ -130,7 +121,7 @@ def gapless_input(wildcards):
     rk = wildcards.ref_final_key
     bk = wildcards.build_key
 
-    bd = config.to_build_data(strip_full_refkey(rk), bk)
+    bd = config.to_build_data_full(rk, bk)
     sex_chrs = config.buildkey_to_wanted_xy(rk, bk)
 
     gaps_target = (

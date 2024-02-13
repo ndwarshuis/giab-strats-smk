@@ -107,7 +107,7 @@ rule filter_autosomes:
 # first get a list of the X/Y chromosomes required (in the case of dip2, for
 # the haplotype at hand)
 def all_xy_features(ref_final_key, build_key):
-    bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
+    bd = config.to_build_data_full(ref_final_key, build_key)
     sex_chrs = config.buildkey_to_wanted_xy_names(ref_final_key, build_key)
     all_targets = [
         (rules.filter_XTR_features.output[0], bd.want_xy_XTR),
@@ -124,7 +124,7 @@ def all_xy_features(ref_final_key, build_key):
 
 
 def all_xy_PAR(ref_final_key, build_key):
-    bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
+    bd = config.to_build_data_full(ref_final_key, build_key)
     sex_chrs = [
         c
         for c in config.buildkey_to_wanted_xy_names(ref_final_key, build_key)

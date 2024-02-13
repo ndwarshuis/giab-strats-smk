@@ -93,12 +93,12 @@ def combine_dip_inputs(rule, wildcards):
     # NOTE: the wildcard value of ref_final_key will not have a haplotype (as
     # per logic of dip1 references)
     return {
-        h.name: expand(
+        r.hap.name: expand(
             getattr(rules, rule).output,
             allow_missing=True,
-            ref_final_key=RefKeyFull(wildcards.ref_final_key, h).name,
+            ref_final_key=r.name,
         )
-        for h in Haplotype
+        for r in config.refkey_append_if_dip1(wildcards.ref_final_key)
     }
 
 

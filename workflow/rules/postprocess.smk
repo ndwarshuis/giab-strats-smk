@@ -1,7 +1,7 @@
 from os.path import dirname, basename
 from more_itertools import unique_everseen, unzip
 from os import scandir
-from common.config import CoreLevel, strip_full_refkey
+from common.config import CoreLevel
 from common.functional import DesignError
 
 post_inter_dir = config.intermediate_build_dir / "postprocess"
@@ -14,9 +14,9 @@ def expand_strat_targets_inner(ref_final_key, build_key):
     # TODO this is crude
     # NOTE we need to do this because despite the final key potentially having
     # one or two haps, the configuration applies to both haps simultaneously
-    bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
+    bd = config.to_build_data_full(ref_final_key, build_key)
     function_targets = [
-        (all_low_complexity, bd.want_low_complexity),
+        (lambda rk, _: all_low_complexity(rk), bd.want_low_complexity),
         (gc_inputs_flat, bd.want_gc),
         (mappabilty_inputs, bd.want_mappability),
         (het_hom_inputs, bd.want_hets),

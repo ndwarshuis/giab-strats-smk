@@ -1,5 +1,5 @@
 from more_itertools import unzip
-from common.config import strip_full_refkey, bd_to_other
+from common.config import bd_to_other
 
 # make sure the wildcards here can match everything except the "built-in" other-
 # difficult beds (listed here)

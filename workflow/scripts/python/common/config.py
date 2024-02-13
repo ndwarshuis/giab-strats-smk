@@ -2872,6 +2872,20 @@ class GiabStrats(BaseModel):
             lambda rd: not_none_unsafe(hap, lambda hap: dip2_f(hap, rd)),
         )
 
+    def to_ref_data_full(self, rk: RefKeyFullS) -> AnyRefData:
+        """Like 'to_ref_data' but takes a full refkey and does error checking."""
+
+        def hap(rd: HapRefData) -> AnyRefData:
+            return rd
+
+        def dip1(rd: Dip1RefData) -> AnyRefData:
+            return rd
+
+        def dip2(_: Haplotype, rd: Dip2RefData) -> AnyRefData:
+            return rd
+
+        return self.with_ref_data_full(rk, hap, dip1, dip2)
+
     def with_ref_data_full_nohap(
         self,
         rk: RefKeyFullS,
@@ -2996,6 +3010,20 @@ class GiabStrats(BaseModel):
             lambda bd: none_unsafe(hap, dip1_f(bd)),
             lambda bd: not_none_unsafe(hap, lambda hap: dip2_f(hap, bd)),
         )
+
+    def to_build_data_full(self, rk: RefKeyFullS, bk: BuildKey) -> AnyBuildData:
+        """Like 'to_build_data' but takes a full refkey and does error checking."""
+
+        def hap(rd: HapBuildData) -> AnyBuildData:
+            return rd
+
+        def dip1(rd: Dip1BuildData) -> AnyBuildData:
+            return rd
+
+        def dip2(_: Haplotype, rd: Dip2BuildData) -> AnyBuildData:
+            return rd
+
+        return self.with_build_data_full(rk, bk, hap, dip1, dip2)
 
     def with_build_data_full_nohap(
         self,
@@ -3434,6 +3462,34 @@ class GiabStrats(BaseModel):
             lambda _: True,
             lambda _, __: True,
             lambda _, __: False,
+        )
+
+    def refkey_strip_if_dip1(self, rk: RefKeyFullS, nohap: bool) -> RefKeyFullS:
+        """Remove haplotype from refkey if dip1.
+
+        Note this assumes a split refkey configuration.
+        """
+        rk_ = RefKeyFull(strip_full_refkey(rk), None).name
+        if nohap:
+            return self.with_ref_data_split_full_nohap(
+                rk,
+                lambda _, __: rk_,
+                lambda _, __: rk,
+            )
+        else:
+            return self.with_ref_data_split_full(
+                rk,
+                lambda _: rk,
+                lambda _, __: rk_,
+                lambda _, __: rk,
+            )
+
+    def refkey_append_if_dip1(self, rk: RefKeyFullS) -> list[RefKeyFull]:
+        rk_ = strip_full_refkey(rk)
+        return self.with_ref_data_full_nohap(
+            rk,
+            lambda _: [RefKeyFull(rk_, h) for h in Haplotype],
+            lambda _, __: raise_inline("dip2 case not allowed"),
         )
 
     def thread_per_chromosome(

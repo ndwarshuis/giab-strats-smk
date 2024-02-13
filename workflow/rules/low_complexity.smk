@@ -1,12 +1,6 @@
 from more_itertools import unzip, flatten
 from collections import namedtuple
-from common.config import (
-    CoreLevel,
-    si_to_rmsk,
-    si_to_simreps,
-    si_to_satellites,
-    strip_full_refkey,
-)
+from common.config import CoreLevel, si_to_rmsk, si_to_simreps, si_to_satellites
 from functools import partial
 
 lc = config.to_bed_dirs(CoreLevel.LOWCOMPLEXITY)
@@ -523,8 +517,9 @@ rule merge_satellites_intermediate:
     input:
         lambda w: (
             read_checkpoint("normalize_censat", w)
-            if config.to_build_data(
-                strip_full_refkey(w.ref_final_key), w.build_key
+            if config.to_build_data_full(
+                w.ref_final_key,
+                w.build_key,
             ).refdata.has_low_complexity_censat
             else all_rmsk_classes["Satellite"]
         ),
@@ -742,8 +737,8 @@ use rule invert_satellites as invert_HPs_and_TRs with:
 #     localrule: True
 
 
-def all_low_complexity(ref_final_key, _):
-    rd = config.to_ref_data(strip_full_refkey(ref_final_key))
+def all_low_complexity(ref_final_key):
+    rd = config.to_ref_data_full(ref_final_key)
     rmsk = rd.has_low_complexity_rmsk
     simreps = rd.has_low_complexity_simreps
     censat = rd.has_low_complexity_censat

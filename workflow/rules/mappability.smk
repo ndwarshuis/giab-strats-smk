@@ -1,6 +1,6 @@
 from os.path import splitext, basename
 from pathlib import Path
-from common.config import CoreLevel, strip_full_refkey
+from common.config import CoreLevel
 
 mlty = config.to_bed_dirs(CoreLevel.MAPPABILITY)
 
@@ -74,18 +74,17 @@ def plaid_mode(wildcards):
 
 
 def filter_mappability_ref_inputs(wildcards):
-    rk = wildcards["ref_final_key"]
-    rk_ = strip_full_refkey(rk) if config.refkey_is_dip1(rk, True, False) else rk
+    rk = config.refkey_strip_if_dip1(wildcards["ref_final_key"], False)
     return {
         "fa": expand(
             rules.download_ref.output,
             allow_missing=True,
-            ref_src_key=rk_,
+            ref_src_key=rk,
         ),
         "idx": expand(
             rules.index_full_ref.output,
             allow_missing=True,
-            ref_final_key=rk_,
+            ref_final_key=rk,
         ),
     }
 
@@ -228,10 +227,9 @@ rule combine_dip1_nonunique_beds:
 
 
 def merge_nonunique_inputs(wildcards):
-    rkf = wildcards["ref_final_key"]
-    rk = strip_full_refkey(rkf)
+    rk = wildcards["ref_final_key"]
     bk = wildcards["build_key"]
-    l, m, e = config.to_build_data(rk, bk).mappability_params
+    l, m, e = config.to_build_data_full(rk, bk).mappability_params
     out = if_dip1_else(
         False, False, "combine_dip1_nonunique_beds", "wig_to_bed", wildcards
     )
