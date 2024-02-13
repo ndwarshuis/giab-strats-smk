@@ -93,7 +93,7 @@ rule breaks_cross_alignment_to_bed:
 rule sort_breaks_bed:
     input:
         bed=rules.cross_align_breaks.output,
-        genome=lambda w: id_dip1_else(
+        genome=lambda w: if_dip1_else(
             True, True, "filter_sort_split_ref", "filter_sort_ref", w
         )["genome"],
     output:
