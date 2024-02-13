@@ -4,6 +4,7 @@ from common.config import (
     bd_to_bench_vcf,
     bd_to_query_vcf,
     strip_full_refkey,
+    refkey_config_to_prefix,
     ChrIndex,
 )
 
@@ -58,14 +59,13 @@ rule index_full_ref:
 
 
 def filter_sort_ref_outputs(split, nohap):
-    sp = "withsplit" if split else "nosplit"
-    hp = "nohap" if nohap else "withhap"
-    fa = f"{sp}_{hp}_filtered_ref.fa"
-    prefix = ref.inter.build.data
+    prefix = refkey_config_to_prefix(split, nohap)
+    fa = f"{prefix}_filtered_ref.fa"
+    parent = ref.inter.build.data
     return {
-        "fa": prefix / fa,
-        "index": prefix / (fa + ".fai"),
-        "genome": prefix / f"{sp}_{hp}_genome.txt",
+        "fa": parent / fa,
+        "index": parent / (fa + ".fai"),
+        "genome": parent / f"{prefix}_genome.txt",
     }
 
 

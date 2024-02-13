@@ -233,21 +233,41 @@ def choose_xy_unsafe(c: ChrIndex, x_res: X, y_res: X) -> X:
         raise DesignError(f"I am not an X or Y, I am a {c}")
 
 
-# def choose_refkey_configuration(r: RefkeyConfiguration, a: X, b: X, c: X) -> X:
-#     if r is RefkeyConfiguration.STANDARD:
-#         return a
-#     elif r is RefkeyConfiguration.DIP1_SPLIT:
-#         return b
-#     elif r is RefkeyConfiguration.DIP1_SPLIT_NOHAP:
-#         return c
-#     else:
-#         assert_never(r)
-
-
 def sort_chr_indices(cs: HapChrs) -> OrderedHapChrs:
     return OrderedHapChrs(
         [x for x, _ in sorted([(c, c.value) for c in cs], key=lambda x: x[1])]
     )
+
+
+def refkey_config_to_prefix(split: bool, nohap: bool) -> str:
+    sp = "split" if split else "nosplit"
+    hp = "nohap" if nohap else "withhap"
+    return f"{sp}_{hp}"
+
+
+def prefix_to_refkey_config(s: str) -> tuple[bool, bool]:
+    m = re.match("^([^_]+)_([^_]+)", s)
+
+    if m is None:
+        raise DesignError(f"could not parse refkeys config: {s}")
+
+    match m[1]:
+        case "split":
+            split = True
+        case "nosplit":
+            split = False
+        case _ as e:
+            raise DesignError(f"unknown split {e}")
+
+    match m[2]:
+        case "withhap":
+            nohap = False
+        case "nohap":
+            nohap = True
+        case _ as e:
+            raise DesignError(f"unknown split {e}")
+
+    return split, nohap
 
 
 # type helpers
@@ -920,28 +940,6 @@ class CoreLevel(Enum):
     DIPLOID = "Diploid"
 
 
-# @unique
-# class RefkeyConfiguration(Enum):
-#     """Identifier to track which refkeys are allowed in a given rule/script.
-
-#     Standard: dip1 doesn't have haplotype appended
-#     DIP1_SPLIT: dip1 have haplotype appended
-#     DIP1_SPLIT_NOHAP: dip1 have haplotype appended and hap is not allowed at all
-
-#     In all cases hap does not have a haplotype appended and dip2 does have a
-#     haplotype appended.
-
-#     This is useful for places in the pipeline where we must split the dip1
-#     fasta/bed files in order to operate on them separately (het regions,
-#     mappability)
-
-#     """
-
-#     STANDARD = "standard"
-#     DIP1_SPLIT = "dip1_split"
-#     DIP1_SPLIT_NOHAP = "dip1_split_nohap"
-
-
 # chromosome name conversions
 
 
@@ -1080,6 +1078,8 @@ class RefDirs(NamedTuple):
     src: RefSrcDirs
     inter: RefInterDirs
 
+
+# types to enumerate all possible cases for ref and build data operations
 
 ################################################################################
 # Snakemake configuration model

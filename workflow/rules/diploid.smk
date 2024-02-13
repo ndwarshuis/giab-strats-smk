@@ -40,7 +40,7 @@ rule cross_align_breaks:
         unpack(minimap_inputs),
     output:
         dip.inter.postsort.data / "breaks_cross_align.paf.gz",
-    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 8)
+    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 8, True, True)
     log:
         dip.inter.postsort.log / "cross_align_breaks.log",
     benchmark:
@@ -115,7 +115,7 @@ rule cross_align_variants:
         unpack(minimap_inputs),
     output:
         dip.inter.postsort.data / "variant_cross_align.sam.gz",
-    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 8)
+    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 8, True, True)
     log:
         dip.inter.postsort.log / "cross_align_variants.log",
     # this is what dipcall does to produce the pair file in one step

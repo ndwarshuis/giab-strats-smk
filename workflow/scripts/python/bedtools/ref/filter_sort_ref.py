@@ -1,10 +1,8 @@
-import re
 from typing import Any
 from pathlib import Path
 import subprocess as sp
 from common.samtools import chr_filter_sort_fasta
 import common.config as cfg
-from common.functional import DesignError
 
 # Given a FASTA and a build, filter and sort the FASTA for the chromosomes
 # we want, write it either uncompressed or compressed, then index the output
@@ -14,27 +12,7 @@ Finished = sp.CompletedProcess[bytes]
 
 
 def parse_refkeys_config(p: Path) -> tuple[bool, bool]:
-    m = re.match("^([^_]+)_([^_]+)", p.name)
-    if m is None:
-        raise DesignError(f"could not parse refkeys config from path: {p}")
-
-    match m[1]:
-        case "split":
-            split = True
-        case "nosplit":
-            split = False
-        case _ as e:
-            raise DesignError(f"unknown split {e}")
-
-    match m[2]:
-        case "withhap":
-            nohap = False
-        case "nohap":
-            nohap = True
-        case _ as e:
-            raise DesignError(f"unknown split {e}")
-
-    return split, nohap
+    return cfg.prefix_to_refkey_config(p.name)
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
