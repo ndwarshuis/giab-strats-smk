@@ -145,6 +145,8 @@ rule filter_sort_variant_cross_alignment:
         dip.inter.postsort.data / "sorted_variant_cross_alignments.bam",
     benchmark:
         dip.inter.postsort.bench / "filter_sort_variant_cross_alignment.txt"
+    log:
+        dip.inter.postsort.log / "filter_sort_variant_cross_alignment.txt",
     conda:
         "../envs/quasi-dipcall.yml"
     threads: 4
@@ -160,7 +162,7 @@ rule filter_sort_variant_cross_alignment:
         """
         k8 {input.aux_bin} samflt {input.sam} | \
         samtools sort -m{params.mem_per_thread}M --threads {threads} \
-        > {output}
+        2> {log} > {output}
         """
 
 
@@ -234,7 +236,7 @@ rule merge_all_hets:
 use rule merge_all_hets as merge_SNVorSV_hets with:
     input:
         rules.filter_SNVorSV.output,
-        rules.breaks_cross_alignment_to_bed.output,
+        rules.sort_breaks_bed.output,
     output:
         dip.inter.postsort.data / "SNV_or_SV_het_regions.bed.gz",
 
