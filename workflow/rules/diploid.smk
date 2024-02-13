@@ -213,6 +213,7 @@ rule filter_SNVorSV:
         """
 
 
+# gzip here so we can concatenate later without crossing the beams
 rule merge_all_hets:
     input:
         rules.variant_cross_alignment_to_bed.output,
