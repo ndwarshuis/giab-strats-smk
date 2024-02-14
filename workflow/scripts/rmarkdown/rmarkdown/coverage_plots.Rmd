@@ -30,7 +30,7 @@ read_coverage <- function(paths) {
     right_join(all_combos, by = c("chrom", "key", "stype", "strat")) %>%
     replace_na(list(coverage = 0)) %>%
     arrange(stype, strat, chromIndex) %>%
-    mutate(chrom = factor(chrom, names = chrom))
+    mutate(chrom = factor(chrom, levels = chrom))
 }
 
 coverage_plot <- function(df, level) {
