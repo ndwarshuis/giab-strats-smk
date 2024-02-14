@@ -17,7 +17,7 @@ knitr::opts_chunk$set(fig.width=25, fig.height=6, fig_caption=TRUE)
 read_coverage_table <- function(path) {
   read_tsv(
     path,
-    col_types = "ccccd",
+    col_types = "ccccid",
     col_names = c("key", "stype", "strat", "chrom", "chromIndex", "coverage")
   )
 }
