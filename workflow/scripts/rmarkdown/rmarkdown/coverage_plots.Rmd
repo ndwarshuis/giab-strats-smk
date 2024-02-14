@@ -35,7 +35,7 @@ read_coverage <- function(paths) {
 coverage_plot <- function(df, level) {
   cat(sprintf("#### %s\n\n", level))
   p <- df %>%
-    ggplot(aes(fct_reorder(chrom, chromIndex), coverage, fill = key)) +
+    ggplot(aes(chrom, coverage, fill = key)) +
     geom_col(position = "dodge") +
     scale_y_continuous(labels = scales::percent) +
     theme(legend.position = "top",
