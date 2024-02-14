@@ -24,18 +24,19 @@ read_coverage_table <- function(path) {
 
 read_coverage <- function(paths) {
   df <- snakemake@input$coverage %>%
-    map_dfr(read_coverage_table)
+    map_dfr(read_coverage_table) %>%
   all_combos <- expand(df, key, chrom, nesting(stype, strat))
   df %>%
     right_join(all_combos, by = c("chrom", "key", "stype", "strat")) %>%
     replace_na(list(coverage = 0)) %>%
-    arrange(stype, strat)
+    arrange(stype, strat, chromIndex) %>%
+    mutate(chrom = factor(chrom, names = chrom))
 }
 
 coverage_plot <- function(df, level) {
   cat(sprintf("#### %s\n\n", level))
   p <- df %>%
-    ggplot(aes(reorder(chrom, chromIndex), coverage, fill = key)) +
+    ggplot(aes(chrom, coverage, fill = key)) +
     geom_col(position = "dodge") +
     scale_y_continuous(labels = scales::percent) +
     theme(legend.position = "top",
