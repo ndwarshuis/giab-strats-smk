@@ -60,6 +60,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         for bedpath in i:
             bp = Path(bedpath.strip())
             level_name, strat_name = bedpath_to_strat_names(bp)
+            # TODO I could make these names a bit shorter by only appending
+            # the haplotype to dip2 references since that's the only place
+            # we need to do this
             for chrom, bedtotal in sum_bed_file(bp).items():
                 shortChromName, hap, idx = chr_hap_mapper[ChrName(chrom)]
                 fraction = bedtotal / gapless_sum[chrom]
