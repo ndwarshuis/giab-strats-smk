@@ -3500,7 +3500,7 @@ class GiabStrats(BaseModel):
         split: bool,
         nohap: bool,
     ) -> int:
-        return min(n, len(self.buildkey_to_chrs(rk, bk, split, nohap)))
+        return max(n, len(self.buildkey_to_chrs(rk, bk, split, nohap)))
 
 
 ################################################################################
