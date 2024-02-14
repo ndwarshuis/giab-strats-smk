@@ -70,7 +70,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
                         level_name,
                         strat_name,
                         shortChromName,
-                        str(idx),
+                        str(idx - hap.value * 24),
                         str(fraction),
                     ]
                 )
