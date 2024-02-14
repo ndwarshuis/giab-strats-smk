@@ -17,7 +17,7 @@ knitr::opts_chunk$set(fig.width=25, fig.height=6, fig_caption=TRUE)
 read_coverage_table <- function(path) {
   read_tsv(
     path,
-    col_types = "ccccid",
+    col_types = "cccfid",
     col_names = c("key", "stype", "strat", "chrom", "chromIndex", "coverage")
   )
 }
@@ -29,14 +29,13 @@ read_coverage <- function(paths) {
   df %>%
     right_join(all_combos, by = c("chrom", "key", "stype", "strat")) %>%
     replace_na(list(coverage = 0)) %>%
-    arrange(stype, strat, chromIndex) %>%
-    mutate(chrom = factor(chrom, levels = chrom))
+    arrange(stype, strat)
 }
 
 coverage_plot <- function(df, level) {
   cat(sprintf("#### %s\n\n", level))
   p <- df %>%
-    ggplot(aes(chrom, coverage, fill = key)) +
+    ggplot(aes(fct_reorder(chrom, chromIndex), coverage, fill = key)) +
     geom_col(position = "dodge") +
     scale_y_continuous(labels = scales::percent) +
     theme(legend.position = "top",
