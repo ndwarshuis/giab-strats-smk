@@ -1953,7 +1953,7 @@ class Malloc(BaseModel):
     filterSortVariantCrossAlignment: int = 16000  # samtools sort
 
     # happy
-    runHappy: int = 24000
+    runHappy: int = 48000
 
 
 class Build(GenericModel, Generic[AnyBedT, AnyBedT_]):
