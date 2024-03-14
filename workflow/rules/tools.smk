@@ -53,8 +53,10 @@ use rule unpack_repseq as unpack_kent with:
 # NOTE this entire thing is simply to get bigBedToBed, which I can't seem to
 # install using conda without it complaining that the constraints for my other
 # packages can't be satisfied (something about openssl and python needing
-# different version). "easy" solution: build from source. Start by building
-# just the kent libraries and then just build the bigBedToBed binary.
+# different version). This binary is also available on the UCSC download portal
+# but it doesn't seem to be version-tagged. "easy" solution: build from source.
+# Start by building just the kent libraries and then just build the bigBedToBed
+# binary.
 rule build_kent:
     input:
         rules.unpack_kent.output[0],
