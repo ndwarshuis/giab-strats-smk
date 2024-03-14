@@ -1,9 +1,8 @@
 from pathlib import Path
 import subprocess as sp
-from typing import Callable
+from typing import Callable, IO
 from typing_extensions import assert_never
-from tempfile import NamedTemporaryFile as Tmp
-from common.io import is_bgzip, is_gzip, get_md5, setup_logging
+import common.io as io
 from common.functional import DesignError
 import common.config as cfg
 
@@ -13,68 +12,77 @@ import common.config as cfg
 
 smk_log = snakemake.log[0]  # type: ignore
 
-log = setup_logging(smk_log)
+log = io.setup_logging(smk_log)
 
-GUNZIP = ["gunzip", "-c"]
-BGZIP = ["bgzip", "-c"]
-GZIP = ["gzip", "-c"]
 CURL = ["curl", "-f", "-Ss", "-L", "-q"]
 
 
-def main(opath: str, src: cfg.BedSrc | cfg.RefSrc | None) -> None:
+def main(bbBin: str, opath: str, src: cfg.BedSrc | cfg.RefSrc | None) -> None:
     if isinstance(src, cfg.FileSrc_):
         # ASSUME these are already tested via the pydantic class for the
         # proper file format
         Path(opath).symlink_to(Path(src.filepath).resolve())
 
     elif isinstance(src, cfg.HttpSrc_):
-        curlcmd = [*CURL, src.url]
+        with open(opath, "wb") as f:
+            curlcmd = [*CURL, src.url]
+            bbcmd = [bbBin, src.url, "stdout"]
 
-        # to test the format of downloaded files, sample the first 65000 bytes
-        # (which should be enough to get one block of a bgzip file, which will
-        # allow us to test for it)
-        curltestcmd = [*CURL, "-r", "0-65000", src.url]
-
-        with open(opath, "wb") as f, Tmp() as tf, open(smk_log, "w") as lf:
+            # to test the format of downloaded files, sample the first 65000
+            # bytes (which should be enough to get one block of a bgzip file,
+            # which will allow us to test for it)
+            curltestcmd = [*CURL, "-r", "0-65000", src.url]
 
             def curl() -> None:
-                if sp.run(curlcmd, stdout=f, stderr=lf).returncode != 0:
-                    exit(1)
+                p = sp.run(curlcmd, stdout=f, stderr=sp.PIPE)
+                io.check_processes([p], smk_log)
 
-            def curl_test(testfun: Callable[[Path], bool]) -> bool:
-                if sp.run(curltestcmd, stdout=tf, stderr=lf).returncode != 0:
-                    exit(1)
-                return testfun(Path(tf.name))
+            def curl_test(testfun: Callable[[IO[bytes]], bool]) -> bool:
+                p, o = io.spawn_stream(curltestcmd)
+                res = testfun(o)
+                io.check_processes([p], smk_log)
+                return res
 
-            def curl_gzip(cmd: list[str]) -> None:
-                p1 = sp.Popen(curlcmd, stdout=sp.PIPE, stderr=lf)
-                p2 = sp.run(cmd, stdin=p1.stdout, stdout=f, stderr=lf)
-                p1.wait()
-                if not (p1.returncode == p2.returncode == 0):
-                    exit(1)
+            def curl_gzip(use_bgzip: bool) -> None:
+                zipf = io.bgzip if use_bgzip else io.gzip_
+                p1, o1 = io.spawn_stream(curlcmd)
+                p2 = zipf(o1, f)
+                o1.close()
+                io.check_processes([p1, p2], smk_log)
 
-            # if we are getting a bed file (or related) ensure it is in gzip
-            # format
+            def bb_bed_gzip() -> None:
+                p1, o1 = io.spawn_stream(bbcmd)
+                p2 = io.gzip_(o1, f)
+                o1.close()
+                io.check_processes([p1, p2], smk_log)
+
+            # If we are getting a bed(like) file ensure it is in gzip
+            # format; if we are getting a bigbed file then force it to a bed
+            # then gzip it
             if isinstance(src, cfg.BedHttpSrc):
-                if curl_test(is_gzip):
+                # ASSUME that any url that points to a big-bed will end in .bb
+                # TODO this may or may not actually be true, in which case
+                # it might be sensible to override with a config switch
+                if src.url.endswith(".bb"):
+                    bb_bed_gzip()
+                elif curl_test(io.is_gzip_stream):
                     curl()
                 else:
-                    curl_gzip(GZIP)
+                    curl_gzip(False)
 
             # if we are getting a fasta file ensure it is in bgzip format
             elif isinstance(src, cfg.RefHttpSrc):
-                if curl_test(is_bgzip):
+                if curl_test(io.is_bgzip_stream):
                     curl()
-                elif curl_test(is_gzip):
-                    p1 = sp.Popen(curlcmd, stdout=sp.PIPE, stderr=lf)
-                    p2 = sp.Popen(GUNZIP, stdin=p1.stdout, stdout=sp.PIPE, stderr=lf)
-                    p3 = sp.run(BGZIP, stdin=p2.stdout, stdout=f, stderr=lf)
-                    p1.wait()
-                    p2.wait()
-                    if not (p1.returncode == p2.returncode == p3.returncode == 0):
-                        exit(1)
+                elif curl_test(io.is_gzip_stream):
+                    p1, o1 = io.spawn_stream(curlcmd)
+                    p2, o2 = io.gunzip_stream(o1)
+                    p3 = io.bgzip(o2, f)
+                    o1.close()
+                    o2.close()
+                    io.check_processes([p1, p2, p3], smk_log)
                 else:
-                    curl_gzip(BGZIP)
+                    curl_gzip(True)
             else:
                 assert_never(src)
 
@@ -83,9 +91,9 @@ def main(opath: str, src: cfg.BedSrc | cfg.RefSrc | None) -> None:
     else:
         assert_never(src)
 
-    if src.md5 is not None and src.md5 != (actual := get_md5(opath, True)):
+    if src.md5 is not None and src.md5 != (actual := io.get_md5(opath, True)):
         log.error("md5s don't match; wanted %s, actual %s", src.md5, actual)
         exit(1)
 
 
-main(snakemake.output[0], snakemake.params.src)  # type: ignore
+main(snakemake.input[0], snakemake.output[0], snakemake.params.src)  # type: ignore

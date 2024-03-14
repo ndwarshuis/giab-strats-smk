@@ -467,26 +467,23 @@ haploid_stratifications:
           data:
             src:
               hap:
-                url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/annotation/chm13v2.0_RepeatMasker_4.1.2p1.bed
+                url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/t2tRepeatMasker/chm13v2.0_rmsk.bb
                 md5: f304b3f2a98c1772c693e3b01c33e409
-          class_col: 6
+          class_col: 3
         simreps:
           data:
             src:
-              # from here: https://app.globus.org/file-manager?origin_id=9db1f0a6-a05a-11ea-8f06-0a21f750d19b&origin_path=%2Fteam-segdups%2FAssembly_analysis%2FMasked%2F/T2T_CHM13v2_trf.bed
               hap:
-                filepath: test/data/CHM13/LowComplexity/trf21and22.bed.gz
-                md5: 73c59d8c9f062fbc75d834b851e2d738
-        # https://t2t-consortium.slack.com/files/ULT7E06GL/F039A96RY84/t2t_censat_chm13v2.0_trackv2.0.bed
+                url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/bbi/simpleRepeat.bb
+                md5: 4548537655ac6dc4fcad8f0cdb2deca9
         satellites:
           data:
             src:
               hap:
-                filepath: test/data/CHM13/LowComplexity/censat21and22.bed.gz
+                url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/censat/censat.bb
                 md5: cf0ca1d84f41263b25ba1863bca99b5b
           params:
             skip_lines: 1
-          # the column with the type of satellite in it (for filtering)
           sat_col: 3
       xy:
         # from a slack thread w/ Melissa Wilson
@@ -514,7 +511,12 @@ haploid_stratifications:
           start: [0, 2458320]
           end: [62122809, 62460029]
       segdups:
-        superdups: null
+        superdups:
+          data:
+            src:
+              hap:
+                url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/sedefSegDups/sedefSegDups.bb
+                md5: 674a084afd2a80b35955f20a11fc0621
       functional:
         ftbl_src:
           hap:

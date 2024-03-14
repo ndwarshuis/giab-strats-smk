@@ -36,6 +36,51 @@ rule build_repseq:
         "make -C {input} 2>&1 > {log} && mv {input}/repseq {output}"
 
 
+use rule download_repseq as download_kent with:
+    output:
+        config.tools_src_dir / "kent.tar.gz",
+    params:
+        url=config.tools.kent,
+
+
+use rule unpack_repseq as unpack_kent with:
+    input:
+        rules.download_kent.output,
+    output:
+        directory(config.tools_make_dir / "kent"),
+
+
+# NOTE this entire thing is simply to get bigBedToBed, which I can't seem to
+# install using conda without it complaining that the constraints for my other
+# packages can't be satisfied (something about openssl and python needing
+# different version). "easy" solution: build from source. Start by building
+# just the kent libraries and then just build the bigBedToBed binary.
+rule build_kent:
+    input:
+        rules.unpack_kent.output[0],
+    output:
+        config.tools_bin_dir / "bigBedToBed",
+    threads: 8
+    log:
+        config.log_root_dir / "tools" / "kent_build.log",
+    conda:
+        "../envs/kent.yml"
+    params:
+        destdir=lambda _, output: str(Path(output[0]).parent),
+    shell:
+        """
+        here=$(pwd)
+        libpath="$CONDA_PREFIX/include"
+
+        cd $here/{input}/src
+        make clean -j{threads} 2>&1 > /dev/null
+        CFLAGS="-I$libpath" make libs -j{threads} 2>&1 > {log}
+
+        cd $here/{input}/src/utils/bigBedToBed
+        make DESTDIR=$here/{params.destdir} BINDIR=/ 2>&1 > {log}
+        """
+
+
 use rule download_repseq as download_paftools with:
     output:
         config.tools_src_dir / "paftools.js",

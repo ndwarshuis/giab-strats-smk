@@ -1,0 +1,11 @@
+channels:
+  - conda-forge
+dependencies:
+  # build tools
+  - make=4.3
+  - gcc=12.2.0
+  # stuff that kent needs to build everything
+  - mysql
+  - libuuid
+  - zlib
+  - freetype

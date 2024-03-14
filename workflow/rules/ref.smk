@@ -13,6 +13,8 @@ ref = config.ref_dirs
 
 
 rule download_ref:
+    input:
+        rules.build_kent.output,
     output:
         ref.src.reference.data / "ref.fna.gz",
     params:

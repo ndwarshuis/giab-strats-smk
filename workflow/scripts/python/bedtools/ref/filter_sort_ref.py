@@ -3,6 +3,7 @@ from pathlib import Path
 import subprocess as sp
 from common.samtools import chr_filter_sort_fasta
 import common.config as cfg
+import common.io as io
 
 # Given a FASTA and a build, filter and sort the FASTA for the chromosomes
 # we want, write it either uncompressed or compressed, then index the output
@@ -64,14 +65,13 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     # columns of the .fai (uncompressed) index.
     with open(index_out, "w") as i, open(genome_out, "w") as g:
         cmd = ["samtools", "faidx", str(fa_out), "-o", "-"]
-        proc_idx = sp.run(cmd, stdout=sp.PIPE, text=True)
+        proc_idx = sp.run(cmd, stdout=sp.PIPE)
         for x in proc_idx.stdout.splitlines():
-            i.write(x + "\n")
-            g.write("\t".join(x.split("\t")[0:2]) + "\n")
+            i.write(x.decode() + "\n")
+            g.write("\t".join(x.decode().split("\t")[0:2]) + "\n")
 
     # TODO log errors here if the index step fails
-    if proc_idx.returncode != 0:
-        exit(1)
+    io.check_processes([proc_idx], log)
 
 
 main(snakemake, snakemake.config)  # type: ignore

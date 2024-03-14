@@ -28,30 +28,39 @@ def setup_logging(path: str, console: bool = False) -> Logger:
     return logger
 
 
+def is_gzip_stream(i: IO[bytes]) -> bool:
+    # test if gzip by inspecting the first two bytes in the stream
+    return i.read(2) == b"\x1f\x8b"
+
+
+def is_bgzip_stream(i: IO[bytes]) -> bool:
+    # since bgzip is in blocks (vs gzip), determine if in bgzip by
+    # attempting to seek first block
+    try:
+        # NOTE this will also raise a StopIteration exception if it gets EOF,
+        # which should never happen (in theory...)
+        bgzf._load_bgzf_block(i)
+        return True
+    except ValueError:
+        return False
+
+
 def is_gzip(p: Path) -> bool:
     # test if gzip by trying to read first byte
-    with gzip.open(p, "r") as f:
-        try:
-            f.read(1)
-            return True
-        except gzip.BadGzipFile:
-            return False
+    with open(p, "rb") as f:
+        return is_gzip_stream(f)
 
 
 def is_bgzip(p: Path) -> bool:
     # since bgzip is in blocks (vs gzip), determine if in bgzip by
     # attempting to seek first block
     with open(p, "rb") as f:
-        try:
-            next(bgzf.BgzfBlocks(f), None)
-            return True
-        except ValueError:
-            return False
+        return is_bgzip_stream(f)
 
 
 def spawn_stream(
     cmd: list[str],
-    i: IO[bytes] | int,
+    i: IO[bytes] | int | None = None,
 ) -> tuple[sp.Popen[bytes], IO[bytes]]:
     p = sp.Popen(cmd, stdin=i, stdout=sp.PIPE, stderr=sp.PIPE)
     # ASSUME since we typed the inputs so that the stdin/stdout can only take
@@ -63,6 +72,15 @@ def spawn_stream(
 def bgzip_file(i: IO[bytes], p: Path) -> sp.CompletedProcess[bytes]:
     with open(p, "wb") as f:
         return bgzip(i, f)
+
+
+def gzip_(i: IO[bytes], o: IO[bytes]) -> sp.CompletedProcess[bytes]:
+    """Stream gzip to endpoint.
+
+    NOTE: this will block since this is almost always going to be the
+    final step in a pipeline.
+    """
+    return sp.run(["gzip", "-c"], stdin=i, stdout=o)
 
 
 def bgzip(i: IO[bytes], o: IO[bytes]) -> sp.CompletedProcess[bytes]:
@@ -84,11 +102,21 @@ def gunzip(i: Path) -> tuple[sp.Popen[bytes], IO[bytes]]:
     return (p, not_none_unsafe(p.stdout, noop))
 
 
-def check_processes(ps: list[sp.Popen[bytes]], log: Path) -> None:
+def gunzip_stream(i: IO[bytes]) -> tuple[sp.Popen[bytes], IO[bytes]]:
+    p = sp.Popen(["gunzip", "-c"], stdin=i, stdout=sp.PIPE)
+    return (p, not_none_unsafe(p.stdout, noop))
+
+
+def check_processes(
+    ps: list[sp.Popen[bytes] | sp.CompletedProcess[bytes]], log: Path
+) -> None:
     some_error = False
     with open(log, "w") as lf:
         for p in ps:
-            _, err = p.communicate()  # break deadlocks if there are any
+            if isinstance(p, sp.CompletedProcess):
+                err = p.stderr
+            else:
+                _, err = p.communicate()  # break deadlocks if there are any
             if p.returncode != 0:
                 some_error = True
 
