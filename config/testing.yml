@@ -468,7 +468,7 @@ haploid_stratifications:
             src:
               hap:
                 url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/t2tRepeatMasker/chm13v2.0_rmsk.bb
-                md5: f304b3f2a98c1772c693e3b01c33e409
+                md5: 5bb6104edd5c5f5246c60eebeac97e57
           class_col: 3
         simreps:
           data:
@@ -481,7 +481,7 @@ haploid_stratifications:
             src:
               hap:
                 url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/censat/censat.bb
-                md5: cf0ca1d84f41263b25ba1863bca99b5b
+                md5: aa89dad8ab80270f963f2c99f1df3697
           params:
             skip_lines: 1
           sat_col: 3
