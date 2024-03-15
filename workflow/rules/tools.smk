@@ -76,10 +76,10 @@ rule build_kent:
 
         cd $here/{input}/src
         make clean -j{threads} 2>&1 > /dev/null
-        CFLAGS="-I$libpath" make libs -j{threads} 2>&1 > {log}
+        CFLAGS="-I$libpath" make libs -j{threads} 2>&1 > $here/{log}
 
         cd $here/{input}/src/utils/bigBedToBed
-        make DESTDIR=$here/{params.destdir} BINDIR=/ 2>&1 > {log}
+        make DESTDIR=$here/{params.destdir} BINDIR=/ 2>&1 > $here/{log}
         """
 
 
