@@ -5,7 +5,7 @@ dependencies:
   - make=4.3
   - gcc=12.2.0
   # stuff that kent needs to build everything
-  - mysql
-  - libuuid
-  - zlib
-  - freetype
+  - mysql=8.3.0
+  - libuuid=2.38.1
+  - zlib=1.2.13
+  - freetype=2.12.1
