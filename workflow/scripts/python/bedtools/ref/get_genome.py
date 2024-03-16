@@ -1,7 +1,6 @@
 from typing import Any
-import pandas as pd
 import common.config as cfg
-from common.bed import filter_sort_bed
+from common.bed import ChrName
 from common.functional import DesignError
 
 
@@ -22,14 +21,15 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     im, fm = f(cfg.wc_to_reffinalkey(ws), cfg.wc_to_buildkey(ws))
 
     # ASSUME the input for this is a .fa.fai file (columns = chr, length)
-    df = pd.read_table(
-        smk.input[0],
-        header=None,
-        dtype={0: str, 1: int},
-        usecols=[0, 1],
-    )
-    filtered = filter_sort_bed(im, fm, df, 2)
-    filtered.to_csv(smk.output[0], sep="\t", header=False, index=False)
+    with open(smk.input[0], "r") as i, open(smk.output[0], "w") as o:
+        for line in i:
+            s = line.split("\t")
+            chr = ChrName(s[0])
+            try:
+                chrIdx = im[chr]
+            except KeyError:
+                continue
+            o.write(f"{fm[chrIdx]}\t{s[1]}")
 
 
 main(snakemake, snakemake.config)  # type: ignore
