@@ -123,6 +123,8 @@ def bed_to_stream(df: pd.DataFrame) -> Generator[IO[bytes], None, None]:
     _r = os.fdopen(r, "rb")
     _w = os.fdopen(w, "w")
 
+    # TODO this will do weird things if it throws an exception (which the caller
+    # can't read)
     def read_df() -> None:
         write_bed_stream(_w, df)
         _w.close()
