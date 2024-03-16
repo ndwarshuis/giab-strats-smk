@@ -2,7 +2,6 @@ import hashlib
 from logging import Logger
 from typing import IO
 from pathlib import Path
-from Bio import bgzf  # type: ignore
 import subprocess as sp
 from common.functional import not_none_unsafe, noop
 import gzip
@@ -36,13 +35,7 @@ def is_gzip_stream(i: IO[bytes]) -> bool:
 def is_bgzip_stream(i: IO[bytes]) -> bool:
     # since bgzip is in blocks (vs gzip), determine if in bgzip by
     # attempting to seek first block
-    try:
-        # NOTE this will also raise a StopIteration exception if it gets EOF,
-        # which should never happen (in theory...)
-        bgzf._load_bgzf_block(i)
-        return True
-    except ValueError:
-        return False
+    return i.read(4) == b"\x1f\x8b\x08\x04"
 
 
 def is_gzip(p: Path) -> bool:
