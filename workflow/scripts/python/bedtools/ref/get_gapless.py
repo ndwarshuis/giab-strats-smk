@@ -82,28 +82,23 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         with bed_to_stream(gaps_df) as s:
             p1, o1 = mergeBed(s, ["-d", "100"])
             p2, o2 = complementBed(o1, genome_path)
-            # gaps_with_parY = read_bed_default(o2)
 
-        # If we have a parY bed, subtract parY from the gaps bed, otherwise just
-        # link them since we have nothing to subtract off
-        if hasattr(inputs, "parY"):
-            parY_src = Path(inputs["parY"])
-            p3, o3, o4 = tee(o2)
-            # with bed_to_stream(gaps_with_parY) as s:
-            #     p3, o3 = subtractBed(s, parY_src, genome_path)
-            #     gaps_no_parY = read_bed_default(o3)
-            p4, o5 = subtractBed(o3, parY_src, genome_path)
-            # gaps_no_parY = read_bed_default(o3)
+            # If we have a parY bed, subtract parY from the gaps bed, otherwise
+            # just link them since we have nothing to subtract off
+            if hasattr(inputs, "parY"):
+                parY_src = Path(inputs["parY"])
+                p3, o3, o4 = tee(o2)
+                p4, o5 = subtractBed(o3, parY_src, genome_path)
 
-            bgzip_file(o4, parY_out)
-            bgzip_file(o5, auto_out)
+                bgzip_file(o4, parY_out)
+                bgzip_file(o5, auto_out)
 
-            check_processes([p1, p2, p3, p4], log)
-        else:
-            bgzip_file(o2, auto_out)
-            parY_out.symlink_to(auto_out.resolve())
+                check_processes([p1, p2, p3, p4], log)
+            else:
+                bgzip_file(o2, auto_out)
+                parY_out.symlink_to(auto_out.resolve())
 
-            check_processes([p1, p2], log)
+                check_processes([p1, p2], log)
 
 
 main(snakemake, snakemake.config)  # type: ignore
