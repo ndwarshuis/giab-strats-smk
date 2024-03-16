@@ -28,13 +28,10 @@ def setup_logging(path: str, console: bool = False) -> Logger:
 
 
 def is_gzip_stream(i: IO[bytes]) -> bool:
-    # test if gzip by inspecting the first two bytes in the stream
     return i.read(2) == b"\x1f\x8b"
 
 
 def is_bgzip_stream(i: IO[bytes]) -> bool:
-    # since bgzip is in blocks (vs gzip), determine if in bgzip by
-    # attempting to seek first block
     return i.read(4) == b"\x1f\x8b\x08\x04"
 
 
