@@ -97,6 +97,12 @@ def gunzip_stream(i: IO[bytes]) -> tuple[sp.Popen[bytes], IO[bytes]]:
     return (p, not_none_unsafe(p.stdout, noop))
 
 
+def tee(i: IO[bytes]) -> tuple[sp.Popen[bytes], IO[bytes], IO[bytes]]:
+    cmd = ["tee", "-a", "/dev/stderr"]
+    p = sp.Popen(cmd, stdin=i, stdout=sp.PIPE, stderr=sp.PIPE)
+    return (p, not_none_unsafe(p.stdout, noop), not_none_unsafe(p.stderr, noop))
+
+
 def check_processes(
     ps: list[sp.Popen[bytes] | sp.CompletedProcess[bytes]], log: Path
 ) -> None:

@@ -4,12 +4,11 @@ import common.config as cfg
 from common.bed import (
     write_bed,
     bed_to_stream,
-    read_bed_default,
     complementBed,
     mergeBed,
     subtractBed,
 )
-from common.io import check_processes
+from common.io import check_processes, tee, bgzip_file
 from common.functional import match1_unsafe, match2_unsafe
 import pandas as pd
 
@@ -82,28 +81,29 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
         with bed_to_stream(gaps_df) as s:
             p1, o1 = mergeBed(s, ["-d", "100"])
-            gaps_bed = read_bed_default(o1)
-
-        with bed_to_stream(gaps_bed) as s:
-            p2, o2 = complementBed(s, genome_path)
-            gaps_with_parY = read_bed_default(o2)
+            p2, o2 = complementBed(o1, genome_path)
+            # gaps_with_parY = read_bed_default(o2)
 
         # If we have a parY bed, subtract parY from the gaps bed, otherwise just
         # link them since we have nothing to subtract off
         if hasattr(inputs, "parY"):
             parY_src = Path(inputs["parY"])
-            with bed_to_stream(gaps_with_parY) as s:
-                p3, o3 = subtractBed(s, parY_src, genome_path)
-                gaps_no_parY = read_bed_default(o3)
-            check_processes([p1, p2, p3], log)
+            p3, o3, o4 = tee(o2)
+            # with bed_to_stream(gaps_with_parY) as s:
+            #     p3, o3 = subtractBed(s, parY_src, genome_path)
+            #     gaps_no_parY = read_bed_default(o3)
+            p4, o5 = subtractBed(o3, parY_src, genome_path)
+            # gaps_no_parY = read_bed_default(o3)
 
-            write_bed(parY_out, gaps_with_parY)
-            write_bed(auto_out, gaps_no_parY)
+            bgzip_file(o4, parY_out)
+            bgzip_file(o5, auto_out)
+
+            check_processes([p1, p2, p3, p4], log)
         else:
-            check_processes([p1, p2], log)
-
-            write_bed(auto_out, gaps_with_parY)
+            bgzip_file(o2, auto_out)
             parY_out.symlink_to(auto_out.resolve())
+
+            check_processes([p1, p2], log)
 
 
 main(snakemake, snakemake.config)  # type: ignore
