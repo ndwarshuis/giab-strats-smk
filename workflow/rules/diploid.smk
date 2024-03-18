@@ -268,9 +268,15 @@ rule merge_het_regions:
         genome=rules.filter_sort_ref.output["genome"],
     wildcard_constraints:
         merge_len=f"\d+",
+    # NOTE: The initial gunzip is very necessary despite the fact that mergeBed
+    # can read gzip'ed files. For the dip1 case, the incoming bed will be two
+    # concat'ed gzip'ed beds, and for some reason bedtools will only read the
+    # first bed (probably because there's a header in the middle of the file?).
+    # Unzipping first to a text stream will solve this issue.
     shell:
         """
-        mergeBed -i {input} -d $(({wildcards.merge_len}*1000)) | \
+        gunzip -c {input} | \
+        mergeBed -i stdin -d $(({wildcards.merge_len}*1000)) | \
         intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
         bgzip -c > {output}
         """
