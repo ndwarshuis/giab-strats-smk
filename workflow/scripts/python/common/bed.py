@@ -6,9 +6,10 @@ import pandas as pd
 import subprocess as sp
 from typing import NewType, IO, Generator
 from pathlib import Path
-from common.functional import not_none_unsafe, noop
-from common.io import spawn_stream
-from Bio import bgzf  # type: ignore
+from common.functional import not_none_unsafe, noop, DesignError
+from common.io import spawn_stream, bgzip_file
+
+# from Bio import bgzf  # type: ignore
 import csv
 
 # A complete chromosome name like "chr1" or "chr21_PATERNAL"
@@ -125,20 +126,28 @@ def bed_to_stream(df: pd.DataFrame) -> Generator[IO[bytes], None, None]:
     _r = os.fdopen(r, "rb")
     _w = os.fdopen(w, "w")
 
-    # TODO this will do weird things if it throws an exception (which the caller
-    # can't read)
+    # NOTE: python threads can't pass exceptions between themselves and the
+    # calling thread, so need to hack something to signal when something bad
+    # happens. Do this by closing read side of the thread (which will also make
+    # any process that depends on the pipe die since it can't be opened after
+    # we close it), and then testing if the read end is closed after the context
+    # block.
     def read_df() -> None:
-        write_bed_stream(_w, df)
-        _w.close()
+        try:
+            write_bed_stream(_w, df)
+        except Exception:
+            _r.close()
+        finally:
+            _w.close()
 
     t = threading.Thread(target=read_df)
     t.start()
 
     try:
         yield _r
+        if _r.closed:
+            raise DesignError("bed stream thread exited unexpectedly")
     finally:
-        # close read end first so that we send SIGPIPE if the reader exits
-        # prematurely
         _r.close()
         _w.close()
 
@@ -148,8 +157,10 @@ def write_bed(path: Path, df: pd.DataFrame) -> None:
 
     Dataframe is not checked to make sure it is a "real" bed file.
     """
-    with bgzf.open(path, "w") as f:
-        write_bed_stream(f, df)
+    with bed_to_stream(df) as s:
+        bgzip_file(s, path)
+    # with bgzf.open(path, "w") as f:
+    #     write_bed_stream(f, df)
 
 
 def complementBed(

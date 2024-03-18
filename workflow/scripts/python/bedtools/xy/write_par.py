@@ -1,5 +1,7 @@
 from typing import Any
-from Bio import bgzf  # type: ignore
+import subprocess as sp
+
+# from Bio import bgzf  # type: ignore
 import common.config as cfg
 
 
@@ -15,9 +17,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     par_fun = cfg.choose_xy_unsafe(i, cxy.fmt_x_par_unsafe, cxy.fmt_y_par_unsafe)
 
-    # TODO not dry?
-    with bgzf.BgzfWriter(smk.output[0], "w") as f:
-        f.write(par_fun(pat))
+    par = par_fun(pat)
+    with open(smk.output[0], "wb") as f:
+        sp.run(["bgzip", "-c"], input=par, stdout=f, text=True)
 
 
 main(snakemake, snakemake.config)  # type: ignore
