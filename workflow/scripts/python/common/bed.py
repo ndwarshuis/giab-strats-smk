@@ -4,7 +4,7 @@ import os
 import contextlib
 import pandas as pd
 import subprocess as sp
-from typing import Type, NewType, IO, Generator
+from typing import NewType, IO, Generator
 from pathlib import Path
 from common.functional import not_none_unsafe, noop
 from common.io import spawn_stream
@@ -32,6 +32,8 @@ FinalMapper = dict[InternalChrIndex, ChrName]
 # paternal, False = maternal
 SplitMapper = dict[str, bool]
 
+BedColumns = tuple[int, int, int]
+
 
 def make_split_mapper(im: InitMapper, fm: FinalMapper) -> SplitMapper:
     return {n: i in fm for n, i in im.items()}
@@ -39,7 +41,7 @@ def make_split_mapper(im: InitMapper, fm: FinalMapper) -> SplitMapper:
 
 def read_bed(
     path: Path,
-    columns: dict[int, Type[int | str]],
+    columns: BedColumns,
     skip_lines: int,
     sep: str,
     more: list[int],
@@ -73,7 +75,7 @@ def read_bed(
 
 def read_bed_raw(
     h: IO[bytes] | Path,
-    columns: dict[int, Type[int | str]],
+    columns: BedColumns,
     skip_lines: int,
     sep: str,
     more: list[int],
@@ -87,7 +89,7 @@ def read_bed_raw(
         skiprows=skip_lines,
         # satisfy type checker :/
         dtype={
-            **{k: v for k, v in columns.items()},
+            **{columns[0]: str, columns[1]: int, columns[2]: int},
             **{m: str for m in more},
         },
     )
@@ -95,7 +97,7 @@ def read_bed_raw(
 
 
 def read_bed_default(h: IO[bytes] | Path) -> pd.DataFrame:
-    return read_bed_raw(h, {0: str, 1: int, 2: int}, 0, "\t", [])
+    return read_bed_raw(h, (0, 1, 2), 0, "\t", [])
 
 
 def bed_to_text(df: pd.DataFrame) -> Generator[str, None, None]:

@@ -1562,8 +1562,8 @@ class BedColumns(BaseModel):
         ), "Column must be different index"
 
     @property
-    def columns(self) -> dict[int, Type[int | str]]:
-        return {self.chr: str, self.start: int, self.end: int}
+    def columns(self) -> bed.BedColumns:
+        return (self.chr, self.start, self.end)
 
 
 class BedFileParams(BaseModel):

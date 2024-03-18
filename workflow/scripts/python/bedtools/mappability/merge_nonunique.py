@@ -5,7 +5,7 @@ from pathlib import Path
 import common.config as cfg
 import subprocess as sp
 from common.bed import (
-    read_bed,
+    read_bed_default,
     filter_sort_bed,
     bed_to_stream,
     mergeBed,
@@ -44,9 +44,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         # Sort here because we can't assume wig2bed sorts its output. Also,
         # filtering is necessary because the output should have unplaced contigs
         # in it that we don't want.
-        return filter_sort_bed(
-            im, fm, read_bed(p, {0: str, 1: int, 2: int}, 0, "\t", [])
-        )
+        return filter_sort_bed(im, fm, read_bed_default(p))
 
     def merge_bed(bed: IO[bytes], out: Path) -> tuple[sp.Popen[bytes], sp.Popen[bytes]]:
         p1, o1 = mergeBed(bed, ["-d", "100"])
