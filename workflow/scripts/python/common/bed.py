@@ -46,6 +46,7 @@ def read_bed(
     skip_lines: int,
     sep: str,
     more: list[int],
+    comment: str | None,
 ) -> pd.DataFrame:
     """Read a bed file as a pandas dataframe.
 
@@ -71,7 +72,7 @@ def read_bed(
                 total_skip += 1
             else:
                 break
-    return read_bed_raw(path, columns, total_skip, sep, more)
+    return read_bed_raw(path, columns, total_skip, sep, more, comment)
 
 
 def read_bed_raw(
@@ -80,6 +81,7 @@ def read_bed_raw(
     skip_lines: int,
     sep: str,
     more: list[int],
+    comment: str | None,
 ) -> pd.DataFrame:
     bedcols = [*columns, *more]
     df = pd.read_table(
@@ -88,17 +90,18 @@ def read_bed_raw(
         usecols=bedcols,
         sep=sep,
         skiprows=skip_lines,
+        comment=comment,
         # satisfy type checker :/
         dtype={
             **{columns[0]: str, columns[1]: int, columns[2]: int},
             **{m: str for m in more},
         },
-    )
+    )[bedcols]
     return df.set_axis(range(len(bedcols)), axis=1)
 
 
 def read_bed_default(h: IO[bytes] | Path) -> pd.DataFrame:
-    return read_bed_raw(h, (0, 1, 2), 0, "\t", [])
+    return read_bed_raw(h, (0, 1, 2), 0, "\t", [], None)
 
 
 def bed_to_text(df: pd.DataFrame) -> Generator[str, None, None]:

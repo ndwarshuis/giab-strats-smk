@@ -1626,10 +1626,17 @@ class BedFile(GenericModel, Generic[X]):
         """Read bed file with params from Path."""
         return self._read(path, [])
 
-    def _read(self, path: Path, more: list[int] = []) -> pd.DataFrame:
+    def _read(
+        self,
+        path: Path,
+        more: list[int] = [],
+        comment: str | None = None,
+    ) -> pd.DataFrame:
         "Read bed file with params from Path, optionally with 'more' columns."
         p = self.params
-        return bed.read_bed(path, p.bed_cols.columns, p.skip_lines, p.sep, more)
+        return bed.read_bed(
+            path, p.bed_cols.columns, p.skip_lines, p.sep, more, comment
+        )
 
 
 RefSrc = RefFileSrc | RefHttpSrc
@@ -2009,11 +2016,11 @@ class Build(GenericModel, Generic[AnyBedT, AnyBedT_]):
         return fmap_maybe(lambda x: x.other, self.comparison)
 
 
-class FunctionalParams(GenericModel):
+class FunctionalParams(BaseModel):
     # Defaults for a for a "normal" gff file with Refseq and CDS for source and
     # type columns respectively
-    refseq_match: tuple[str, int] | None = ("RefSeq", 1)
-    cds_match: tuple[str, int] | None = ("CDS", 2)
+    source_match: tuple[str, int] | None = ("RefSeq", 1)
+    type_match: tuple[str, int] | None = ("CDS", 2)
     attr_col: int = 8
 
 
@@ -2027,9 +2034,10 @@ class Functional(BedFile[X], Generic[X]):
         """Read a bed file at 'path' on disk and return dataframe"""
         mempty: list[int] = []
         fps = self.fparams
-        r = fmap_maybe_def(mempty, lambda x: [x[1]], fps.refseq_match)
-        c = fmap_maybe_def(mempty, lambda x: [x[1]], fps.cds_match)
-        return super()._read(path, r + c + [fps.attr_col])
+        r = fmap_maybe_def(mempty, lambda x: [x[1]], fps.source_match)
+        c = fmap_maybe_def(mempty, lambda x: [x[1]], fps.type_match)
+        # comment needed here since GFF files have ### at the end (womp)
+        return super()._read(path, r + c + [fps.attr_col], "#")
 
 
 class StratInputs(GenericModel, Generic[AnyBedT]):
@@ -3477,13 +3485,11 @@ class GiabStrats(BaseModel):
             lambda bd: fmap_maybe(lambda x: x.data.src, bd_to_bench_vcf(bd))
         )
 
-    # @property
-    # def all_refkey_ftbl(self) -> list[RefKeyFullS]:
-    #     return self._all_bed_refsrckeys(bd_to_ftbl)
-
-    # @property
-    # def all_refkey_gff(self) -> list[RefKeyFullS]:
-    #     return self._all_bed_refsrckeys(bd_to_gff)
+    @property
+    def all_refkey_functional(self) -> list[RefKeyFullS]:
+        return self._all_bed_refsrckeys(
+            lambda bd: fmap_maybe(lambda x: x.data.src, bd_to_satellites(bd))
+        )
 
     # other nice functions
 
