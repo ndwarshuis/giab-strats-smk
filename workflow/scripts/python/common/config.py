@@ -270,6 +270,28 @@ def prefix_to_refkey_config(s: str) -> tuple[bool, bool]:
     return split, nohap
 
 
+def wrap_dip_2to2_i_f(
+    f: Callable[[X, Haplotype, Dip2BuildData, Dip2BedFile], Y],
+    i: tuple[X, X],
+    bd: Dip2BuildData,
+    bf: Dip2BedFile,
+) -> tuple[Y, Y]:
+    return (f(i[0], Haplotype.HAP1, bd, bf), f(i[1], Haplotype.HAP2, bd, bf))
+
+
+def wrap_dip_2to2_io_f(
+    f: Callable[[X, Path, Haplotype, Dip2BuildData, Dip2BedFile], Y],
+    i: tuple[X, X],
+    o: tuple[Path, Path],
+    bd: Dip2BuildData,
+    bf: Dip2BedFile,
+) -> tuple[Y, Y]:
+    return (
+        f(i[0], o[0], Haplotype.HAP1, bd, bf),
+        f(i[1], o[1], Haplotype.HAP2, bd, bf),
+    )
+
+
 # type helpers
 
 
@@ -493,7 +515,21 @@ def bd_to_si(
     return f(x.refdata.strat_inputs)
 
 
-def si_to_simreps(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | None:
+def si_to_functional(x: StratInputs[AnyBedT]) -> Functional[AnyBedT] | None:
+    return x.functional
+
+
+def bd_to_functional(
+    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
+) -> Functional[AnyBedT] | None:
+    return (
+        si_to_functional(x.refdata.strat_inputs)
+        if x.want_functional or x.want_vdj
+        else None
+    )
+
+
+def si_to_simreps(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
     return x.low_complexity.simreps
 
 
@@ -503,7 +539,7 @@ def bd_to_simreps(
     return si_to_simreps(x.refdata.strat_inputs) if x.want_low_complexity else None
 
 
-def si_to_rmsk(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | None:
+def si_to_rmsk(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
     return x.low_complexity.rmsk
 
 
@@ -513,7 +549,7 @@ def bd_to_rmsk(
     return si_to_rmsk(x.refdata.strat_inputs) if x.want_low_complexity else None
 
 
-def si_to_satellites(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | None:
+def si_to_satellites(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
     return x.low_complexity.satellites
 
 
@@ -523,7 +559,7 @@ def bd_to_satellites(
     return si_to_satellites(x.refdata.strat_inputs) if x.want_low_complexity else None
 
 
-def si_to_superdups(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | None:
+def si_to_superdups(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
     return x.segdups.superdups
 
 
@@ -533,7 +569,7 @@ def bd_to_superdups(
     return si_to_superdups(x.refdata.strat_inputs) if x.want_segdups else None
 
 
-def si_to_gaps(x: StratInputs[AnyBedT, AnySrcT]) -> BedFile[AnyBedT] | None:
+def si_to_gaps(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
     return x.gap
 
 
@@ -569,24 +605,24 @@ def bd_to_query_vcf(
     return fmap_maybe(lambda y: y.query_vcf, x.build.bench)
 
 
-def si_to_ftbl(x: StratInputs[AnyBedT, AnySrcT]) -> AnySrcT | None:
-    return fmap_maybe(lambda y: y.ftbl_src, x.functional)
+# def si_to_ftbl(x: StratInputs[AnyBedT, AnySrcT]) -> AnySrcT | None:
+#     return fmap_maybe(lambda y: y.ftbl_src, x.functional)
 
 
-def si_to_gff(x: StratInputs[AnyBedT, AnySrcT]) -> AnySrcT | None:
-    return fmap_maybe(lambda y: y.gff_src, x.functional)
+# def si_to_gff(x: StratInputs[AnyBedT, AnySrcT]) -> AnySrcT | None:
+#     return fmap_maybe(lambda y: y.gff_src, x.functional)
 
 
-def bd_to_ftbl(
-    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
-) -> AnySrcT | None:
-    return si_to_ftbl(x.refdata.strat_inputs) if x.want_functional else None
+# def bd_to_ftbl(
+#     x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
+# ) -> AnySrcT | None:
+#     return si_to_ftbl(x.refdata.strat_inputs) if x.want_functional else None
 
 
-def bd_to_gff(
-    x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
-) -> AnySrcT | None:
-    return si_to_gff(x.refdata.strat_inputs) if x.want_functional else None
+# def bd_to_gff(
+#     x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
+# ) -> AnySrcT | None:
+#     return si_to_gff(x.refdata.strat_inputs) if x.want_functional else None
 
 
 # snakemake wildcard helpers
@@ -1973,20 +2009,36 @@ class Build(GenericModel, Generic[AnyBedT, AnyBedT_]):
         return fmap_maybe(lambda x: x.other, self.comparison)
 
 
-class Functional(GenericModel, Generic[X]):
+class FunctionalParams(GenericModel):
+    # Defaults for a for a "normal" gff file with Refseq and CDS for source and
+    # type columns respectively
+    refseq_match: tuple[str, int] | None = ("RefSeq", 1)
+    cds_match: tuple[str, int] | None = ("CDS", 2)
+    attr_col: int = 8
+
+
+class Functional(BedFile[X], Generic[X]):
     """Configuration for Functional stratifications."""
 
-    ftbl_src: X
-    gff_src: X
+    data: X
+    fparams: FunctionalParams = FunctionalParams()
+
+    def read(self, path: Path) -> pd.DataFrame:
+        """Read a bed file at 'path' on disk and return dataframe"""
+        mempty: list[int] = []
+        fps = self.fparams
+        r = fmap_maybe_def(mempty, lambda x: [x[1]], fps.refseq_match)
+        c = fmap_maybe_def(mempty, lambda x: [x[1]], fps.cds_match)
+        return super()._read(path, r + c + [fps.attr_col])
 
 
-class StratInputs(GenericModel, Generic[AnyBedT, AnySrcT]):
+class StratInputs(GenericModel, Generic[AnyBedT]):
     gap: BedFile[AnyBedT] | None
     low_complexity: LowComplexity[AnyBedT]
     xy: XY
     mappability: Mappability | None
     segdups: SegDups[AnyBedT]
-    functional: Functional[AnySrcT] | None
+    functional: Functional[AnyBedT] | None
 
     @property
     def xy_features_unsafe(self) -> XYFeatures:
@@ -2000,8 +2052,8 @@ class StratInputs(GenericModel, Generic[AnyBedT, AnySrcT]):
         return choose_xy_unsafe(i, f.x_bed, f.y_bed)
 
 
-HapStratInputs = StratInputs[HapChrSrc[BedSrc], Haploid[BedSrc]]
-DipStratInputs = StratInputs[Dip1ChrSrc[BedSrc] | Dip2ChrSrc[BedSrc], Diploid[BedSrc]]
+HapStratInputs = StratInputs[HapChrSrc[BedSrc]]
+DipStratInputs = StratInputs[Dip1ChrSrc[BedSrc] | Dip2ChrSrc[BedSrc]]
 
 StratInputT = TypeVar("StratInputT", HapStratInputs, DipStratInputs)
 
@@ -2030,7 +2082,7 @@ class RefData_(Generic[RefSrcT, AnyBedT, AnyBedT_, AnySrcT]):
 
     refkey: RefKey
     ref: RefSrcT
-    strat_inputs: StratInputs[AnyBedT, AnySrcT]
+    strat_inputs: StratInputs[AnyBedT]
     builds: dict[BuildKey, Build[AnyBedT, AnyBedT_]]
 
     @property
@@ -2273,7 +2325,7 @@ class Stratification(GenericModel, Generic[RefSrcT, AnyBedT, AnyBedT_, AnySrcT])
     """Configuration for stratifications for a given reference."""
 
     ref: RefSrcT
-    strat_inputs: StratInputs[AnyBedT, AnySrcT]
+    strat_inputs: StratInputs[AnyBedT]
     builds: dict[BuildKey, Build[AnyBedT, AnyBedT_]]
 
 
@@ -2804,19 +2856,19 @@ class GiabStrats(BaseModel):
             raise DesignError()
         return from_hap_or_dip(src.data.src, hap)
 
-    def refkey_to_functional_refsrckeys(
-        self, f: StratInputToSrc, rk: RefKey
-    ) -> list[RefKeyFullS]:
-        """Like 'refkey_to_bed_refsrckeys' but for source files in the
-        "Functional" stratification level."""
-        return self.to_ref_data(rk).get_refkeys_unsafe(f)
+    # def refkey_to_functional_refsrckeys(
+    #     self, f: StratInputToSrc, rk: RefKey
+    # ) -> list[RefKeyFullS]:
+    #     """Like 'refkey_to_bed_refsrckeys' but for source files in the
+    #     "Functional" stratification level."""
+    #     return self.to_ref_data(rk).get_refkeys_unsafe(f)
 
-    def refsrckey_to_functional_src(
-        self, f: StratInputToSrc, rk: RefKeyFullS
-    ) -> BedSrc:
-        """Like 'refsrckey_to_bed_src' but for source files in the
-        "Functional" stratification level."""
-        return self._refkey_to_src(lambda rd: f(rd.strat_inputs), rk)
+    # def refsrckey_to_functional_src(
+    #     self, f: StratInputToSrc, rk: RefKeyFullS
+    # ) -> BedSrc:
+    #     """Like 'refsrckey_to_bed_src' but for source files in the
+    #     "Functional" stratification level."""
+    #     return self._refkey_to_src(lambda rd: f(rd.strat_inputs), rk)
 
     def to_ref_data(self, rk: RefKey) -> AnyRefData:
         """Lookup refdata object for a given refkey."""
@@ -3223,7 +3275,7 @@ class GiabStrats(BaseModel):
             lambda hap, rd, bf: dip_2to2_f(hap, rd.to_build_data_unsafe(bk), bf),
         )
 
-    def _with_build_data_and_bed_i(
+    def with_build_data_and_bed_i(
         self,
         rk: RefKey,
         bk: BuildKey,
@@ -3257,7 +3309,7 @@ class GiabStrats(BaseModel):
             ),
         )
 
-    def _with_build_data_and_bed_io(
+    def with_build_data_and_bed_io2(
         self,
         rk: RefKey,
         bk: BuildKey,
@@ -3287,7 +3339,7 @@ class GiabStrats(BaseModel):
                 both(output_f, src.keys(rk)), lambda o: write_outputs([*o])
             )
 
-        return self._with_build_data_and_bed_i(
+        return self.with_build_data_and_bed_i(
             rk,
             bk,
             inputs,
@@ -3331,20 +3383,11 @@ class GiabStrats(BaseModel):
 
         """
 
-        def _dip_2to2_f(
-            i: tuple[X, X],
-            o: tuple[Path, Path],
-            bd: Dip2BuildData,
-            bf: Dip2BedFile,
-        ) -> None:
-            dip_2to2_f(i[0], o[0], Haplotype.HAP1, bd, bf)
-            dip_2to2_f(i[1], o[1], Haplotype.HAP2, bd, bf)
-
         def write_output(ps: list[Path]) -> None:
             with open(output, "w") as f:
                 json.dump([str(p) for p in ps], f)
 
-        self._with_build_data_and_bed_io(
+        self.with_build_data_and_bed_io2(
             rk,
             bk,
             inputs,
@@ -3355,7 +3398,7 @@ class GiabStrats(BaseModel):
             dip_1to1_f,
             dip_1to2_f,
             dip_2to1_f,
-            _dip_2to2_f,
+            lambda i, o, bd, bf: wrap_dip_2to2_io_f(dip_2to2_f, i, o, bd, bf),
         )
 
     # final refkey/buildkey lists (for the "all" target and related)
@@ -3434,13 +3477,13 @@ class GiabStrats(BaseModel):
             lambda bd: fmap_maybe(lambda x: x.data.src, bd_to_bench_vcf(bd))
         )
 
-    @property
-    def all_refkey_ftbl(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(bd_to_ftbl)
+    # @property
+    # def all_refkey_ftbl(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(bd_to_ftbl)
 
-    @property
-    def all_refkey_gff(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(bd_to_gff)
+    # @property
+    # def all_refkey_gff(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(bd_to_gff)
 
     # other nice functions
 
@@ -3533,14 +3576,14 @@ class RefDataToSrc(Protocol):
 class StratInputToBed(Protocol):
     A = TypeVar("A", HapChrSrc[BedSrc], Dip1ChrSrc[BedSrc] | Dip2ChrSrc[BedSrc])
 
-    def __call__(self, __x: StratInputs[A, AnySrcT]) -> BedFile[A] | None:
+    def __call__(self, __x: StratInputs[A]) -> BedFile[A] | None:
         pass
 
 
 class StratInputToSrc(Protocol):
     A = TypeVar("A", Haploid[BedSrc], Diploid[BedSrc])
 
-    def __call__(self, __x: StratInputs[AnyBedT, A]) -> A | None:
+    def __call__(self, __x: StratInputs[AnyBedT]) -> A | None:
         pass
 
 
