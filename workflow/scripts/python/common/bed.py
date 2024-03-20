@@ -246,7 +246,8 @@ def filter_sort_bed(
     df[chr_col] = df[chr_col].map(from_map)
     df = sort_bed_numerically(df.dropna(subset=[chr_col]), n)
     df[chr_col] = df[chr_col].map(to_map)
-    return df
+    # remove lines where the start and end are the same
+    return df[df[1] != df[2]].copy()
 
 
 def split_bed(
