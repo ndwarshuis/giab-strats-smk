@@ -2019,7 +2019,7 @@ class Build(GenericModel, Generic[AnyBedT, AnyBedT_]):
 class FunctionalParams(BaseModel):
     # Defaults for a for a "normal" gff file with Refseq and CDS for source and
     # type columns respectively
-    source_match: tuple[str, int] | None = ("RefSeq", 1)
+    source_match: tuple[str, int] | None = (".*RefSeq", 1)
     type_match: tuple[str, int] | None = ("CDS", 2)
     attr_col: int = 8
 
