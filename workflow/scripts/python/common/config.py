@@ -3488,7 +3488,7 @@ class GiabStrats(BaseModel):
     @property
     def all_refkey_functional(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.data.src, bd_to_satellites(bd))
+            lambda bd: fmap_maybe(lambda x: x.data.src, bd_to_functional(bd))
         )
 
     # other nice functions
