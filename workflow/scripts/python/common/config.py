@@ -743,6 +743,9 @@ def read_filter_sort_dip1to2_bed(
     imap, splitter = conv.init_mapper
     fmap0, fmap1 = conv.final_mapper
 
+    # TODO small micro-optimization for when I feel like it; splitting the bed
+    # will also filter it, so we need only sort it after vs filtering and
+    # sorting
     def go(df: pd.DataFrame, fmap: bed.FinalMapper) -> pd.DataFrame:
         return bed.filter_sort_bed(imap, fmap, df)
 
