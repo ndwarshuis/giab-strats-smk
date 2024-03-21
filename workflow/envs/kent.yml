@@ -4,6 +4,7 @@ dependencies:
   # build tools
   - make=4.3
   - gcc=12.2.0
+  - binutils=2.40
   # stuff that kent needs to build everything
   - mysql=8.3.0
   - libuuid=2.38.1
