@@ -3,7 +3,7 @@ from common.config import CoreLevel, si_to_functional
 func = config.to_bed_dirs(CoreLevel.FUNCTIONAL)
 
 
-# use rule download_ref as download_ftbl with:
+# use rule download_gaps as download_ftbl with:
 #     output:
 #         func.src.data / "ftbl.txt.gz",
 #     params:
@@ -13,7 +13,7 @@ func = config.to_bed_dirs(CoreLevel.FUNCTIONAL)
 #         func.src.log / "ftbl.log",
 
 
-use rule download_ref as download_functional with:
+use rule download_gaps as download_functional with:
     output:
         func.src.data / "gff.txt.gz",
     params:

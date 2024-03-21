@@ -11,7 +11,7 @@ other_constraints = {
 }
 
 
-use rule download_ref as download_other with:
+use rule download_gaps as download_other with:
     output:
         config.ref_src_dir
         / "{build_key}"

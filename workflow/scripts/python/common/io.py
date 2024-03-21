@@ -1,6 +1,6 @@
 import hashlib
 from logging import Logger
-from typing import IO
+from typing import IO, Callable
 from pathlib import Path
 import subprocess as sp
 from common.functional import not_none_unsafe, noop
@@ -101,6 +101,40 @@ def tee(i: IO[bytes]) -> tuple[sp.Popen[bytes], IO[bytes], IO[bytes]]:
     cmd = ["tee", "-a", "/dev/stderr"]
     p = sp.Popen(cmd, stdin=i, stdout=sp.PIPE, stderr=sp.PIPE)
     return (p, not_none_unsafe(p.stdout, noop), not_none_unsafe(p.stderr, noop))
+
+
+CURL = ["curl", "-f", "-Ss", "-L", "-q"]
+
+
+def curl_cmd(url: str) -> list[str]:
+    return [*CURL, url]
+
+
+# to test the format of downloaded files, sample the first 65000
+# bytes (which should be enough to get one block of a bgzip file,
+# which will allow us to test for it)
+def curl_test_cmd(url: str) -> list[str]:
+    return [*CURL, "-r", "0-65000", url]
+
+
+def curl(url: str, o: IO[bytes], log: Path) -> None:
+    p = sp.run(curl_cmd(url), stdout=o, stderr=sp.PIPE)
+    check_processes([p], log)
+
+
+def curl_test(url: str, testfun: Callable[[IO[bytes]], bool], log: Path) -> bool:
+    p, o = spawn_stream(curl_test_cmd(url))
+    res = testfun(o)
+    check_processes([p], log)
+    return res
+
+
+def curl_gzip(url: str, ofinal: IO[bytes], log: Path, use_bgzip: bool) -> None:
+    zipf = bgzip if use_bgzip else gzip_
+    p1, o1 = spawn_stream(curl_cmd(url))
+    p2 = zipf(o1, ofinal)
+    o1.close()
+    check_processes([p1, p2], log)
 
 
 def check_processes(

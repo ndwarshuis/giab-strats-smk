@@ -3,7 +3,7 @@ from common.config import CoreLevel
 xy = config.to_bed_dirs(CoreLevel.XY)
 
 
-use rule download_ref as download_genome_features_bed with:
+use rule download_gaps as download_genome_features_bed with:
     output:
         xy.src.data / "genome_features_{sex_chr}.bed.gz",
     log:

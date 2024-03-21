@@ -13,8 +13,6 @@ ref = config.ref_dirs
 
 
 rule download_ref:
-    input:
-        rules.build_kent.output,
     output:
         ref.src.reference.data / "ref.fna.gz",
     params:
@@ -25,7 +23,7 @@ rule download_ref:
         "../envs/bedtools.yml"
     localrule: True
     script:
-        "../scripts/python/bedtools/misc/get_file.py"
+        "../scripts/python/bedtools/misc/get_ref.py"
 
 
 # note this is only needed for mappability where we need all chromosome names;
@@ -109,7 +107,9 @@ use rule filter_sort_ref as filter_sort_split_ref_nohap with:
         ref.inter.build.log / "filter_sort_split_ref_nohap.log",
 
 
-use rule download_ref as download_gaps with:
+rule download_gaps:
+    input:
+        rules.build_kent.output,
     output:
         ref.src.reference.data / "gap.bed.gz",
     params:
@@ -117,6 +117,10 @@ use rule download_ref as download_gaps with:
     localrule: True
     log:
         ref.src.reference.log / "download_gaps.log",
+    conda:
+        "../envs/bedtools.yml"
+    script:
+        "../scripts/python/bedtools/misc/get_ref.py"
 
 
 def gapless_input(wildcards):
@@ -173,7 +177,7 @@ rule get_gapless:
 # benchmark
 
 
-use rule download_ref as download_bench_vcf with:
+use rule download_gaps as download_bench_vcf with:
     output:
         ref.src.benchmark.data / "bench.vcf.gz",
     params:
@@ -187,7 +191,7 @@ use rule download_ref as download_bench_vcf with:
         ref.src.benchmark.log / "download_bench_vcf.log",
 
 
-use rule download_ref as download_bench_bed with:
+use rule download_gaps as download_bench_bed with:
     output:
         ref.src.benchmark.data / "bench.bed.gz",
     params:
@@ -201,7 +205,7 @@ use rule download_ref as download_bench_bed with:
         ref.src.benchmark.log / "download_bench_bed.log",
 
 
-use rule download_ref as download_query_vcf with:
+use rule download_gaps as download_query_vcf with:
     output:
         ref.src.benchmark.data / "query.vcf.gz",
     params:
