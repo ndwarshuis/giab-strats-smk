@@ -42,24 +42,26 @@ def to_output_pattern(dirs, name, wildcards):
 def read_checkpoint(rulename, wildcards, other=[]):
     """Read a normalization checkpoint"""
     r = getattr(checkpoints, rulename)
+    rk = wildcards.ref_final_key
     c = r.get(
-        ref_key=strip_full_refkey(wildcards.ref_final_key),
+        ref_key=strip_full_refkey(rk),
         build_key=wildcards.build_key,
         **{k: wildcards[k] for k in other},
     )
     with c.output[0].open() as f:
-        return json.load(f)
+        return config.refkey_to_normalization_path(rk, f)
 
 
 def read_named_checkpoint(rulename, name, wildcards):
     """Read a normalization checkpoint (with name)"""
     # TODO not DRY
     r = getattr(checkpoints, rulename)
+    rfk = wildcards.ref_final_key
     rk = strip_full_refkey(wildcards.ref_final_key)
     c = r.get(ref_key=rk, build_key=wildcards.build_key)
     # TODO isn't there supposed to be a [0] after [name]?
     with c.output[name].open() as f:
-        return json.load(f)
+        return config.refkey_to_normalization_path(rfk, f)
 
 
 def bed_src_inputs(pathlist, f, wildcards):

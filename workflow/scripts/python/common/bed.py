@@ -155,13 +155,13 @@ def bed_to_stream(df: pd.DataFrame) -> Generator[IO[bytes], None, None]:
         _w.close()
 
 
-def write_bed(path: Path, df: pd.DataFrame) -> None:
+def write_bed(path: Path, df: pd.DataFrame, parents: bool = True) -> None:
     """Write a bed file in bgzip format from a dataframe.
 
     Dataframe is not checked to make sure it is a "real" bed file.
     """
     with bed_to_stream(df) as s:
-        bgzip_file(s, path)
+        bgzip_file(s, path, parents)
     # with bgzf.open(path, "w") as f:
     #     write_bed_stream(f, df)
 

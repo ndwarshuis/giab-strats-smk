@@ -59,7 +59,13 @@ def spawn_stream(
     return p, not_none_unsafe(p.stdout, noop)
 
 
-def bgzip_file(i: IO[bytes], p: Path) -> sp.CompletedProcess[bytes]:
+def bgzip_file(
+    i: IO[bytes], p: Path, parents: bool = True
+) -> sp.CompletedProcess[bytes]:
+    # make parent directory as necessary since snakemake won't make the parent
+    # in the case of checkpoints where the output files aren't fully known at
+    # parsetime
+    p.parent.mkdir(parents=parents, exist_ok=True)
     with open(p, "wb") as f:
         return bgzip(i, f)
 
@@ -141,6 +147,7 @@ def check_processes(
     ps: list[sp.Popen[bytes] | sp.CompletedProcess[bytes]], log: Path
 ) -> None:
     some_error = False
+    # TODO make parent directory if it doesn't exist? probably won't be necessary
     with open(log, "w") as lf:
         for p in ps:
             if isinstance(p, sp.CompletedProcess):

@@ -109,6 +109,7 @@ from pydantic import validator, HttpUrl, FilePath, NonNegativeInt, Field
 from dataclasses import dataclass
 from enum import unique, Enum
 from typing import (
+    IO,
     Union,
     NewType,
     Any,
@@ -625,7 +626,7 @@ def bd_to_query_vcf(
 #     return si_to_gff(x.refdata.strat_inputs) if x.want_functional else None
 
 
-# snakemake wildcard helpers
+# snakemake helpers
 
 
 def wc_lookup(ws: SmkWildcards, k: str) -> Any:
@@ -2886,6 +2887,30 @@ class GiabStrats(BaseModel):
     #     """Like 'refsrckey_to_bed_src' but for source files in the
     #     "Functional" stratification level."""
     #     return self._refkey_to_src(lambda rd: f(rd.strat_inputs), rk)
+
+    def refkey_to_normalization_path(self, rk: RefKeyFullS, s: IO[bytes]) -> Path:
+        """Return a list of paths for a given normalization checkpoint.
+
+        This is assumed to specifically be called within a checkpoint that is
+        downstream of a normalization rule. In this case, the rule spits out a
+        JSON file with a list of paths that it produces, which either has one
+        or two paths correspond to hap/dip1 or dip2 cases. In the latter case
+        return the one path corresponding to the haplotype appended to 'rk'.
+
+        's' is an open stream representing the output path from the checkpoint.
+        """
+        res = json.load(s)
+        try:
+            paths = [Path(p) for p in res]
+        except TypeError:
+            raise DesignError(f"Checkpoint does not have paths list, got {res}")
+
+        return self.with_ref_data_full(
+            rk,
+            lambda _: match1_unsafe(paths, noop),
+            lambda _: match1_unsafe(paths, noop),
+            lambda hap, _: match2_unsafe(paths, lambda p0, p1: hap.choose(p0, p1)),
+        )
 
     def to_ref_data(self, rk: RefKey) -> AnyRefData:
         """Lookup refdata object for a given refkey."""

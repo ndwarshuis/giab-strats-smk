@@ -18,6 +18,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     bed_in = Path(smk.input["bed"][0])
     log = Path(smk.log[0])
     genome_in = Path(smk.input["genome"])
+    out = Path(smk.output[0])
 
     m = sconf.with_build_data_split_full_nohap(
         cfg.wc_to_reffinalkey(ws),
@@ -31,7 +32,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     df = read_bed_default(bed_in)
     with bed_to_stream(filter_sort_bed(im, fm, df)) as s:
         p1, o = complementBed(s, genome_in)
-        bgzip_file(o, smk.output[0])
+        bgzip_file(o, out)
         check_processes([p1], log)
 
 

@@ -15,7 +15,7 @@ def main(smk: Any) -> None:
     # benchmark because the desired chromosomes in this build are not included
     # in the benchmark
     with open(smk.log[0], "w") as f:
-        if gzip_empty(smk.input["bench_bed"][0]):
+        if gzip_empty(smk.input["bench_bed"]):
             Path(smk.output[0]).touch()
             f.write("no overlapping chromosomes, writing empty dummy file\n")
         else:
