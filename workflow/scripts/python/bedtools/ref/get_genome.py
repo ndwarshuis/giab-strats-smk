@@ -6,8 +6,9 @@ from common.functional import DesignError
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, Any] = smk.wildcards
-
-    allowed_refkeys = str(smk.params["allowed_refkeys"])
+    input_path = cfg.smk_to_input(smk)
+    output_path = cfg.smk_to_output(smk)
+    allowed_refkeys = cfg.smk_to_param_str(smk, "allowed_refkeys")
 
     if allowed_refkeys == "any":
         f = sconf.buildkey_to_ref_mappers
@@ -21,7 +22,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     im, fm = f(cfg.wc_to_reffinalkey(ws), cfg.wc_to_buildkey(ws))
 
     # ASSUME the input for this is a .fa.fai file (columns = chr, length)
-    with open(smk.input[0], "r") as i, open(smk.output[0], "w") as o:
+    with open(input_path, "r") as i, open(output_path, "w") as o:
         for line in i:
             s = line.split("\t")
             chr = ChrName(s[0])

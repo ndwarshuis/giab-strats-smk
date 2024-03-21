@@ -87,6 +87,15 @@ def write_intersected_range_beds(
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
+    path_pattern = cfg.smk_to_param_str(smk, "path_pattern")
+
+    low_paths = cfg.smk_to_inputs_name(smk, "low")
+    high_paths = cfg.smk_to_inputs_name(smk, "high")
+    genome_path = cfg.smk_to_input_name(smk, "genome")
+    gapless_path = cfg.smk_to_input_name(smk, "gapless")
+    log_path = cfg.smk_to_log(smk)
+    out_path = cfg.smk_to_output(smk)
+
     rfk = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)
     bd = sconf.to_build_data(cfg.strip_full_refkey(rfk), bk)
@@ -94,45 +103,45 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     if gps is None:
         raise DesignError
     # ASSUME both of these input lists are sorted by GC fraction
-    low = [GCInput(p, f, r) for p, (f, r) in zip(smk.input.low, gps.low)]
-    high = [GCInput(p, f, r) for p, (f, r) in zip(smk.input.high, gps.high)]
-    genome = Path(smk.input.genome)
-    gapless = Path(smk.input.gapless)
-    log = Path(smk.log[0])
+    low = [GCInput(p, f, r) for p, (f, r) in zip(low_paths, gps.low)]
+    high = [GCInput(p, f, r) for p, (f, r) in zip(high_paths, gps.high)]
+    genome = Path(genome_path)
+    gapless = Path(gapless_path)
 
     def final_path(name: str) -> Path:
-        p = Path(str(smk.params.path_pattern).format(name))
+        p = Path(path_pattern.format(name))
         p.parent.mkdir(exist_ok=True, parents=True)
         return p
 
-    low_strats = write_simple_range_beds(final_path, low, genome, True, log)
-    high_strats = write_simple_range_beds(final_path, high, genome, False, log)
+    low_strats = write_simple_range_beds(final_path, low, genome, True, log_path)
+    high_strats = write_simple_range_beds(final_path, high, genome, False, log_path)
     range_strat = write_middle_range_bed(
         final_path,
         low[-1],
         high[0],
         genome,
         gapless,
-        log,
+        log_path,
     )
     inter_strats = write_intersected_range_beds(
         final_path,
         low,
         high,
-        log,
+        log_path,
     )
 
-    with open(smk.output[0], "w") as f:
+    with open(out_path, "w") as f:
         # put the first low and last high input here since these are already
         # in the final directory
+        ranges: list[str] = [
+            str(low[0].bed),
+            *low_strats,
+            range_strat,
+            *high_strats,
+            str(high[-1].bed),
+        ]
         obj = {
-            "gc_ranges": [
-                low[0][0],
-                *low_strats,
-                range_strat,
-                *high_strats,
-                high[-1][0],
-            ],
+            "gc_ranges": ranges,
             "widest_extreme": inter_strats[0],
             "other_extremes": inter_strats[1:],
         }

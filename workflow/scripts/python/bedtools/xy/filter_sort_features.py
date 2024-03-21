@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Any
 import common.config as cfg
 from common.bed import filter_sort_bed, bed_to_stream, intersectBed
@@ -7,13 +6,13 @@ from common.io import bgzip_file, check_processes
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
-    bed_input = Path(smk.input["bed"])
-    gapless_input = Path(smk.input["gapless"])
-    genome_input = Path(smk.input["genome"])
-    bed_output = Path(smk.output[0])
-    log = Path(smk.log[0])
+    bed_input = cfg.smk_to_input_name(smk, "bed")
+    gapless_input = cfg.smk_to_input_name(smk, "gapless")
+    genome_input = cfg.smk_to_input_name(smk, "genome")
+    bed_output = cfg.smk_to_output(smk)
+    log = cfg.smk_to_log(smk)
+    level = cfg.smk_to_param_str(smk, "level")
 
-    level = smk.params["level"]
     i = cfg.ChrIndex.from_name_unsafe(ws["sex_chr"])
 
     rfk = cfg.wc_to_reffinalkey(ws)

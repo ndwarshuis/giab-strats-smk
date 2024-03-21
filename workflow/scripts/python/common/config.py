@@ -648,6 +648,105 @@ def wc_to_reffinalkey(ws: SmkWildcards) -> RefKeyFullS:
     return RefKeyFullS(wc_lookup(ws, "ref_final_key"))
 
 
+def smk_to_param_str(smk: Any, name: str) -> str:
+    ps = smk.params
+    if hasattr(ps, name):
+        x = ps[name]
+        if isinstance(x, str):
+            return x
+        else:
+            raise DesignError(f"{name} in params is not a string")
+    else:
+        raise DesignError(f"Params does not have {name}")
+
+
+def smk_to_output(smk: Any, n: int = 0) -> Path:
+    try:
+        return Path(smk.output[n])
+    except IndexError:
+        raise DesignError(f"No output file for index {n}")
+
+
+def smk_to_output_name(smk: Any, name: str) -> Path:
+    # TODO not DRY
+    ps = smk.output
+    if hasattr(ps, name):
+        p = ps[name]
+        if isinstance(p, str):
+            return Path(p)
+        else:
+            raise DesignError(f"Output file for {name} is not a string")
+    else:
+        raise DesignError(f"Output files do not have name {name}")
+
+
+def smk_to_log(smk: Any, n: int = 0) -> Path:
+    try:
+        return Path(smk.log[n])
+    except IndexError:
+        raise DesignError(f"No log file for index {n}")
+
+
+def smk_to_log_name(smk: Any, name: str) -> Path:
+    ps = smk.log
+    if hasattr(ps, name):
+        p = ps[name]
+        if isinstance(p, str):
+            return Path(p)
+        else:
+            raise DesignError(f"Log file for {name} is not a string")
+    else:
+        raise DesignError(f"Log files do not have name {name}")
+
+
+def smk_to_input(smk: Any, n: int = 0) -> Path:
+    i = smk.input[n]
+    if isinstance(i, str):
+        return Path(i)
+    else:
+        raise DesignError(f"Input files for {i} are a list")
+
+
+def smk_to_inputs(smk: Any, n: int = 0) -> list[Path]:
+    i = smk.input[n]
+    if isinstance(i, str):
+        raise DesignError(f"Input files for {i} are not a list")
+    else:
+        return [Path(p) for p in i]
+
+
+def smk_to_inputs_all(smk: Any) -> list[Path]:
+    i = smk.input
+    if isinstance(i, str):
+        raise DesignError(f"Input files for {i} are not a list")
+    else:
+        return [Path(p) for p in i]
+
+
+def smk_to_input_name(smk: Any, name: str) -> Path:
+    i = smk.input
+    if hasattr(i, name):
+        x = i[name]
+        if isinstance(x, str):
+            return Path(x)
+        else:
+            raise DesignError(f"Input files for {name} are a list")
+    else:
+        raise DesignError(f"Input files do not have name {name}")
+
+
+def smk_to_inputs_name(smk: Any, name: str) -> list[Path]:
+    i = smk.input
+    if hasattr(i, name):
+        x = i[name]
+        if isinstance(x, str):
+            raise DesignError(f"Input files for {name} are not a list")
+        else:
+            return [Path(p) for p in x]
+    else:
+        raise DesignError(f"Input files do not have name {name}")
+
+
 # IO functions for processing bed files of various flavors
 
 

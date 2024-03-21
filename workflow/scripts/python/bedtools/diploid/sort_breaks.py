@@ -15,10 +15,10 @@ from common.io import bgzip_file, check_processes
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
 
-    bed_in = Path(smk.input["bed"][0])
-    log = Path(smk.log[0])
-    genome_in = Path(smk.input["genome"])
-    out = Path(smk.output[0])
+    bed_in = cfg.smk_to_input_name(smk, "bed")
+    genome_in = cfg.smk_to_input_name(smk, "genome")
+    log = cfg.smk_to_log(smk)
+    out = cfg.smk_to_output(smk)
 
     m = sconf.with_build_data_split_full_nohap(
         cfg.wc_to_reffinalkey(ws),

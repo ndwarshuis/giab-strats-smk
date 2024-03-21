@@ -20,18 +20,20 @@ import json
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
 
+    inputs = cfg.smk_to_inputs_name(smk, "bed")
+    genome = cfg.smk_to_input_name(smk, "genome")
+    gapless = cfg.smk_to_input_name(smk, "gapless")
+    log = cfg.smk_to_log(smk)
+    out = cfg.smk_to_output(smk)
+    path_pattern = cfg.smk_to_param_str(smk, "path_pattern")
+
     im, fm = sconf.buildkey_to_ref_mappers(
         cfg.wc_to_reffinalkey(ws),
         cfg.wc_to_buildkey(ws),
     )
 
-    inputs = smk.input["bed"]
-    genome = Path(smk.input["genome"])
-    gapless = Path(smk.input["gapless"])
-    log = Path(smk.log[0])
-
     def final_path(name: str) -> Path:
-        p = Path(str(smk.params.path_pattern).format(name))
+        p = Path(path_pattern.format(name))
         p.parent.mkdir(exist_ok=True, parents=True)
         return p
 
@@ -78,7 +80,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         p2, p3 = merge_bed(mi_out, all_lowmap)
         check_processes([p1, p2, p3], log)
 
-    with open(smk.output[0], "w") as f:
+    with open(out, "w") as f:
         obj = {
             "all_lowmap": str(all_lowmap),
             "single_lowmap": [str(p) for p in single_lowmap],

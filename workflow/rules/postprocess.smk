@@ -30,7 +30,7 @@ def expand_strat_targets_inner(ref_final_key, build_key):
         (rules.find_telomeres.output, bd.want_telomeres),
         (rules.all_segdup_and_map.input, bd.want_segdup_and_map),
         (rules.all_alldifficult.input, bd.want_alldifficult),
-        (rules.get_gaps.output, lambda r, _: bd.want_gaps(r)),
+        (rules.get_gaps.output, bd.want_gaps),
         (rules.remove_vdj_gaps.output, bd.want_vdj),
     ]
     all_function = [f(ref_final_key, build_key) for f, test in function_targets if test]
@@ -81,7 +81,7 @@ rule generate_tsv_list:
 
 rule unit_test_strats:
     input:
-        strats=rules.list_all_strats.output,
+        strats=rules.list_all_strats.output[0],
         gapless_auto=rules.get_gapless.output.auto,
         gapless_parY=rules.get_gapless.output.parY,
         genome=rules.filter_sort_ref.output["genome"],
@@ -201,10 +201,10 @@ rule run_happy:
     input:
         _test=rules.unit_test_strats.output,
         ref=rules.filter_sort_ref.output["fa"],
-        bench_vcf=lambda w: expand_final_to_src(rules.download_bench_vcf.output, w),
+        bench_vcf=lambda w: expand_final_to_src(rules.download_bench_vcf.output, w)[0],
         bench_bed=lambda w: read_checkpoint("normalize_bench_bed", w),
-        query_vcf=lambda w: expand_final_to_src(rules.download_query_vcf.output, w),
-        strats=rules.generate_tsv_list.output,
+        query_vcf=lambda w: expand_final_to_src(rules.download_query_vcf.output, w)[0],
+        strats=rules.generate_tsv_list.output[0],
     output:
         post_inter_dir / "happy" / "happy.extended.csv",
     params:

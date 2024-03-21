@@ -19,12 +19,11 @@ def parse_refkeys_config(p: Path) -> tuple[bool, bool]:
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
 
-    fa = Path(smk.input[0])
-
-    fa_out = Path(smk.output["fa"])
-    index_out = Path(smk.output["index"])
-    genome_out = Path(smk.output["genome"])
-    log = Path(smk.log[0])
+    fa = cfg.smk_to_input(smk)
+    fa_out = cfg.smk_to_output_name(smk, "fa")
+    index_out = cfg.smk_to_output_name(smk, "index")
+    genome_out = cfg.smk_to_output_name(smk, "genome")
+    log = cfg.smk_to_log(smk)
 
     rk = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)

@@ -1,7 +1,6 @@
 import re
 from typing import Any
 import common.config as cfg
-from pathlib import Path
 from common.samtools import filter_sort_fasta
 from common.bed import ChrName
 
@@ -15,10 +14,10 @@ from common.bed import ChrName
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
-    fa = Path(smk.input["fa"][0])
-    idx = Path(smk.input["idx"][0])
-    log = Path(smk.log[0])
-    out = Path(smk.output[0])
+    fa = cfg.smk_to_input_name(smk, "fa")
+    idx = cfg.smk_to_input_name(smk, "idx")
+    log = cfg.smk_to_log(smk)
+    out = cfg.smk_to_output(smk)
 
     # Parse the index file to get a list of all chromosomes in the FASTA
     # (including all the weird unmapped contigs we don't normally care about).

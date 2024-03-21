@@ -1,19 +1,20 @@
 from pathlib import Path
+from typing import Any
 from typing_extensions import assert_never
 import common.io as io
 from common.functional import DesignError
 import common.config as cfg
 
-smk_log = snakemake.log[0]  # type: ignore
 
-log = io.setup_logging(smk_log)
-
-
-def main(bbBin: str, opath: str, src: cfg.BedSrc | None) -> None:
+def main(smk: Any) -> None:
+    bbBin = cfg.smk_to_input(smk)
+    opath = cfg.smk_to_output(smk)
+    log = cfg.smk_to_log(smk)
+    src: cfg.BedSrc | None = smk.params.src
     if isinstance(src, cfg.FileSrc_):
         # ASSUME these are already tested via the pydantic class for the
         # proper file format
-        Path(opath).symlink_to(Path(src.filepath).resolve())
+        opath.symlink_to(Path(src.filepath).resolve())
 
     elif isinstance(src, cfg.HttpSrc_):
         with open(opath, "wb") as f:
@@ -25,14 +26,14 @@ def main(bbBin: str, opath: str, src: cfg.BedSrc | None) -> None:
                 #
                 # TODO this may or may not actually be true, in which case
                 # it might be sensible to override with a config switch
-                p1, o1 = io.spawn_stream([bbBin, src.url, "stdout"])
+                p1, o1 = io.spawn_stream([str(bbBin), src.url, "stdout"])
                 p2 = io.gzip_(o1, f)
                 o1.close()
-                io.check_processes([p1, p2], smk_log)
-            elif io.curl_test(src.url, io.is_gzip_stream, smk_log):
-                io.curl(src.url, f, smk_log)
+                io.check_processes([p1, p2], log)
+            elif io.curl_test(src.url, io.is_gzip_stream, log):
+                io.curl(src.url, f, log)
             else:
-                io.curl_gzip(src.url, f, smk_log, False)
+                io.curl_gzip(src.url, f, log, False)
 
     elif src is None:
         raise DesignError("file src is null; this should not happen")
@@ -40,8 +41,9 @@ def main(bbBin: str, opath: str, src: cfg.BedSrc | None) -> None:
         assert_never(src)
 
     if src.md5 is not None and src.md5 != (actual := io.get_md5(opath, True)):
-        log.error("md5s don't match; wanted %s, actual %s", src.md5, actual)
+        with open(log, "a") as f:
+            f.write(f"md5s don't match; wanted {src.md5}, actual {actual}\n")
         exit(1)
 
 
-main(snakemake.input[0], snakemake.output[0], snakemake.params.src)  # type: ignore
+main(snakemake)  # type: ignore

@@ -14,10 +14,11 @@ VDJ_PAT = "^ID=gene-(IGH|IGK|IGL|TRA|TRB|TRG);"
 def main(smk: Any) -> None:
     sconf: cfg.GiabStrats = smk.config
     ws: dict[str, str] = smk.wildcards
-    ps: dict[str, str] = smk.params
-    inputs: list[Path] = [Path(i) for i in smk.input]
-    cds_pattern: str = ps["cds_output"]
-    vdj_pattern: str = ps["vdj_output"]
+    inputs = cfg.smk_to_inputs_all(smk)
+    cds_pattern = cfg.smk_to_param_str(smk, "cds_output")
+    vdj_pattern = cfg.smk_to_param_str(smk, "vdj_output")
+    cds_out = cfg.smk_to_output_name(smk, "cds")
+    vdj_out = cfg.smk_to_output_name(smk, "vdj")
 
     rk = cfg.wc_to_refkey(ws)
     bk = cfg.wc_to_buildkey(ws)
@@ -117,8 +118,8 @@ def main(smk: Any) -> None:
         if bd.build.include.vdj:
             write_bed(vdj_path, filter_vdj(df))
 
-    write_output(smk.output["cds"], [c for _, (c, _) in res])
-    write_output(smk.output["vdj"], [v for _, (_, v) in res])
+    write_output(cds_out, [c for _, (c, _) in res])
+    write_output(vdj_out, [v for _, (_, v) in res])
 
 
 main(snakemake)  # type: ignore

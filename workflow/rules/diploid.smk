@@ -92,7 +92,7 @@ rule breaks_cross_alignment_to_bed:
 # TODO misleading name since this also complements after sorting
 rule sort_breaks_bed:
     input:
-        bed=rules.breaks_cross_alignment_to_bed.output,
+        bed=rules.breaks_cross_alignment_to_bed.output[0],
         genome=lambda w: if_dip1_else(
             True, True, "filter_sort_split_ref", "filter_sort_ref", w
         )["genome"],

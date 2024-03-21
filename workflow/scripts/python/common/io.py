@@ -7,10 +7,10 @@ from common.functional import not_none_unsafe, noop
 import gzip
 
 
-def get_md5(path: str, unzip: bool = False) -> str:
+def get_md5(p: Path, unzip: bool = False) -> str:
     h = hashlib.md5()
-    do_unzip = path.endswith(".gz") and unzip is True
-    with gzip.open(path, "rb") if do_unzip else open(path, "rb") as f:
+    do_unzip = p.name.endswith(".gz") and unzip is True
+    with gzip.open(p, "rb") if do_unzip else open(p, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             h.update(chunk)
     return h.hexdigest()

@@ -57,7 +57,7 @@ def read_named_checkpoint(rulename, name, wildcards):
     # TODO not DRY
     r = getattr(checkpoints, rulename)
     rfk = wildcards.ref_final_key
-    rk = strip_full_refkey(wildcards.ref_final_key)
+    rk = strip_full_refkey(rfk)
     c = r.get(ref_key=rk, build_key=wildcards.build_key)
     # TODO isn't there supposed to be a [0] after [name]?
     with c.output[name].open() as f:

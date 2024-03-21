@@ -32,12 +32,12 @@ def filter_mappability_ref_inputs(wildcards):
             rules.download_ref.output,
             allow_missing=True,
             ref_src_key=rk,
-        ),
+        )[0],
         "idx": expand(
             rules.index_full_ref.output,
             allow_missing=True,
             ref_final_key=rk,
-        ),
+        )[0],
     }
 
 
