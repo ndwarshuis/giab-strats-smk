@@ -260,4 +260,4 @@ def split_bed(
     """
     chr_col = df.columns.tolist()[0]
     sp = df[chr_col].map(split_map)
-    return df[sp], df[~sp]
+    return df[sp.fillna(False)].copy(), df[~sp.fillna(True)].copy()
