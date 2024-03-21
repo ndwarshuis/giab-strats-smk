@@ -822,11 +822,13 @@ def filter_sort_bed_main(
         smk.output[0],
         output_pattern,
         f,
-        read_write_filter_sort_hap_bed,
-        read_write_filter_sort_dip1to1_bed,
-        read_write_filter_sort_dip1to2_bed,
-        read_write_filter_sort_dip2to1_bed,
-        read_write_filter_sort_dip2to2_bed,
+        lambda i, o, bd, bf: read_write_filter_sort_hap_bed(i, o, bd, bf, g),
+        lambda i, o, bd, bf: read_write_filter_sort_dip1to1_bed(i, o, bd, bf, g),
+        lambda i, o, bd, bf: read_write_filter_sort_dip1to2_bed(i, o, bd, bf, g),
+        lambda i, o, bd, bf: read_write_filter_sort_dip2to1_bed(i, o, bd, bf, g),
+        lambda i, o, hap, bd, bf: read_write_filter_sort_dip2to2_bed(
+            i, o, hap, bd, bf, g
+        ),
     )
 
 
