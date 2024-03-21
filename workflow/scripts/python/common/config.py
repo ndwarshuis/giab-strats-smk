@@ -606,26 +606,6 @@ def bd_to_query_vcf(
     return fmap_maybe(lambda y: y.query_vcf, x.build.bench)
 
 
-# def si_to_ftbl(x: StratInputs[AnyBedT, AnySrcT]) -> AnySrcT | None:
-#     return fmap_maybe(lambda y: y.ftbl_src, x.functional)
-
-
-# def si_to_gff(x: StratInputs[AnyBedT, AnySrcT]) -> AnySrcT | None:
-#     return fmap_maybe(lambda y: y.gff_src, x.functional)
-
-
-# def bd_to_ftbl(
-#     x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
-# ) -> AnySrcT | None:
-#     return si_to_ftbl(x.refdata.strat_inputs) if x.want_functional else None
-
-
-# def bd_to_gff(
-#     x: BuildData_[RefSrcT, AnyBedT, AnyBedT_, AnySrcT],
-# ) -> AnySrcT | None:
-#     return si_to_gff(x.refdata.strat_inputs) if x.want_functional else None
-
-
 # snakemake helpers
 
 
@@ -2972,20 +2952,6 @@ class GiabStrats(BaseModel):
         if src is None:
             raise DesignError()
         return from_hap_or_dip(src.data.src, hap)
-
-    # def refkey_to_functional_refsrckeys(
-    #     self, f: StratInputToSrc, rk: RefKey
-    # ) -> list[RefKeyFullS]:
-    #     """Like 'refkey_to_bed_refsrckeys' but for source files in the
-    #     "Functional" stratification level."""
-    #     return self.to_ref_data(rk).get_refkeys_unsafe(f)
-
-    # def refsrckey_to_functional_src(
-    #     self, f: StratInputToSrc, rk: RefKeyFullS
-    # ) -> BedSrc:
-    #     """Like 'refsrckey_to_bed_src' but for source files in the
-    #     "Functional" stratification level."""
-    #     return self._refkey_to_src(lambda rd: f(rd.strat_inputs), rk)
 
     def refkey_to_normalization_path(self, rk: RefKeyFullS, s: IO[bytes]) -> Path:
         """Return a list of paths for a given normalization checkpoint.
