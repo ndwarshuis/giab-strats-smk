@@ -120,7 +120,7 @@ rule download_gaps:
     conda:
         "../envs/bedtools.yml"
     script:
-        "../scripts/python/bedtools/misc/get_ref.py"
+        "../scripts/python/bedtools/misc/get_bedlike.py"
 
 
 def gapless_input(wildcards):
