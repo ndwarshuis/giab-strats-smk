@@ -76,7 +76,8 @@ rule build_kent:
 
         cd $here/{input}/src
         make clean -j{threads} 2>&1 > /dev/null
-        CFLAGS="-I$libpath" make libs -j{threads} 2>&1 > $here/{log}
+        CFLAGS="-I$libpath" CPLUS_INCLUDE_PATH="$libpath" \
+          make libs -j{threads} > $here/{log} 2>&1 
 
         cd $here/{input}/src/utils/bigBedToBed
         make DESTDIR=$here/{params.destdir} BINDIR=/ 2>&1 > $here/{log}
