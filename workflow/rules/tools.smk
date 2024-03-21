@@ -85,7 +85,7 @@ rule build_repseq:
     conda:
         "../envs/build.yml"
     log:
-        config.log_root_dir / "tools" / "repseq_build.log",
+        config.log_tools_dir / "repseq_build.log",
     shell:
         "make -C {input} 2>&1 > {log} && mv {input}/repseq {output}"
 
@@ -122,7 +122,7 @@ rule build_kent:
         config.tools_bin_dir / "bigBedToBed",
     threads: 8
     log:
-        config.log_root_dir / "tools" / "kent_build.log",
+        config.log_tools_dir / "tools" / "kent_build.log",
     conda:
         "../envs/kent.yml"
     params:
