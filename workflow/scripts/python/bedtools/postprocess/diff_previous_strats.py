@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Any
 import common.config as cfg
 from common.stratdiff.lib.diff import compare_all
