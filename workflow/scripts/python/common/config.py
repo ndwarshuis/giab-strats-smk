@@ -2515,8 +2515,20 @@ class GiabStrats(BaseModel):
         return self.paths.resources
 
     @property
-    def tools_src_dir(self) -> Path:
+    def _tools_base_dir(self) -> Path:
         return self.resources_dir / "tools"
+
+    @property
+    def tools_src_dir(self) -> Path:
+        return self._tools_base_dir / "src"
+
+    @property
+    def tools_make_dir(self) -> Path:
+        return self._tools_base_dir / "make"
+
+    @property
+    def tools_bin_dir(self) -> Path:
+        return self._tools_base_dir / "bin"
 
     @property
     def ref_src_dir(self) -> Path:
@@ -2525,14 +2537,6 @@ class GiabStrats(BaseModel):
     @property
     def results_dir(self) -> Path:
         return self.paths.results
-
-    @property
-    def tools_make_dir(self) -> Path:
-        return self.results_dir / "tools" / "make"
-
-    @property
-    def tools_bin_dir(self) -> Path:
-        return self.results_dir / "tools" / "bin"
 
     @property
     def final_root_dir(self) -> Path:

@@ -51,6 +51,7 @@ include: "rules/postprocess.smk"
 # the big stuff, like .fa files and large bed files)
 rule all_resources:
     input:
+        rules.all_tools.output,
         expand(rules.download_ref.output, ref_src_key=config.all_ref_refsrckeys),
         expand(rules.download_gaps.output, ref_src_key=config.all_refkey_gap),
         expand(rules.download_rmsk.output, ref_src_key=config.all_refkey_rmsk),

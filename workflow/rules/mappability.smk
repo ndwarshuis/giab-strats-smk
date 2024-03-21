@@ -4,59 +4,11 @@ from common.config import CoreLevel
 
 mlty = config.to_bed_dirs(CoreLevel.MAPPABILITY)
 
-################################################################################
-# download a bunch of stuff to run GEM
-#
-# NOTE: this is in bioconda, but the bioconda version does not have gem-2-wig
-# for some reason
-
-
-gemlib_bin = Path("GEM-binaries-Linux-x86_64-core_i3-20130406-045632/bin")
-
 gem_wc_constraints = {
     "l": "\d+",
     "m": "\d+",
     "e": "\d+",
 }
-
-
-rule download_gem:
-    output:
-        config.tools_src_dir / "gemlib.tbz2",
-    params:
-        url=config.tools.gemlib,
-    conda:
-        "../envs/utils.yml"
-    localrule: True
-    shell:
-        "curl -sS -L -o {output} {params.url}"
-
-
-rule unpack_gem:
-    input:
-        rules.download_gem.output,
-    output:
-        # called by other binaries
-        config.tools_bin_dir / "gem-indexer_fasta2meta+cont",
-        config.tools_bin_dir / "gem-indexer_bwt-dna",
-        config.tools_bin_dir / "gem-indexer_generate",
-        # the things I actually need
-        indexer=config.tools_bin_dir / "gem-indexer",
-        mappability=config.tools_bin_dir / "gem-mappability",
-        gem2wig=config.tools_bin_dir / "gem-2-wig",
-    params:
-        bins=lambda wildcards, output: " ".join(
-            str(gemlib_bin / basename(o)) for o in output
-        ),
-    shell:
-        """
-        mkdir -p {config.tools_bin_dir} && \
-        tar xjf {input} \
-        --directory {config.tools_bin_dir} \
-        --strip-components=2 \
-        {params.bins}
-        """
-
 
 ################################################################################
 # index/align

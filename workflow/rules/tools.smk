@@ -1,3 +1,57 @@
+from pathlib import Path
+
+################################################################################
+# download a bunch of stuff to run GEM
+#
+# NOTE: this is in bioconda, but the bioconda version does not have gem-2-wig
+# for some reason
+
+
+gemlib_bin = Path("GEM-binaries-Linux-x86_64-core_i3-20130406-045632/bin")
+
+
+rule download_gem:
+    output:
+        config.tools_src_dir / "gemlib.tbz2",
+    params:
+        url=config.tools.gemlib,
+    conda:
+        "../envs/utils.yml"
+    localrule: True
+    shell:
+        "curl -sS -L -o {output} {params.url}"
+
+
+rule unpack_gem:
+    input:
+        rules.download_gem.output,
+    output:
+        # called by other binaries
+        config.tools_bin_dir / "gem-indexer_fasta2meta+cont",
+        config.tools_bin_dir / "gem-indexer_bwt-dna",
+        config.tools_bin_dir / "gem-indexer_generate",
+        # the things I actually need
+        indexer=config.tools_bin_dir / "gem-indexer",
+        mappability=config.tools_bin_dir / "gem-mappability",
+        gem2wig=config.tools_bin_dir / "gem-2-wig",
+    params:
+        bins=lambda wildcards, output: " ".join(
+            str(gemlib_bin / basename(o)) for o in output
+        ),
+    shell:
+        """
+        mkdir -p {config.tools_bin_dir} && \
+        tar xjf {input} \
+        --directory {config.tools_bin_dir} \
+        --strip-components=2 \
+        {params.bins}
+        """
+
+
+################################################################################
+# repseq
+
+
 rule download_repseq:
     output:
         config.tools_src_dir / "repseq.tar.gz",
@@ -34,6 +88,10 @@ rule build_repseq:
         config.log_root_dir / "tools" / "repseq_build.log",
     shell:
         "make -C {input} 2>&1 > {log} && mv {input}/repseq {output}"
+
+
+################################################################################
+# bigBedToBed
 
 
 use rule download_repseq as download_kent with:
@@ -84,6 +142,10 @@ rule build_kent:
         """
 
 
+################################################################################
+# other stuff
+
+
 use rule download_repseq as download_paftools with:
     output:
         config.tools_src_dir / "paftools.js",
@@ -98,3 +160,12 @@ use rule download_repseq as download_dipcall_aux with:
     params:
         url=config.tools.dipcall_aux,
     localrule: True
+
+
+rule all_tools:
+    input:
+        rules.unpack_gem.output,
+        rules.unpack_gem.output,
+        rules.build_kent.output,
+        rules.download_paftools.output,
+        rules.download_dipcall_aux.output,
