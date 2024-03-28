@@ -1570,8 +1570,12 @@ class _Dip2ChrSrc:
 class HapChrSrc(GenericModel, Generic[X], _HapChrSrc):
     """Specification for a haploid source file."""
 
-    chr_pattern: HapChrPattern = HapChrPattern()
+    chr_pattern_: HapChrPattern = Field(HapChrPattern(), alias="chr_pattern")
     src: Haploid[X]
+
+    @property
+    def chr_pattern(self) -> HapChrPattern:
+        return self.chr_pattern_
 
 
 class Dip1ChrSrc(GenericModel, Generic[X], _Dip1ChrSrc):
@@ -1583,8 +1587,12 @@ class Dip1ChrSrc(GenericModel, Generic[X], _Dip1ChrSrc):
     chromosome name.
     """
 
-    chr_pattern: DipChrPattern = DipChrPattern()
+    chr_pattern_: DipChrPattern = Field(DipChrPattern(), alias="chr_pattern")
     src: Haploid[X]
+
+    @property
+    def chr_pattern(self) -> DipChrPattern:
+        return self.chr_pattern_
 
 
 class Dip2ChrSrc(GenericModel, Generic[X], _Dip2ChrSrc):
@@ -1596,17 +1604,24 @@ class Dip2ChrSrc(GenericModel, Generic[X], _Dip2ChrSrc):
     matched according to its corresponding entry in `chr_pattern`.
     """
 
-    chr_pattern: Diploid[HapChrPattern] = Diploid(
-        hap1=HapChrPattern(
-            template="chr%i_PATERNAL",
-            exclusions=[ChrIndex.CHRX],
+    chr_pattern_: Diploid[HapChrPattern] = Field(
+        Diploid(
+            hap1=HapChrPattern(
+                template="chr%i_PATERNAL",
+                exclusions=[ChrIndex.CHRX],
+            ),
+            hap2=HapChrPattern(
+                template="chr%i_MATERNAL",
+                exclusions=[ChrIndex.CHRY],
+            ),
         ),
-        hap2=HapChrPattern(
-            template="chr%i_MATERNAL",
-            exclusions=[ChrIndex.CHRY],
-        ),
+        alias="chr_pattern",
     )
     src: Diploid[X]
+
+    @property
+    def chr_pattern(self) -> Diploid[HapChrPattern]:
+        return self.chr_pattern_
 
 
 class HapBedTxtLine(BaseModel):
@@ -2547,15 +2562,15 @@ class Stratification(GenericModel, Generic[RefSrcT, AnyBedT, AnyVcfT]):
     builds: dict[BuildKey, Build[AnyBedT, AnyVcfT]]
 
 
-HapBuildData = BuildData_[HapChrSrc[RefSrc], HapBedSrc, HapChrSrc[BedFileSrc]]
-Dip1BuildData = BuildData_[Dip1ChrSrc[RefSrc], DipBedSrc, Dip1ChrSrc[BedFileSrc]]
-Dip2BuildData = BuildData_[Dip2ChrSrc[RefSrc], DipBedSrc, Dip2ChrSrc[BedFileSrc]]
+HapBuildData = BuildData_[HapRefSrc, HapBedSrc, HapVcfSrc]
+Dip1BuildData = BuildData_[Dip1RefSrc, DipBedSrc, Dip1VcfSrc]
+Dip2BuildData = BuildData_[Dip2RefSrc, DipBedSrc, Dip2VcfSrc]
 
 AnyBuildData = HapBuildData | Dip1BuildData | Dip2BuildData
 
-HapStrat = Stratification[HapChrSrc[RefSrc], HapBedSrc, HapChrSrc[BedFileSrc]]
-Dip1Strat = Stratification[Dip1ChrSrc[RefSrc], DipBedSrc, Dip1ChrSrc[BedFileSrc]]
-Dip2Strat = Stratification[Dip2ChrSrc[RefSrc], DipBedSrc, Dip2ChrSrc[BedFileSrc]]
+HapStrat = Stratification[HapRefSrc, HapBedSrc, HapVcfSrc]
+Dip1Strat = Stratification[Dip1RefSrc, DipBedSrc, Dip1VcfSrc]
+Dip2Strat = Stratification[Dip2RefSrc, DipBedSrc, Dip2VcfSrc]
 
 
 # TODO add validator to ensure none of the keys in the strat/build dicts overlap
@@ -3755,11 +3770,7 @@ class GiabStrats(BaseModel):
 
 
 class RefDataToBed(Protocol):
-    A = TypeVar(
-        "A",
-        HapChrSrc[BedFileSrc] | HapChrTxt,
-        Dip1ChrSrc[BedFileSrc] | Dip2ChrSrc[BedFileSrc] | Dip1ChrTxt | Dip2ChrTxt,
-    )
+    A = TypeVar("A", HapBedSrc, DipBedSrc)
 
     def __call__(self, __x: RefData_[RefSrcT, A, AnyVcfT]) -> BedFile[A] | None:
         pass
@@ -3773,11 +3784,7 @@ class RefDataToSrc(Protocol):
 
 
 class StratInputToBed(Protocol):
-    A = TypeVar(
-        "A",
-        HapChrSrc[BedFileSrc] | HapChrTxt,
-        Dip1ChrSrc[BedFileSrc] | Dip2ChrSrc[BedFileSrc] | Dip1ChrTxt | Dip2ChrTxt,
-    )
+    A = TypeVar("A", HapBedSrc, DipBedSrc)
 
     def __call__(self, __x: StratInputs[A]) -> BedFile[A] | None:
         pass
@@ -3798,9 +3805,7 @@ class BuildDataToBed(Protocol):
 
 
 class BuildDataToVCF(Protocol):
-    A = TypeVar(
-        "A", HapChrSrc[BedFileSrc], Dip1ChrSrc[BedFileSrc], Dip2ChrSrc[BedFileSrc]
-    )
+    A = TypeVar("A", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
 
     def __call__(self, __x: BuildData_[RefSrcT, AnyBedT, A]) -> BedFile[A] | None:
         pass
