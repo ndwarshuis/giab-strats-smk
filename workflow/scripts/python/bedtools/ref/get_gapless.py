@@ -34,7 +34,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, Any] = smk.wildcards
 
     def go(
-        x: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyBedT_]
+        x: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyVcfT]
     ) -> cfg.BedFile[cfg.AnyBedT] | None:
         return x.refdata.strat_inputs.gap
 
