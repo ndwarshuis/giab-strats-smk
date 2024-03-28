@@ -252,6 +252,13 @@ haploid_stratifications:
                   hap:
                     url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
               remove_gaps: true
+            test:
+              data:
+                src:
+                  hap:
+                    lines:
+                      - {chr: 2, start: 10, end: 50}
+                      - {chr: 21, start: 10, end: 50}
 
         # Benchmark files for this reference (if desired). Each key will be fed
         # into corresponding inputs for hap.py using the generated stratifications
@@ -497,6 +504,16 @@ haploid_stratifications:
           xy: false
           telomeres: false
           mappability: []
+        other_strats:
+          OtherDifficult:
+            test:
+              data:
+                src:
+                  hap:
+                    lines:
+                      - {chr: 2, start: 10, end: 50}
+                      - {chr: 21, start: 10, end: 50}
+
       test-xy:
         chr_filter: [23, 24]
         include:
@@ -611,6 +628,15 @@ haploid_stratifications:
           xy: false
           segdups: false
           mappability: []
+        other_strats:
+          OtherDifficult:
+            test:
+              data:
+                src:
+                  hap:
+                    lines:
+                      - {chr: 2, start: 10, end: 50}
+                      - {chr: 21, start: 10, end: 50}
 
       test-xy:
         chr_filter: [23, 24]
@@ -658,6 +684,28 @@ diploid1_stratifications:
           hets: []
           mappability:
             - {length: 50, mismatches: 0, indels: 0}
+        other_strats:
+          OtherDifficult:
+            test_hap:
+              data:
+                src:
+                  hap:
+                    lines:
+                      - {chr: 2, hap: 0, start: 10, end: 50}
+                      - {chr: 2, hap: 1, start: 12, end: 60}
+                      - {chr: 21, hap: 0, start: 10, end: 50}
+                      - {chr: 21, hap: 1, start: 15, end: 55}
+            test_dip:
+              data:
+                src:
+                  hap1:
+                    lines:
+                      - {chr: 2, start: 10, end: 50}
+                      - {chr: 21, start: 10, end: 50}
+                  hap2:
+                    lines:
+                      - {chr: 2, start: 12, end: 60}
+                      - {chr: 21, start: 15, end: 55}
       test-xy:
         chr_filter: [23, 24]
         include:
@@ -743,6 +791,29 @@ diploid2_stratifications:
           hets: []
           mappability:
             - {length: 50, mismatches: 0, indels: 0}
+        other_strats:
+          OtherDifficult:
+            test_hap:
+              data:
+                src:
+                  hap:
+                    lines:
+                      - {chr: 2, hap: 0, start: 10, end: 50}
+                      - {chr: 2, hap: 1, start: 12, end: 60}
+                      - {chr: 21, hap: 0, start: 10, end: 50}
+                      - {chr: 21, hap: 1, start: 15, end: 55}
+            test_dip:
+              data:
+                src:
+                  hap1:
+                    lines:
+                      - {chr: 2, start: 10, end: 50}
+                      - {chr: 21, start: 10, end: 50}
+                  hap2:
+                    lines:
+                      - {chr: 2, start: 12, end: 60}
+                      - {chr: 21, start: 15, end: 55}
+
       test-xy:
         chr_filter: [23, 24]
         include:

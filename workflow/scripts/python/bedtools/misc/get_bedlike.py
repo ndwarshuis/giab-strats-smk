@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any
+import subprocess as sp
 from typing_extensions import assert_never
 import common.io as io
 from common.functional import DesignError
@@ -46,8 +47,9 @@ def main(smk: Any) -> None:
         check_md5(src)
 
     elif isinstance(src, list):
-        pass
-        # raise DesignError("file src is null; this should not happen")
+        with open(opath, "wb") as f:
+            out = "\n".join([x.txt for x in src])
+            sp.run(["bgzip", "-c"], input=out, stdout=f, text=True)
 
     elif src is None:
         raise DesignError("file src is null; this should not happen")
