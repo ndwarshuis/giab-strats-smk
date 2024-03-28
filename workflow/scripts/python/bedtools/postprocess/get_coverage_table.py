@@ -47,8 +47,9 @@ def bedpath_to_strat_names(bp: Path) -> tuple[str, str]:
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
-    gapless_path = Path(smk.input["gapless"])
-    bedlist = Path(smk.input["bedlist"])
+    gapless_path = cfg.smk_to_input_name(smk, "gapless")
+    bedlist = cfg.smk_to_input_name(smk, "bedlist")
+    out = cfg.smk_to_output(smk)
 
     rk = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)
@@ -56,7 +57,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     chr_hap_mapper = get_chr_paired_mapper(sconf, rk, bk)
     gapless_sum = sum_bed_file(gapless_path)
 
-    with open(bedlist, "r") as i, gzip.open(smk.output[0], "w") as o:
+    with open(bedlist, "r") as i, gzip.open(out, "w") as o:
         for bedpath in i:
             bp = Path(bedpath.strip())
             level_name, strat_name = bedpath_to_strat_names(bp)

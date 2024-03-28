@@ -1,23 +1,23 @@
-from common.config import CoreLevel, si_to_ftbl, si_to_gff
+from common.config import CoreLevel, si_to_functional
 
 func = config.to_bed_dirs(CoreLevel.FUNCTIONAL)
 
 
-use rule download_ref as download_ftbl with:
-    output:
-        func.src.data / "ftbl.txt.gz",
-    params:
-        src=lambda w: config.refsrckey_to_functional_src(si_to_ftbl, w.ref_src_key),
-    localrule: True
-    log:
-        func.src.log / "ftbl.log",
+# use rule download_gaps as download_ftbl with:
+#     output:
+#         func.src.data / "ftbl.txt.gz",
+#     params:
+#         src=lambda w: config.refsrckey_to_functional_src(si_to_ftbl, w.ref_src_key),
+#     localrule: True
+#     log:
+#         func.src.log / "ftbl.log",
 
 
-use rule download_ref as download_gff with:
+use rule download_gaps as download_functional with:
     output:
         func.src.data / "gff.txt.gz",
     params:
-        src=lambda w: config.refsrckey_to_functional_src(si_to_gff, w.ref_src_key),
+        src=lambda w: to_bed_src(si_to_functional, w),
     localrule: True
     log:
         func.src.log / "gff.log",
@@ -25,19 +25,20 @@ use rule download_ref as download_gff with:
 
 checkpoint normalize_cds:
     input:
-        unpack(
-            lambda w: {
-                k: expand(
-                    p,
-                    ref_src_key=config.refkey_to_functional_refsrckeys(f, w.ref_key),
-                )
-                for k, f, p in zip(
-                    ["ftbl", "gff"],
-                    [si_to_ftbl, si_to_gff],
-                    [rules.download_ftbl.output, rules.download_gff.output],
-                )
-            }
-        ),
+        lambda w: bed_src_inputs(rules.download_functional.output, si_to_functional, w),
+        # unpack(
+        #     lambda w: {
+        #         k: expand(
+        #             p,
+        #             ref_src_key=config.refkey_to_functional_refsrckeys(f, w.ref_key),
+        #         )
+        #         for k, f, p in zip(
+        #             ["ftbl", "gff"],
+        #             [si_to_ftbl, si_to_gff],
+        #             [rules.download_ftbl.output, rules.download_gff.output],
+        #         )
+        #     }
+        # ),
     output:
         **{k: func.inter.filtersort.data / f"{k}.json" for k in ["cds", "vdj"]},
     params:

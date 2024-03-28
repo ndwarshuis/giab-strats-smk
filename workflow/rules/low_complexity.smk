@@ -370,7 +370,7 @@ rule all_uniform_repeats:
 ## simple repeats
 
 
-use rule download_ref as download_simreps with:
+use rule download_gaps as download_simreps with:
     output:
         lc.src.data / "simreps.txt.gz",
     log:
@@ -418,7 +418,7 @@ rule merge_simreps:
 ## rmsk
 
 
-use rule download_ref as download_rmsk with:
+use rule download_gaps as download_rmsk with:
     output:
         lc.src.data / "rmsk.txt.gz",
     log:
@@ -479,7 +479,7 @@ all_rmsk_classes = {
 ## Satellites (censat, alternative to RMSK as in above)
 
 
-use rule download_ref as download_censat with:
+use rule download_gaps as download_censat with:
     output:
         lc.src.data / "censat.txt.gz",
     log:

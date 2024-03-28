@@ -3,7 +3,7 @@ from common.config import CoreLevel, si_to_superdups
 segdup = config.to_bed_dirs(CoreLevel.SEGDUPS)
 
 
-use rule download_ref as download_superdups with:
+use rule download_gaps as download_superdups with:
     output:
         segdup.src.data / "superdups.txt.gz",
     log:

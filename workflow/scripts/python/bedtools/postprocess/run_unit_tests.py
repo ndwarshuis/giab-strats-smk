@@ -161,7 +161,7 @@ def run_all_tests(
     ]
 
 
-def strat_files(path: str) -> list[Path]:
+def strat_files(path: Path) -> list[Path]:
     with open(path, "r") as f:
         return [Path(s.strip()) for s in f]
 
@@ -174,15 +174,21 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     )[1]
     reverse_map = {v: k for k, v in fm.items()}
 
-    failed_tests = Path(smk.log["failed"])
+    checksums_path = cfg.smk_to_input_name(smk, "checksums")
+    strat_list_path = cfg.smk_to_input_name(smk, "strat_list")
+    strats_path = cfg.smk_to_input_name(smk, "strats")
+    genome_path = cfg.smk_to_input_name(smk, "genome")
+    gapless_auto_path = cfg.smk_to_input_name(smk, "gapless_auto")
+    gapless_parY_path = cfg.smk_to_input_name(smk, "gapless_parY")
+
+    failed_tests_path = cfg.smk_to_log_name(smk, "failed")
+    error_path = cfg.smk_to_log_name(smk, "error")
 
     # check global stuff first (since this is faster)
 
-    global_failures: list[str] = test_checksums(
-        Path(smk.input["checksums"])
-    ) + test_tsv_list(Path(smk.input["strat_list"]))
+    global_failures = test_checksums(checksums_path) + test_tsv_list(strat_list_path)
 
-    with open(failed_tests, "w") as f:
+    with open(failed_tests_path, "w") as f:
         for j in global_failures:
             f.write(j + "\n")
 
@@ -192,19 +198,19 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     # check individual stratification files
 
     gapless = GaplessBT(
-        auto=Path(smk.input["gapless_auto"]),
-        parY=Path(smk.input["gapless_parY"]),
-        genome=Path(smk.input["genome"]),
-        error_log=Path(smk.log["error"]),
+        auto=gapless_auto_path,
+        parY=gapless_parY_path,
+        genome=genome_path,
+        error_log=error_path,
     )
 
     strat_failures = [
         res
-        for p in strat_files(str(smk.input["strats"]))
+        for p in strat_files(strats_path)
         for res in run_all_tests(p, reverse_map, gapless)
     ]
 
-    with open(failed_tests, "a") as f:
+    with open(failed_tests_path, "a") as f:
         for i in strat_failures:
             f.write("%s: %s" % i + "\n")
 

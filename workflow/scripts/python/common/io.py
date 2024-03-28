@@ -1,16 +1,16 @@
 import hashlib
 from logging import Logger
-from typing import IO
+from typing import IO, Callable
 from pathlib import Path
 import subprocess as sp
 from common.functional import not_none_unsafe, noop
 import gzip
 
 
-def get_md5(path: str, unzip: bool = False) -> str:
+def get_md5(p: Path, unzip: bool = False) -> str:
     h = hashlib.md5()
-    do_unzip = path.endswith(".gz") and unzip is True
-    with gzip.open(path, "rb") if do_unzip else open(path, "rb") as f:
+    do_unzip = p.name.endswith(".gz") and unzip is True
+    with gzip.open(p, "rb") if do_unzip else open(p, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             h.update(chunk)
     return h.hexdigest()
@@ -59,7 +59,13 @@ def spawn_stream(
     return p, not_none_unsafe(p.stdout, noop)
 
 
-def bgzip_file(i: IO[bytes], p: Path) -> sp.CompletedProcess[bytes]:
+def bgzip_file(
+    i: IO[bytes], p: Path, parents: bool = True
+) -> sp.CompletedProcess[bytes]:
+    # make parent directory as necessary since snakemake won't make the parent
+    # in the case of checkpoints where the output files aren't fully known at
+    # parsetime
+    p.parent.mkdir(parents=parents, exist_ok=True)
     with open(p, "wb") as f:
         return bgzip(i, f)
 
@@ -103,10 +109,45 @@ def tee(i: IO[bytes]) -> tuple[sp.Popen[bytes], IO[bytes], IO[bytes]]:
     return (p, not_none_unsafe(p.stdout, noop), not_none_unsafe(p.stderr, noop))
 
 
+CURL = ["curl", "-f", "-Ss", "-L", "-q"]
+
+
+def curl_cmd(url: str) -> list[str]:
+    return [*CURL, url]
+
+
+# to test the format of downloaded files, sample the first 65000
+# bytes (which should be enough to get one block of a bgzip file,
+# which will allow us to test for it)
+def curl_test_cmd(url: str) -> list[str]:
+    return [*CURL, "-r", "0-65000", url]
+
+
+def curl(url: str, o: IO[bytes], log: Path) -> None:
+    p = sp.run(curl_cmd(url), stdout=o, stderr=sp.PIPE)
+    check_processes([p], log)
+
+
+def curl_test(url: str, testfun: Callable[[IO[bytes]], bool], log: Path) -> bool:
+    p, o = spawn_stream(curl_test_cmd(url))
+    res = testfun(o)
+    check_processes([p], log)
+    return res
+
+
+def curl_gzip(url: str, ofinal: IO[bytes], log: Path, use_bgzip: bool) -> None:
+    zipf = bgzip if use_bgzip else gzip_
+    p1, o1 = spawn_stream(curl_cmd(url))
+    p2 = zipf(o1, ofinal)
+    o1.close()
+    check_processes([p1, p2], log)
+
+
 def check_processes(
     ps: list[sp.Popen[bytes] | sp.CompletedProcess[bytes]], log: Path
 ) -> None:
     some_error = False
+    # TODO make parent directory if it doesn't exist? probably won't be necessary
     with open(log, "w") as lf:
         for p in ps:
             if isinstance(p, sp.CompletedProcess):

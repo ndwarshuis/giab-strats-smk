@@ -46,6 +46,7 @@ def read_bed(
     skip_lines: int,
     sep: str,
     more: list[int],
+    comment: str | None,
 ) -> pd.DataFrame:
     """Read a bed file as a pandas dataframe.
 
@@ -71,7 +72,7 @@ def read_bed(
                 total_skip += 1
             else:
                 break
-    return read_bed_raw(path, columns, total_skip, sep, more)
+    return read_bed_raw(path, columns, total_skip, sep, more, comment)
 
 
 def read_bed_raw(
@@ -80,6 +81,7 @@ def read_bed_raw(
     skip_lines: int,
     sep: str,
     more: list[int],
+    comment: str | None,
 ) -> pd.DataFrame:
     bedcols = [*columns, *more]
     df = pd.read_table(
@@ -88,17 +90,18 @@ def read_bed_raw(
         usecols=bedcols,
         sep=sep,
         skiprows=skip_lines,
+        comment=comment,
         # satisfy type checker :/
         dtype={
             **{columns[0]: str, columns[1]: int, columns[2]: int},
             **{m: str for m in more},
         },
-    )
+    )[bedcols]
     return df.set_axis(range(len(bedcols)), axis=1)
 
 
 def read_bed_default(h: IO[bytes] | Path) -> pd.DataFrame:
-    return read_bed_raw(h, (0, 1, 2), 0, "\t", [])
+    return read_bed_raw(h, (0, 1, 2), 0, "\t", [], None)
 
 
 def bed_to_text(df: pd.DataFrame) -> Generator[str, None, None]:
@@ -152,13 +155,13 @@ def bed_to_stream(df: pd.DataFrame) -> Generator[IO[bytes], None, None]:
         _w.close()
 
 
-def write_bed(path: Path, df: pd.DataFrame) -> None:
+def write_bed(path: Path, df: pd.DataFrame, parents: bool = True) -> None:
     """Write a bed file in bgzip format from a dataframe.
 
     Dataframe is not checked to make sure it is a "real" bed file.
     """
     with bed_to_stream(df) as s:
-        bgzip_file(s, path)
+        bgzip_file(s, path, parents)
     # with bgzf.open(path, "w") as f:
     #     write_bed_stream(f, df)
 
@@ -243,7 +246,8 @@ def filter_sort_bed(
     df[chr_col] = df[chr_col].map(from_map)
     df = sort_bed_numerically(df.dropna(subset=[chr_col]), n)
     df[chr_col] = df[chr_col].map(to_map)
-    return df
+    # remove lines where the start and end are the same
+    return df[df[1] != df[2]].copy()
 
 
 def split_bed(
@@ -256,4 +260,4 @@ def split_bed(
     """
     chr_col = df.columns.tolist()[0]
     sp = df[chr_col].map(split_map)
-    return df[sp], df[~sp]
+    return df[sp.fillna(False)].copy(), df[~sp.fillna(True)].copy()

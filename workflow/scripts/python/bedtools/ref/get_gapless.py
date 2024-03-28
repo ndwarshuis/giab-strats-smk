@@ -9,10 +9,12 @@ from common.bed import (
     subtractBed,
 )
 from common.io import check_processes, tee, bgzip_file
-from common.functional import match1_unsafe, match2_unsafe
+from common.functional import match1_unsafe, match2_unsafe, DesignError
 import pandas as pd
 
 
+# convert genome to bed file (where each region is just the length of one
+# chromosome)
 def read_genome_bed(p: Path) -> pd.DataFrame:
     df = pd.read_table(
         p,
@@ -25,35 +27,25 @@ def read_genome_bed(p: Path) -> pd.DataFrame:
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
-    inputs = smk.input
-    auto_out = Path(smk.output["auto"])
-    parY_out = Path(smk.output["parY"])
-    log = Path(smk.log[0])
+    genome_path = cfg.smk_to_input_name(smk, "genome")
+    auto_out = cfg.smk_to_output_name(smk, "auto")
+    parY_out = cfg.smk_to_output_name(smk, "parY")
+    log = cfg.smk_to_log(smk)
     ws: dict[str, Any] = smk.wildcards
 
     def go(
-        x: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyBedT_, cfg.AnySrcT]
+        x: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyBedT_]
     ) -> cfg.BedFile[cfg.AnyBedT] | None:
         return x.refdata.strat_inputs.gap
 
-    # convert genome to bed file (where each region is just the length of
-    # one chromosome)
-    genome_path = Path(inputs["genome"])
-
     # If we have gap input, make the gapless file, otherwise just symlink to the
     # genome bed file (which just means the entire genome is gapless)
-    if not hasattr(inputs, "gaps"):
-        genome_bed = read_genome_bed(genome_path)
-        write_bed(auto_out, genome_bed)
-        parY_out.symlink_to(auto_out.resolve())
-    else:
-        gap_inputs: list[Path] = inputs["gaps"]
-        rk = cfg.wc_to_reffinalkey(ws)
-        bk = cfg.wc_to_buildkey(ws)
+    try:
+        gap_inputs = cfg.smk_to_inputs_name(smk, "gaps")
 
         gaps_df = sconf.with_build_data_and_bed_full(
-            rk,
-            bk,
+            cfg.wc_to_reffinalkey(ws),
+            cfg.wc_to_buildkey(ws),
             go,
             lambda bd, bf: match1_unsafe(
                 gap_inputs, lambda i: cfg.read_filter_sort_hap_bed(bd, bf, i)
@@ -85,20 +77,25 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
             # If we have a parY bed, subtract parY from the gaps bed, otherwise
             # just link them since we have nothing to subtract off
-            if hasattr(inputs, "parY"):
-                parY_src = Path(inputs["parY"])
+            try:
+                parY_path = cfg.smk_to_input_name(smk, "parY")
                 p3, o3, o4 = tee(o2)
-                p4, o5 = subtractBed(o3, parY_src, genome_path)
+                p4, o5 = subtractBed(o3, parY_path, genome_path)
 
                 bgzip_file(o4, parY_out)
                 bgzip_file(o5, auto_out)
 
                 check_processes([p1, p2, p3, p4], log)
-            else:
+            except DesignError:
                 bgzip_file(o2, auto_out)
                 parY_out.symlink_to(auto_out.resolve())
 
                 check_processes([p1, p2], log)
+
+    except DesignError:
+        genome_bed = read_genome_bed(genome_path)
+        write_bed(auto_out, genome_bed)
+        parY_out.symlink_to(auto_out.resolve())
 
 
 main(snakemake, snakemake.config)  # type: ignore

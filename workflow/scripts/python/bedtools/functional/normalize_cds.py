@@ -1,243 +1,125 @@
 import pandas as pd
-from pathlib import Path
 import json
-from typing import Any, Callable, TypeVar
+from pathlib import Path
+from typing import Any, assert_never
 import common.config as cfg
-from common.functional import DesignError, match1_unsafe, match12_unsafe, both
-from common.bed import filter_sort_bed, InitMapper, split_bed, write_bed
+from common.bed import write_bed
+from common.functional import both, DesignError, fmap_maybe
 
-X = TypeVar("X")
-
-# This seems a bit wonky since it is unlike many of the other chromosome name
-# mapping operations. The FTBL file has a mapping b/t bare chromosome names (ie
-# 1-22, X, Y) and accession numbers (ie "NC_gibberish.420"), and the accession
-# numbers are what is reported in GFF files. Thus we need to translate these
-# accession numbers to the final chromosomal names on the target reference.
-#
-# Thus the mapper created here connects accession numbers to each chromosomal
-# index; the main difference b/t this and the other "initial mappers" is that
-# the "accession numbers" are the "chromosome names" found in a normal input bed
-# file.
-FTBLMapper = InitMapper
+CVOut = tuple[pd.DataFrame, tuple[Path, Path]]
 
 VDJ_PAT = "^ID=gene-(IGH|IGK|IGL|TRA|TRB|TRG);"
 
 
-# def _read_df(i: Path) -> pd.DataFrame:
-#     df = read_bed(i, {0: str, 1: int, 2: int}, 0, "\t", more=[3, 4])
-#     return df[df[3].str.contains("RefSeq") & (df[4] == "CDS")][[0, 1, 2]].copy()
-
-
-def read_gff(i: Path) -> pd.DataFrame:
-    """Read a gff file and return a condensed bed-like dataframe."""
-    # Pull the following columns and rearrange like so:
-    # 0 -> 0: accession number
-    # 3 -> 1: start pos
-    # 4 -> 2: end pos
-    # 1 -> 3: source
-    # 2 -> 4: type (eg gene vs exon)
-    # 8 -> 5: attributes
-    #
-    # NOTE that source and type are used for creating the CDS bed, and
-    # attributes are used for creating the VDJ bed (hence why all are included)
-    columns = {0: str, 3: int, 4: int, 1: str, 2: str, 8: str}
-    df = pd.read_table(
-        i,
-        header=None,
-        comment="#",
-        dtype={k: v for k, v in columns.items()},
-        usecols=list(columns),
-    )[list(columns)]
-    df = df.set_axis(range(len(df.columns)), axis=1)
-    # for some reason there are lots of rows where the start/end are the same;
-    # these are useless to us so remove them
-    return df[df[1] != df[2]].copy()
-
-
-def write_gff(
-    o: Path,
-    mask_fun: Callable[[pd.DataFrame], "pd.Series[bool]"],
-    df: pd.DataFrame,
-) -> None:
-    write_bed(o, df[mask_fun(df)][[0, 1, 2]])
-
-
-def cds_mask(df: pd.DataFrame) -> "pd.Series[bool]":
-    refseq_mask = df[3].str.contains("RefSeq")
-    cds_mask = df[4] == "CDS"
-    return refseq_mask & cds_mask
-
-
-def vdj_mask(df: pd.DataFrame) -> "pd.Series[bool]":
-    return df[5].str.match(VDJ_PAT)
-
-
-def read_ftbl(path: Path, cis: cfg.BuildChrs, hap: cfg.Haplotype) -> FTBLMapper:
-    filter_cols = ["assembly_unit", "seq_type"]
-    map_cols = ["chromosome", "genomic_accession"]
-    df = pd.read_table(path, header=0, usecols=filter_cols + map_cols, dtype=str)
-    chr_mask = df["seq_type"] == "chromosome"
-    asm_mask = df["assembly_unit"] == "Primary Assembly"
-    ser = (
-        df[chr_mask & asm_mask][map_cols]
-        .drop_duplicates()
-        .copy()
-        .set_index("chromosome")["genomic_accession"]
-    )
-    try:
-        return {ser[i.chr_name]: i.to_internal_index(hap) for i in cis}
-    except KeyError:
-        raise DesignError("Feature table has wonky chromosome names, fixmeplz")
-
-
-def iamnotlivingimasleep(_: Any) -> Any:
-    """Don't go down the rabbit whole"""
-    raise DesignError("NOT IMPLEMENTED")
-
-
-def write_outputs(p: Path, xs: list[Path]) -> None:
-    with open(p, "w") as f:
-        json.dump([str(x) for x in xs], f)
-
-
-def main(smk: Any, sconf: cfg.GiabStrats) -> None:
+def main(smk: Any) -> None:
+    sconf: cfg.GiabStrats = smk.config
     ws: dict[str, str] = smk.wildcards
-    ps: dict[str, str] = smk.params
-    ftbl_inputs: list[Path] = [Path(i) for i in smk.input["ftbl"]]
-    gff_inputs: list[Path] = [Path(i) for i in smk.input["gff"]]
-    cds_pattern: str = ps["cds_output"]
-    vdj_pattern: str = ps["vdj_output"]
+    inputs = cfg.smk_to_inputs_all(smk)
+    cds_pattern = cfg.smk_to_param_str(smk, "cds_output")
+    vdj_pattern = cfg.smk_to_param_str(smk, "vdj_output")
+    cds_out = cfg.smk_to_output_name(smk, "cds")
+    vdj_out = cfg.smk_to_output_name(smk, "vdj")
 
-    def write_vdj_maybe1(
-        switch: bool,
-        rfk: cfg.RefKeyFull,
-        df: pd.DataFrame,
-    ) -> list[Path]:
-        if switch:
-            v = cfg.sub_output_path(vdj_pattern, rfk)
-            write_gff(v, vdj_mask, df)
-            return [v]
+    rk = cfg.wc_to_refkey(ws)
+    bk = cfg.wc_to_buildkey(ws)
+
+    bd = sconf.to_build_data(rk, bk)
+    fnc = bd.refdata.strat_inputs.functional
+    # NOTE: this should never happen because the logic below should prevent the
+    # bed file object from propagating if it is None, but the below logic isn't
+    # polymorphic enough to understand 'Functional's
+    if fnc is None:
+        raise DesignError()
+    fps = fnc.fparams
+
+    def filter_cds(df: pd.DataFrame) -> pd.DataFrame:
+        source_mask = fmap_maybe(lambda x: df[3].str.match(x[0]), fps.source_match)
+        offset = 0 if source_mask is None else 1
+        type_mask = fmap_maybe(lambda x: df[3 + offset].str.match(x[0]), fps.type_match)
+        if source_mask is None:
+            if type_mask is None:
+                return df
+            elif type_mask is not None:
+                return df[type_mask].copy()
+            else:
+                assert_never(type_mask)
+        elif source_mask is not None:
+            if type_mask is None:
+                return df[source_mask].copy()
+            elif type_mask is not None:
+                return df[source_mask & type_mask].copy()
+            else:
+                assert_never(type_mask)
         else:
-            return []
+            assert_never(source_mask)
 
-    def write_vdj_maybe2(
-        switch: bool,
-        rfks: tuple[cfg.RefKeyFull, cfg.RefKeyFull],
-        df: tuple[pd.DataFrame, pd.DataFrame],
-    ) -> list[Path]:
-        if switch:
-            vs: tuple[Path, Path] = both(
-                lambda r: cfg.sub_output_path(vdj_pattern, r), rfks
-            )
-            write_gff(vs[0], vdj_mask, df[0])
-            write_gff(vs[1], vdj_mask, df[1])
-            return [*vs]
-        else:
-            return []
+    def filter_vdj(df: pd.DataFrame) -> pd.DataFrame:
+        source_offset = 0 if fps.source_match is None else 1
+        type_offset = 1 if fps.type_match is None else 1
+        return df[df[3 + source_offset + type_offset].str.match(VDJ_PAT)].copy()
 
-    def hap(bd: cfg.HapBuildData) -> tuple[list[Path], list[Path]]:
-        rd = bd.refdata
-        rk = rd.ref.src.key(rd.refkey)
-        c = cfg.sub_output_path(cds_pattern, rk)
-
-        def go(f: Path, g: Path) -> pd.DataFrame:
-            im = read_ftbl(f, bd.build_chrs, cfg.Haplotype.HAP1)
-            fm = bd.refdata.ref.chr_pattern.final_mapper(
-                bd.build_chrs, cfg.Haplotype.HAP1
-            )
-            gff = read_gff(g)
-            gff_ = filter_sort_bed(im, fm, gff)
-            write_gff(c, cds_mask, gff_)
-            return gff_
-
-        gff = match1_unsafe(
-            list(zip(ftbl_inputs, gff_inputs)),
-            lambda x: go(*x),
+    def to_output_pattern(rk: cfg.RefKeyFull) -> tuple[Path, Path]:
+        return (
+            cfg.sub_output_path(cds_pattern, rk),
+            cfg.sub_output_path(vdj_pattern, rk),
         )
 
-        v = write_vdj_maybe1(bd.build.include.vdj, rk, gff)
-        return [c], v
+    def hap(i: Path, bd: cfg.HapBuildData, bf: cfg.HapBedFile) -> list[CVOut]:
+        df = cfg.read_filter_sort_hap_bed(bd, bf, i)
+        return [(df, to_output_pattern(bd.refdata.ref.src.key(rk)))]
 
-    def dip1(bd: cfg.Dip1BuildData) -> tuple[list[Path], list[Path]]:
-        fm = bd.refdata.ref.chr_pattern.final_mapper(bd.build_chrs)
-        rd = bd.refdata
-        rk = rd.ref.src.key(rd.refkey)
+    def dip1to1(i: Path, bd: cfg.Dip1BuildData, bf: cfg.Dip1BedFile) -> list[CVOut]:
+        df = cfg.read_filter_sort_dip1to1_bed(bd, bf, i)
+        rfk = bd.refdata.ref.src.key(rk)
+        return [(df, to_output_pattern(rfk))]
 
-        im = match12_unsafe(
-            ftbl_inputs,
-            iamnotlivingimasleep,
-            lambda f0, f1: {
-                **read_ftbl(f0, bd.build_chrs, cfg.Haplotype.HAP1),
-                **read_ftbl(f1, bd.build_chrs, cfg.Haplotype.HAP2),
-            },
-        )
+    def dip1to2(i: Path, bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFile) -> list[CVOut]:
+        dfs = cfg.read_filter_sort_dip1to2_bed(bd, bf, i)
+        paths = both(to_output_pattern, bd.refdata.ref.src.keys(rk))
+        return list(zip(dfs, paths))
 
-        gff = match12_unsafe(
-            gff_inputs,
-            lambda g: filter_sort_bed(im, fm, read_gff(g)),
-            # NOTE this should be ok to do since the accession numbers should be
-            # unique
-            lambda g0, g1: filter_sort_bed(
-                im, fm, pd.concat([read_gff(g) for g in [g0, g1]])
-            ),
-        )
+    def dip2to1(
+        i: tuple[Path, Path],
+        bd: cfg.Dip1BuildData,
+        bf: cfg.Dip2BedFile,
+    ) -> list[CVOut]:
+        df = cfg.read_filter_sort_dip2to1_bed(bd, bf, i)
+        rfk = bd.refdata.ref.src.key(rk)
+        return [(df, to_output_pattern(rfk))]
 
-        c = cfg.sub_output_path(cds_pattern, rk)
-        write_gff(c, cds_mask, gff)
+    def dip2to2(
+        i: Path,
+        hap: cfg.Haplotype,
+        bd: cfg.Dip2BuildData,
+        bf: cfg.Dip2BedFile,
+    ) -> CVOut:
+        df = cfg.read_filter_sort_dip2to2_bed(bd, bf, i, hap)
+        paths = to_output_pattern(cfg.RefKeyFull(rk, hap))
+        return (df, paths)
 
-        v = write_vdj_maybe1(bd.build.include.vdj, rk, gff)
-        return [c], v
-
-    def dip2(bd: cfg.Dip2BuildData) -> tuple[list[Path], list[Path]]:
-        fm0, fm1 = bd.refdata.ref.chr_pattern.both(
-            lambda x, hap: x.final_mapper(bd.build_chrs, hap)
-        )
-        im0, im1 = match12_unsafe(
-            ftbl_inputs,
-            iamnotlivingimasleep,
-            lambda f0, f1: (
-                read_ftbl(f0, bd.build_chrs, cfg.Haplotype.HAP1),
-                read_ftbl(f1, bd.build_chrs, cfg.Haplotype.HAP2),
-            ),
-        )
-        gffs = match12_unsafe(
-            gff_inputs,
-            # TODO set a new PR for number of characters in one lambda :)
-            lambda g: (
-                filter_sort_bed(
-                    im0,
-                    fm0,
-                    (split := split_bed({k: True for k in im0}, read_gff(g)))[0],
-                ),
-                filter_sort_bed(im1, fm1, split[1]),
-            ),
-            lambda g0, g1: (
-                filter_sort_bed(im0, fm0, read_gff(g0)),
-                filter_sort_bed(im1, fm1, read_gff(g1)),
-            ),
-        )
-
-        rd = bd.refdata
-        rks = rd.ref.src.keys(rd.refkey)
-
-        cs = both(lambda r: cfg.sub_output_path(cds_pattern, r), rks)
-
-        write_gff(cs[0], cds_mask, gffs[0])
-        write_gff(cs[1], cds_mask, gffs[1])
-
-        vs = write_vdj_maybe2(bd.build.include.vdj, rks, gffs)
-        return [*cs], vs
-
-    cs, vs = sconf.with_build_data(
-        cfg.wc_to_refkey(ws),
-        cfg.wc_to_buildkey(ws),
+    res = sconf.with_build_data_and_bed_i(
+        rk,
+        bk,
+        inputs,
+        lambda bd: cfg.bd_to_si(cfg.si_to_functional, bd),
         hap,
-        dip1,
-        dip2,
+        dip1to1,
+        dip1to2,
+        dip2to1,
+        lambda i, bf, bd: cfg.wrap_dip_2to2_i_f(dip2to2, i, bf, bd),
     )
 
-    write_outputs(smk.output["cds"], cs)
-    write_outputs(smk.output["vdj"], vs)
+    def write_output(o: Path, ps: list[Path]) -> None:
+        with open(o, "w") as f:
+            json.dump([str(p) for p in ps], f)
+
+    for df, (cds_path, vdj_path) in res:
+        write_bed(cds_path, filter_cds(df))
+        if bd.build.include.vdj:
+            write_bed(vdj_path, filter_vdj(df))
+
+    write_output(cds_out, [c for _, (c, _) in res])
+    write_output(vdj_out, [v for _, (_, v) in res])
 
 
-main(snakemake, snakemake.config)  # type: ignore
+main(snakemake)  # type: ignore
