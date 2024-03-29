@@ -1624,22 +1624,6 @@ class Dip2ChrSrc(GenericModel, Generic[X], _Dip2ChrSrc):
         return self.chr_pattern_
 
 
-@dataclass(frozen=True)
-class BedLine:
-    chr: bed.ChrName
-    start: int
-    end: int
-    more: list[str]
-
-    @property
-    def txt(self) -> str:
-        xs = [self.chr, str(self.start), str(self.end), *self.more]
-        return "\t".join(xs)
-
-
-BedLines = list[BedLine]
-
-
 class BedTxtLine(BaseModel):
     """Represents one line in a bed file, encoded directly in the config.
 
@@ -1666,20 +1650,20 @@ class BedTxtLine(BaseModel):
 
 
 class HapBedTxtLine(BedTxtLine):
-    def to_line(self, pat: HapChrPattern) -> BedLine:
+    def to_line(self, pat: HapChrPattern) -> bed.BedLine:
         return not_none_unsafe(
             pat.to_chr_name(self.chr),
-            lambda n: BedLine(n, self.start, self.end, self.more),
+            lambda n: bed.BedLine(n, self.start, self.end, self.more),
         )
 
 
 class DipBedTxtLine(BedTxtLine):
     hap: Haplotype
 
-    def to_line(self, pat: DipChrPattern) -> BedLine:
+    def to_line(self, pat: DipChrPattern) -> bed.BedLine:
         return not_none_unsafe(
             pat.to_chr_name(self.chr, self.hap),
-            lambda n: BedLine(n, self.start, self.end, self.more),
+            lambda n: bed.BedLine(n, self.start, self.end, self.more),
         )
 
 
@@ -1710,7 +1694,7 @@ class HapChrTxt(BaseModel, _HapChrSrc):
     src_: Haploid[HapBedTxtSrc] = Field(..., alias="src")
 
     @property
-    def src(self) -> Haploid[BedLines]:
+    def src(self) -> Haploid[bed.BedLines]:
         return Haploid(hap=[x.to_line(self.chr_pattern) for x in self.src_.hap.lines])
 
     @property
@@ -1722,7 +1706,7 @@ class Dip1ChrTxt(BaseModel, _Dip1ChrSrc):
     src_: Haploid[DipBedTxtSrc] = Field(..., alias="src")
 
     @property
-    def src(self) -> Haploid[BedLines]:
+    def src(self) -> Haploid[bed.BedLines]:
         return Haploid(hap=[x.to_line(self.chr_pattern) for x in self.src_.hap.lines])
 
     @property
@@ -1734,7 +1718,7 @@ class Dip2ChrTxt(BaseModel, _Dip2ChrSrc):
     src_: Diploid[HapBedTxtSrc] = Field(..., alias="src")
 
     @property
-    def src(self) -> Diploid[BedLines]:
+    def src(self) -> Diploid[bed.BedLines]:
         b1, b2 = self.src_.both(
             lambda x, hap: [x.to_line(self.chr_pattern.choose(hap)) for x in x.lines]
         )
@@ -1914,7 +1898,7 @@ RefSrcT = TypeVar("RefSrcT", HapRefSrc, Dip1RefSrc, Dip2RefSrc)
 # bed-like files may be remote, local, or specified manually in the config
 BedFileSrc = BedLocalSrc | BedHttpSrc
 
-AnyBedSrc = BedLocalSrc | BedHttpSrc | BedLines
+AnyBedSrc = BedLocalSrc | BedHttpSrc | bed.BedLines
 
 HapBedSrc = HapChrSrc[BedFileSrc] | HapChrTxt
 DipBedSrc = Dip1ChrSrc[BedFileSrc] | Dip2ChrSrc[BedFileSrc] | Dip1ChrTxt | Dip2ChrTxt
