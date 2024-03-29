@@ -20,28 +20,27 @@ haploid_stratifications:
   GRCh38:
     # The fasta for this stratification's reference.
     ref:
-      src:
-        # Location of the fasta (either url or filepath). Note that if this is
-        # a local file, the pipeline will raise an error if the file does
-        # not exist. If the file is not bgzipped, it will be bgzipped on the
-        # fly when downloaded
-        #
-        # filepath: path/to/local/file
-        # url: https://url/to/file
-        hap:
-          url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/references/GRCh38/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta.gz
+      # Location of the fasta (either url or filepath). Note that if this is
+      # a local file, the pipeline will raise an error if the file does
+      # not exist. If the file is not bgzipped, it will be bgzipped on the
+      # fly when downloaded
+      #
+      # filepath: path/to/local/file
+      # url: https://url/to/file
+      hap:
+        url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/references/GRCh38/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta.gz
 
-          # MD5 checksum of the file. This is optional, and if not given the
-          # checksum could be anything. Recommended to be used after one has
-          # committed to using a particular set of inputs, and in particular if
-          # one suspects that the sources of said inputs might not be good
-          # stewards (eg, they change files without warning).
-          #
-          # NOTE: the md5 will be calculated against the plain text content of the
-          # file rather than the gzipped version (gzip records lots of
-          # location-specific data in the file header which will throw off the
-          # checksum)
-          md5: a6da8681616c05eb542f1d91606a7b2f
+        # MD5 checksum of the file. This is optional, and if not given the
+        # checksum could be anything. Recommended to be used after one has
+        # committed to using a particular set of inputs, and in particular if
+        # one suspects that the sources of said inputs might not be good
+        # stewards (eg, they change files without warning).
+        #
+        # NOTE: the md5 will be calculated against the plain text content of the
+        # file rather than the gzipped version (gzip records lots of
+        # location-specific data in the file header which will throw off the
+        # checksum)
+        md5: a6da8681616c05eb542f1d91606a7b2f
 
       # The pattern of each chromosome. This must match the fasta exactly or
       # weird things will happen. The final stratification beds will also have
@@ -62,20 +61,19 @@ haploid_stratifications:
       # be subtracted off the final stratification files. If this is null, gaps
       # are not considered.
       gap:
-        data:
-          src: 
-            # Location of the fasta (either url or filepath). This operates in the
-            # same manner as the same key for 'ref' except that these can be in
-            # either gzip or bgzip.
-            #
-            # filepath: path/to/local/file
-            # url: https://url/to/file
-            hap:
-              url: https://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/gap.txt.gz
+        bed:
+          # Location of the fasta (either url or filepath). This operates in the
+          # same manner as the same key for 'ref' except that these can be in
+          # either gzip or bgzip.
+          #
+          # filepath: path/to/local/file
+          # url: https://url/to/file
+          hap:
+            url: https://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/gap.txt.gz
     
-              # Analogous for that in 'ref' except the checksum is calculated after
-              # gzipping the file if it is not already compressed
-              md5: 4880b2f4c3f08766003855818f0db02d
+            # Analogous for that in 'ref' except the checksum is calculated after
+            # gzipping the file if it is not already compressed
+            md5: 4880b2f4c3f08766003855818f0db02d
   
         # Params for the bed file
         params:
@@ -109,11 +107,10 @@ haploid_stratifications:
   
         # Source files for Repeat Masker. 
         rmsk:
-          data:
-            src:
-              hap:
-                url: https://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/rmsk.txt.gz
-                md5: e8afed8cbcfef00b6cc47059c6fb6fa2
+          bed:
+            hap:
+              url: https://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/rmsk.txt.gz
+              md5: e8afed8cbcfef00b6cc47059c6fb6fa2
   
           # the column index of the repeat masker class (eg LINE, SINE, etc)
           class_col: 11
@@ -127,11 +124,10 @@ haploid_stratifications:
   
         # Source file for simple repeats file. Analogous to gaps (see above).
         simreps:
-          data:
-            src: 
-              hap:
-                url: https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/simpleRepeat.txt.gz
-                md5: b0e801344ba654a5146a2ba3e9973462
+          bed:
+            hap:
+              url: https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/simpleRepeat.txt.gz
+              md5: b0e801344ba654a5146a2ba3e9973462
           params:
             bed_cols: {chr: 1, start: 2, end: 3}
   
@@ -141,19 +137,17 @@ haploid_stratifications:
           # Source files for features on the X or Y chromosome. Analogous to gaps
           # (see above) with the addition of the 'level_col' as an option.
           x_bed:
-            data:
-              src: 
-                hap:
-                  url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/GRCh38/chrX_genomic_features_GRCh38.bed
-                  md5: 94acda1d4358d30753422799152f4310
+            bed:
+              hap:
+                url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/GRCh38/chrX_genomic_features_GRCh38.bed
+                md5: 94acda1d4358d30753422799152f4310
             # Column index for the feature level (eg XTR, Ampliconic, etc)
             level_col: 3
           y_bed:
-            data:
-              src: 
-                hap:
-                  url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/GRCh38/chrY_genomic_features_GRCh38.bed
-                  md5: 770682734c41f5f7c1655adf1f986cb6
+            bed:
+              hap:
+                url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/GRCh38/chrY_genomic_features_GRCh38.bed
+                md5: 770682734c41f5f7c1655adf1f986cb6
             level_col: 3
           # Set to true if XTR regions are desired
           xtr: true
@@ -173,22 +167,20 @@ haploid_stratifications:
       segdups:
         # Source files for superdups. Analogous to gaps (see above)
         superdups:
-          data:
-            src:
-              hap:
-                url: https://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/genomicSuperDups.txt.gz
-                md5: 502e2b4dd6bf0cbd8dbdd9eb373aaa8e
+          bed:
+            hap:
+              url: https://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/genomicSuperDups.txt.gz
+              md5: 502e2b4dd6bf0cbd8dbdd9eb373aaa8e
           params:
             bed_cols: {chr: 1, start: 2, end: 3}
   
       # Source files for function regions stratifications.
       functional:
         # Source for the GFF file. Analogous to gaps src (see above)
-        data:
-          src:
-            hap:
-              url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz
-              md5: 6b657881c2c8d2d099a1c1749299538e
+        bed:
+          hap:
+            url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz
+            md5: 6b657881c2c8d2d099a1c1749299538e
           chr_pattern:
             special:
               1: NC_000001.11
@@ -247,18 +239,16 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             contigs_lt500kb:
-              data:
-                src:
-                  hap:
-                    url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
+              bed:
+                hap:
+                  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
               remove_gaps: true
             test:
-              data:
-                src:
-                  hap:
-                    lines:
-                      - {chr: 2, start: 10, end: 50}
-                      - {chr: 21, start: 10, end: 50}
+              bed:
+                hap:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
 
         # Benchmark files for this reference (if desired). Each key will be fed
         # into corresponding inputs for hap.py using the generated stratifications
@@ -268,20 +258,17 @@ haploid_stratifications:
         # bench: null
         bench:
           bench_vcf:
-            data:
-              src:
-                hap:
-                  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
+            bed:
+              hap:
+                url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
           bench_bed:
-            data:
-              src:
-                hap:
-                  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/HG005_GRCh38_1_22_v4.2.1_benchmark.bed
+            bed:
+              hap:
+                url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/HG005_GRCh38_1_22_v4.2.1_benchmark.bed
           query_vcf:
-            data:
-              src:
-                hap:
-                  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/SupplementaryFiles/inputvcfsandbeds/HG005_GRCh38_1_22_PacBio_HiFi_DeepVariant.vcf.gz
+            bed:
+              hap:
+                url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/SupplementaryFiles/inputvcfsandbeds/HG005_GRCh38_1_22_PacBio_HiFi_DeepVariant.vcf.gz
 
         # Specify a previous stratification to which this shall be compared (if
         # any)
@@ -389,57 +376,51 @@ haploid_stratifications:
 
   GRCh37:
     ref:
-      src:
-        hap:
-          url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/references/GRCh37/hs37d5.fa.gz
-          md5: 12a0bed94078e2d9e8c00da793bbc84e
+      hap:
+        url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/references/GRCh37/hs37d5.fa.gz
+        md5: 12a0bed94078e2d9e8c00da793bbc84e
       chr_pattern:
         template: '%i'
     strat_inputs:
       gap:
-        data:
-          src: 
-            hap:
-              url: https://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/gap.txt.gz
-              md5: ec81040d83fd92b431d5abdf3bb0271a
+        bed:
+          hap:
+            url: https://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/gap.txt.gz
+            md5: ec81040d83fd92b431d5abdf3bb0271a
         params:
           bed_cols: {chr: 1, start: 2, end: 3}
       low_complexity:
         rmsk:
-          data:
-            src:
-              hap:
-                url: https://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/rmsk.txt.gz
-                md5: 540d385787030f6dcecd15e6f7229c32
+          bed:
+            hap:
+              url: https://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/rmsk.txt.gz
+              md5: 540d385787030f6dcecd15e6f7229c32
           class_col: 11
           params:
             bed_cols: {chr: 5, start: 6, end: 7}
         satellites: null
         simreps:
-          data:
-            src: 
-              hap:
-                url: https://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/simpleRepeat.txt.gz
-                md5: b8d13e59e6887c9f471ff1ceef92fcb1
+          bed:
+            hap:
+              url: https://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/simpleRepeat.txt.gz
+              md5: b8d13e59e6887c9f471ff1ceef92fcb1
           params:
             bed_cols: {chr: 1, start: 2, end: 3}
       xy:
         features: 
           x_bed:
-            data:
-              src: 
-                hap:
-                  url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/hg19/chrX_genomic_features_hg19.bed
-                  md5: 5af632ccd4a5b0398ca4c0964c93276b
+            bed:
+              hap:
+                url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/hg19/chrX_genomic_features_hg19.bed
+                md5: 5af632ccd4a5b0398ca4c0964c93276b
             level_col: 3
             params:
               sep: "\\s+"
           y_bed:
-            data:
-              src: 
-                hap:
-                  url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/hg19/chrY_genomic_features_hg19.bed
-                  md5: 195dbf25e9b46a4daf528ede71070f74
+            bed:
+              hap:
+                url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/hg19/chrY_genomic_features_hg19.bed
+                md5: 195dbf25e9b46a4daf528ede71070f74
             level_col: 3
             params:
               sep: "\\s+"
@@ -453,19 +434,17 @@ haploid_stratifications:
           end: [59133470, 59373566]
       segdups:
         superdups:
-          data:
-            src:
-              hap:
-                url: https://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
-                md5: f71d6df1a4c04a15997cf58c6334a4e6
+          bed:
+            hap:
+              url: https://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
+              md5: f71d6df1a4c04a15997cf58c6334a4e6
           params:
             bed_cols: {chr: 1, start: 2, end: 3}
       functional:
-        data:
-          src:
-            hap:
-              url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz
-              md5: 2832fbf82812309349a82ebc681d1fdb
+        bed:
+          hap:
+            url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz
+            md5: 2832fbf82812309349a82ebc681d1fdb
           chr_pattern:
             special:
               1: NC_000001.10
@@ -507,12 +486,11 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             test:
-              data:
-                src:
-                  hap:
-                    lines:
-                      - {chr: 2, start: 10, end: 50}
-                      - {chr: 21, start: 10, end: 50}
+              bed:
+                hap:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
 
       test-xy:
         chr_filter: [23, 24]
@@ -524,31 +502,27 @@ haploid_stratifications:
 
   CHM13:
     ref:
-      src:
-        hap:
-          url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz
-          md5: 42b830df45df08ab63068e9128156e56
+      hap:
+        url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz
+        md5: 42b830df45df08ab63068e9128156e56
     strat_inputs:
       low_complexity:
         rmsk:
-          data:
-            src:
-              hap:
-                url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/t2tRepeatMasker/chm13v2.0_rmsk.bb
-                md5: 5bb6104edd5c5f5246c60eebeac97e57
+          bed:
+            hap:
+              url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/t2tRepeatMasker/chm13v2.0_rmsk.bb
+              md5: 5bb6104edd5c5f5246c60eebeac97e57
           class_col: 3
         simreps:
-          data:
-            src:
-              hap:
-                url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/bbi/simpleRepeat.bb
-                md5: 4548537655ac6dc4fcad8f0cdb2deca9
+          bed:
+            hap:
+              url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/bbi/simpleRepeat.bb
+              md5: 4548537655ac6dc4fcad8f0cdb2deca9
         satellites:
-          data:
-            src:
-              hap:
-                url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/censat/censat.bb
-                md5: aa89dad8ab80270f963f2c99f1df3697
+          bed:
+            hap:
+              url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/censat/censat.bb
+              md5: aa89dad8ab80270f963f2c99f1df3697
           params:
             skip_lines: 1
           sat_col: 3
@@ -556,18 +530,16 @@ haploid_stratifications:
         # from a slack thread w/ Melissa Wilson
         features:
           x_bed:
-            data:
-              src:
-                hap:
-                  url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/T2T/chrX_genomic_features_CHM13.bed
-                  md5: 7cd6a2d1970372fa997144f4c842e2cd
+            bed:
+              hap:
+                url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/T2T/chrX_genomic_features_CHM13.bed
+                md5: 7cd6a2d1970372fa997144f4c842e2cd
             level_col: 3
           y_bed:
-            data:
-              src: 
-                hap:
-                  url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/T2T/chrY_genomic_features_HG002.bed
-                  md5: c2cb0d831db1f71dfb4632a6ce79b0d6
+            bed:
+              hap:
+                url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/T2T/chrY_genomic_features_HG002.bed
+                md5: c2cb0d831db1f71dfb4632a6ce79b0d6
             level_col: 3
           xtr: true
           ampliconic: false # not present in these files
@@ -579,17 +551,15 @@ haploid_stratifications:
           end: [62122809, 62460029]
       segdups:
         superdups:
-          data:
-            src:
-              hap:
-                url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/sedefSegDups/sedefSegDups.bb
-                md5: 674a084afd2a80b35955f20a11fc0621
-      functional:
-        data:
-          src:
+          bed:
             hap:
-              url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_009914755.1_T2T-CHM13v2.0/GCF_009914755.1_T2T-CHM13v2.0_genomic.gff.gz
-              md5: ef95051dbf2005a6269dd21399fe08db
+              url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/sedefSegDups/sedefSegDups.bb
+              md5: 674a084afd2a80b35955f20a11fc0621
+      functional:
+        bed:
+          hap:
+            url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_009914755.1_T2T-CHM13v2.0/GCF_009914755.1_T2T-CHM13v2.0_genomic.gff.gz
+            md5: ef95051dbf2005a6269dd21399fe08db
           chr_pattern:
             special:
               1: NC_060925.1
@@ -631,12 +601,11 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             test:
-              data:
-                src:
-                  hap:
-                    lines:
-                      - {chr: 2, start: 10, end: 50}
-                      - {chr: 21, start: 10, end: 50}
+              bed:
+                hap:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
 
       test-xy:
         chr_filter: [23, 24]
@@ -648,9 +617,8 @@ haploid_stratifications:
 diploid1_stratifications:
   HG002d1:
     ref:
-      src:
-        hap:
-          url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.fasta.gz
+      dip:
+        url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.fasta.gz
     strat_inputs:
       low_complexity:
         rmsk: null
@@ -687,25 +655,23 @@ diploid1_stratifications:
         other_strats:
           OtherDifficult:
             test_hap:
-              data:
-                src:
-                  hap:
-                    lines:
-                      - {chr: 2, hap: 0, start: 10, end: 50}
-                      - {chr: 2, hap: 1, start: 12, end: 60}
-                      - {chr: 21, hap: 0, start: 10, end: 50}
-                      - {chr: 21, hap: 1, start: 15, end: 55}
+              bed:
+                dip:
+                  lines:
+                    - {chr: 2, hap: 0, start: 10, end: 50}
+                    - {chr: 2, hap: 1, start: 12, end: 60}
+                    - {chr: 21, hap: 0, start: 10, end: 50}
+                    - {chr: 21, hap: 1, start: 15, end: 55}
             test_dip:
-              data:
-                src:
-                  hap1:
-                    lines:
-                      - {chr: 2, start: 10, end: 50}
-                      - {chr: 21, start: 10, end: 50}
-                  hap2:
-                    lines:
-                      - {chr: 2, start: 12, end: 60}
-                      - {chr: 21, start: 15, end: 55}
+              bed:
+                hap1:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
+                hap2:
+                  lines:
+                    - {chr: 2, start: 12, end: 60}
+                    - {chr: 21, start: 15, end: 55}
       test-xy:
         chr_filter: [23, 24]
         include:
@@ -720,35 +686,31 @@ diploid1_stratifications:
 diploid2_stratifications:
   HG002:
     ref:
-      src:
-        hap1:
-          url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.pat.fasta.gz
-        hap2:
-          url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.mat.fasta.gz
+      hap1:
+        url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.pat.fasta.gz
+      hap2:
+        url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.mat.fasta.gz
     strat_inputs:
       low_complexity:
         rmsk:
-          data:
-            src:
-              hap1:
-                url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/repeatmasker/hg002v1.0.1.paternal.final.bb
-                md5: 5947df8866bd9f190615ca072fd9e6d9
-              hap2:
-                url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/repeatmasker/hg002v1.0.1.maternal.final.bb
-                md5: ec8b96518a8b8d9c09794192b629d328
+          bed:
+            hap1:
+              url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/repeatmasker/hg002v1.0.1.paternal.final.bb
+              md5: 5947df8866bd9f190615ca072fd9e6d9
+            hap2:
+              url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/repeatmasker/hg002v1.0.1.maternal.final.bb
+              md5: ec8b96518a8b8d9c09794192b629d328
           class_col: 3
         simreps:
-          data:
-            src:
-              hap:
-                url:  https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/seqfeatures/hg002v1.0.1.simpleRepeat.newref.sort.bb
-                md5: a187d44b8687c0e8034bbabb8ae40a75
+          bed:
+            dip:
+              url:  https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/seqfeatures/hg002v1.0.1.simpleRepeat.newref.sort.bb
+              md5: a187d44b8687c0e8034bbabb8ae40a75
         satellites:
-          data:
-            src:
-              hap:
-                url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/centromere/hg002v1.0.1.cenSatv1.0.noheader.bb
-                md5: 33e8a32a5509d89aa8310f450f727896
+          bed:
+            dip:
+              url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/centromere/hg002v1.0.1.cenSatv1.0.noheader.bb
+              md5: 33e8a32a5509d89aa8310f450f727896
           sat_col: 3
       xy:
         features: null
@@ -756,20 +718,18 @@ diploid2_stratifications:
         y_par: null
       segdups:
         superdups:
-          data:
-            src:
-              hap:
-                url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/segdups/HG002.SDs.010624.45col.bb
-                md5: da04009022611f6ee7f855aafefcf91c
+          bed:
+            dip:
+              url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/segdups/HG002.SDs.010624.45col.bb
+              md5: da04009022611f6ee7f855aafefcf91c
       functional:
-        data:
-          src:
-            hap1:
-              url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.PAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
-              md5: f436fe09bfd73aeb44f946a69b3a9a83
-            hap2:
-              url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.MAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
-              md5: 78358c171a3c4141aaa2552fc413b5eb
+        bed:
+          hap1:
+            url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.PAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
+            md5: f436fe09bfd73aeb44f946a69b3a9a83
+          hap2:
+            url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.MAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
+            md5: 78358c171a3c4141aaa2552fc413b5eb
       mappability:
         unplaced_chr_patterns: ["^chr(MT|EBV)$"]
     builds:
@@ -794,25 +754,23 @@ diploid2_stratifications:
         other_strats:
           OtherDifficult:
             test_hap:
-              data:
-                src:
-                  hap:
-                    lines:
-                      - {chr: 2, hap: 0, start: 10, end: 50}
-                      - {chr: 2, hap: 1, start: 12, end: 60}
-                      - {chr: 21, hap: 0, start: 10, end: 50}
-                      - {chr: 21, hap: 1, start: 15, end: 55}
+              bed:
+                dip:
+                  lines:
+                    - {chr: 2, hap: 0, start: 10, end: 50}
+                    - {chr: 2, hap: 1, start: 12, end: 60}
+                    - {chr: 21, hap: 0, start: 10, end: 50}
+                    - {chr: 21, hap: 1, start: 15, end: 55}
             test_dip:
-              data:
-                src:
-                  hap1:
-                    lines:
-                      - {chr: 2, start: 10, end: 50}
-                      - {chr: 21, start: 10, end: 50}
-                  hap2:
-                    lines:
-                      - {chr: 2, start: 12, end: 60}
-                      - {chr: 21, start: 15, end: 55}
+              bed:
+                hap1:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
+                hap2:
+                  lines:
+                    - {chr: 2, start: 12, end: 60}
+                    - {chr: 21, start: 15, end: 55}
 
       test-xy:
         chr_filter: [23, 24]
