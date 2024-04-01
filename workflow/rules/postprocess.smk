@@ -151,8 +151,9 @@ rule compare_strats:
         validation_dir / "{ref_final_key}@{build_key}" / "diagnostics.tsv",
     log:
         post_log_dir / "comparison.log",
+    # ASSUME this env will have pandas and bedtools (only real deps for this)
     conda:
-        "../envs/diff.yml"
+        "../envs/bedtools.yml"
     threads: 8
     script:
         "../scripts/python/bedtools/postprocess/diff_previous_strats.py"
