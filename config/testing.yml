@@ -176,39 +176,40 @@ haploid_stratifications:
   
       # Source files for function regions stratifications.
       functional:
-        # Source for the GFF file. Analogous to gaps src (see above)
-        bed:
-          hap:
-            url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz
-            md5: 6b657881c2c8d2d099a1c1749299538e
-          chr_pattern:
-            special:
-              1: NC_000001.11
-              2: NC_000002.12
-              3: NC_000003.12
-              4: NC_000004.12
-              5: NC_000005.10
-              6: NC_000006.12
-              7: NC_000007.14
-              8: NC_000008.11
-              9: NC_000009.12
-              10: NC_000010.11
-              11: NC_000011.10
-              12: NC_000012.12
-              13: NC_000013.11
-              14: NC_000014.9
-              15: NC_000015.10
-              16: NC_000016.10
-              17: NC_000017.11
-              18: NC_000018.10
-              19: NC_000019.10
-              20: NC_000020.11
-              21: NC_000021.9
-              22: NC_000022.11
-              23: NC_000023.11
-              24: NC_000024.10
-        params:
-          bed_cols: {chr: 0, start: 3, end: 4}
+        cds:
+          # Source for the GFF file. Analogous to gaps src (see above)
+          bed:
+            hap:
+              url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz
+              md5: 6b657881c2c8d2d099a1c1749299538e
+            chr_pattern:
+              special:
+                1: NC_000001.11
+                2: NC_000002.12
+                3: NC_000003.12
+                4: NC_000004.12
+                5: NC_000005.10
+                6: NC_000006.12
+                7: NC_000007.14
+                8: NC_000008.11
+                9: NC_000009.12
+                10: NC_000010.11
+                11: NC_000011.10
+                12: NC_000012.12
+                13: NC_000013.11
+                14: NC_000014.9
+                15: NC_000015.10
+                16: NC_000016.10
+                17: NC_000017.11
+                18: NC_000018.10
+                19: NC_000019.10
+                20: NC_000020.11
+                21: NC_000021.9
+                22: NC_000022.11
+                23: NC_000023.11
+                24: NC_000024.10
+          params:
+            bed_cols: {chr: 0, start: 3, end: 4}
   
       # Mappability parameters for this reference
       mappability:
@@ -369,7 +370,7 @@ haploid_stratifications:
           low_complexity: false
           xy: false
           gc: null
-          functional: false
+          cds: false
           telomeres: false
           mappability:
             - {length: 50, mismatches: 0, indels: 0}
@@ -441,38 +442,39 @@ haploid_stratifications:
           params:
             bed_cols: {chr: 1, start: 2, end: 3}
       functional:
-        bed:
-          hap:
-            url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz
-            md5: 2832fbf82812309349a82ebc681d1fdb
-          chr_pattern:
-            special:
-              1: NC_000001.10
-              2: NC_000002.11
-              3: NC_000003.11
-              4: NC_000004.11
-              5: NC_000005.9
-              6: NC_000006.11
-              7: NC_000007.13
-              8: NC_000008.10
-              9: NC_000009.11
-              10: NC_000010.10
-              11: NC_000011.9
-              12: NC_000012.11
-              13: NC_000013.10
-              14: NC_000014.8
-              15: NC_000015.9
-              16: NC_000016.9
-              17: NC_000017.10
-              18: NC_000018.9
-              19: NC_000019.9
-              20: NC_000020.10
-              21: NC_000021.8
-              22: NC_000022.10
-              23: NC_000023.10
-              24: NC_000024.9
-        params:
-          bed_cols: {chr: 0, start: 3, end: 4}
+        cds:
+          bed:
+            hap:
+              url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz
+              md5: 2832fbf82812309349a82ebc681d1fdb
+            chr_pattern:
+              special:
+                1: NC_000001.10
+                2: NC_000002.11
+                3: NC_000003.11
+                4: NC_000004.11
+                5: NC_000005.9
+                6: NC_000006.11
+                7: NC_000007.13
+                8: NC_000008.10
+                9: NC_000009.11
+                10: NC_000010.10
+                11: NC_000011.9
+                12: NC_000012.11
+                13: NC_000013.10
+                14: NC_000014.8
+                15: NC_000015.9
+                16: NC_000016.9
+                17: NC_000017.10
+                18: NC_000018.9
+                19: NC_000019.9
+                20: NC_000020.10
+                21: NC_000021.8
+                22: NC_000022.10
+                23: NC_000023.10
+                24: NC_000024.9
+          params:
+            bed_cols: {chr: 0, start: 3, end: 4}
 
       mappability:
         unplaced_chr_patterns: ["^chrMT$", "^GL.+$", "^hs37d5$"]
@@ -556,38 +558,39 @@ haploid_stratifications:
               url: https://hgdownload.soe.ucsc.edu/gbdb/hs1/sedefSegDups/sedefSegDups.bb
               md5: 674a084afd2a80b35955f20a11fc0621
       functional:
-        bed:
-          hap:
-            url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_009914755.1_T2T-CHM13v2.0/GCF_009914755.1_T2T-CHM13v2.0_genomic.gff.gz
-            md5: ef95051dbf2005a6269dd21399fe08db
-          chr_pattern:
-            special:
-              1: NC_060925.1
-              2: NC_060926.1
-              3: NC_060927.1
-              4: NC_060928.1
-              5: NC_060929.1
-              6: NC_060930.1
-              7: NC_060931.1
-              8: NC_060932.1
-              9: NC_060933.1
-              10: NC_060934.1
-              11: NC_060935.1
-              12: NC_060936.1
-              13: NC_060937.1
-              14: NC_060938.1
-              15: NC_060939.1
-              16: NC_060940.1
-              17: NC_060941.1
-              18: NC_060942.1
-              19: NC_060943.1
-              20: NC_060944.1
-              21: NC_060945.1
-              22: NC_060946.1
-              23: NC_060947.1
-              24: NC_060948.1
-        params:
-          bed_cols: {chr: 0, start: 3, end: 4}
+        cds:
+          bed:
+            hap:
+              url: https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/all_assembly_versions/GCF_009914755.1_T2T-CHM13v2.0/GCF_009914755.1_T2T-CHM13v2.0_genomic.gff.gz
+              md5: ef95051dbf2005a6269dd21399fe08db
+            chr_pattern:
+              special:
+                1: NC_060925.1
+                2: NC_060926.1
+                3: NC_060927.1
+                4: NC_060928.1
+                5: NC_060929.1
+                6: NC_060930.1
+                7: NC_060931.1
+                8: NC_060932.1
+                9: NC_060933.1
+                10: NC_060934.1
+                11: NC_060935.1
+                12: NC_060936.1
+                13: NC_060937.1
+                14: NC_060938.1
+                15: NC_060939.1
+                16: NC_060940.1
+                17: NC_060941.1
+                18: NC_060942.1
+                19: NC_060943.1
+                20: NC_060944.1
+                21: NC_060945.1
+                22: NC_060946.1
+                23: NC_060947.1
+                24: NC_060948.1
+          params:
+            bed_cols: {chr: 0, start: 3, end: 4}
 
       mappability:
         unplaced_chr_patterns: ["^chrM$"]
@@ -620,17 +623,10 @@ diploid1_stratifications:
       dip:
         url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.fasta.gz
     strat_inputs:
-      low_complexity:
-        rmsk: null
-        simreps: null
-        satellites: null
-      xy:
-        features: null
-        x_par: null
-        y_par: null
-      segdups:
-        superdups: null
-      functional: null
+      low_complexity: {}
+      xy: {}
+      segdups: {}
+      functional: {}
       mappability:
         unplaced_chr_patterns: ["^chr(MT|EBV)$"]
     builds:
@@ -639,7 +635,7 @@ diploid1_stratifications:
         include:
           xy: false
           segdups: false
-          functional: false
+          cds: false
           mappability: []
       test-map:
         chr_filter: [21]
@@ -647,7 +643,7 @@ diploid1_stratifications:
           low_complexity: false
           xy: false
           gc: null
-          functional: false
+          cds: false
           telomeres: false
           hets: []
           mappability:
@@ -678,7 +674,7 @@ diploid1_stratifications:
           low_complexity: false
           xy: false
           gc: null
-          functional: false
+          cds: false
           telomeres: false
           hets: []
           mappability: []
@@ -712,10 +708,7 @@ diploid2_stratifications:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/centromere/hg002v1.0.1.cenSatv1.0.noheader.bb
               md5: 33e8a32a5509d89aa8310f450f727896
           sat_col: 3
-      xy:
-        features: null
-        x_par: null
-        y_par: null
+      xy: {}
       segdups:
         superdups:
           bed:
@@ -723,13 +716,54 @@ diploid2_stratifications:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/segdups/HG002.SDs.010624.45col.bb
               md5: da04009022611f6ee7f855aafefcf91c
       functional:
-        bed:
-          hap1:
-            url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.PAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
-            md5: f436fe09bfd73aeb44f946a69b3a9a83
-          hap2:
-            url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.MAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
-            md5: 78358c171a3c4141aaa2552fc413b5eb
+        cds:
+          bed:
+            hap1:
+              url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.PAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
+              md5: f436fe09bfd73aeb44f946a69b3a9a83
+            hap2:
+              url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.MAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
+              md5: 78358c171a3c4141aaa2552fc413b5eb
+          cds_params:
+            source_match: ["Liftoff", 1]
+        
+        vdj:
+          bed:
+            # NOTE: both IGK loci are rearranged and inactivated so this
+            # regions actually starts at IGKDEL
+            hap1:
+              lines:
+                - { chr: 2,  start: 88868026,  end: 90383962  } # IGK
+                - { chr: 7,  start: 38373031,  end: 38494619  } # TRB
+                - { chr: 7,  start: 142831130, end: 143396923 } # TRG
+                - { chr: 14, start: 21320868,  end: 22186895  } # TRA/D
+                - { chr: 14, start: 105296423, end: 105793951 } # IGH
+                - { chr: 22, start: 20560551,  end: 21469623  } # IGL
+            hap2:
+              lines:
+                - { chr: 2,  start: 88855565,  end: 90457524  } # IGK
+                - { chr: 7,  start: 38345243,  end: 38476020  } # TRB
+                - { chr: 7,  start: 143849923, end: 144425197 } # TRG
+                - { chr: 14, start: 23572455,  end: 24503858  } # TRA/D
+                - { chr: 14, start: 107586021, end: 108649328 } # IGH
+                - { chr: 22, start: 24652429,  end: 25418532  } # IGL
+
+        # lifted off from hg38 stratification above
+        kir:
+          bed:
+            dip:
+              lines:
+                - { chr: 19, hap: 0, start: 57430456, end: 57612879 }
+                - { chr: 19, hap: 1, start: 57338741, end: 57569585 }
+
+        # lifted off from hg38 stratification above
+        mhc:
+          bed:
+            dip:
+              lines:
+                - { chr: 6, hap: 0, start: 28466613, end: 33509399 }
+                - { chr: 6, hap: 1, start: 28463469, end: 33412256 }
+
       mappability:
         unplaced_chr_patterns: ["^chr(MT|EBV)$"]
     builds:
@@ -738,59 +772,47 @@ diploid2_stratifications:
         include:
           xy: false
           segdups: false
-          functional: false
+          cds: true
+          vdj: true
+          kir: true
+          mhc: true
           mappability: []
+        other_strats:
+          OtherDifficult:
+            test_hap:
+              bed:
+                dip:
+                  lines:
+                    - {chr: 2, hap: 0, start: 10, end: 50}
+                    - {chr: 2, hap: 1, start: 12, end: 60}
+                    - {chr: 21, hap: 0, start: 10, end: 50}
+                    - {chr: 21, hap: 1, start: 15, end: 55}
+            test_dip:
+              bed:
+                hap1:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
+                hap2:
+                  lines:
+                    - {chr: 2, start: 12, end: 60}
+                    - {chr: 21, start: 15, end: 55}
+
       test-map:
         chr_filter: [21]
         include:
           low_complexity: false
           xy: false
           gc: null
-          functional: false
+          cds: false
           telomeres: false
           hets: []
+          cds: false
           vdj: false
+          kir: false
+          mhc: false
           mappability:
-            - {length: 50, mismatches: 0, indels: 0}
-        other_strats:
-          OtherDifficult:
-            VDJ:
-              bed:
-                # NOTE: both IGK loci are rearranged and inactivated so this
-                # regions actually starts at IGKDEL
-                hap1:
-                  lines:
-                    - { chr: 2,  start: 88868026,  end: 90383962  } # IGK
-                    - { chr: 7,  start: 38373031,  end: 38494619  } # TRB
-                    - { chr: 7,  start: 142831130, end: 143396923 } # TRG
-                    - { chr: 14, start: 21320868,  end: 22186895  } # TRA/D
-                    - { chr: 14, start: 105296423, end: 105793951 } # IGH
-                    - { chr: 22, start: 20560551,  end: 21469623  } # IGL
-                hap2:
-                  lines:
-                    - { chr: 2,  start: 88855565,  end: 90457524  } # IGK
-                    - { chr: 7,  start: 38345243,  end: 38476020  } # TRB
-                    - { chr: 7,  start: 143849923, end: 144425197 } # TRG
-                    - { chr: 14, start: 23572455,  end: 24503858  } # TRA/D
-                    - { chr: 14, start: 107586021, end: 108649328 } # IGH
-                    - { chr: 22, start: 24652429,  end: 25418532  } # IGL
-
-            # lifted off from hg38 stratification above
-            KIR:
-              bed:
-                dip:
-                  lines:
-                    - { chr: 19, hap: 0, start: 57430456, end: 57612879 }
-                    - { chr: 19, hap: 1, start: 57338741, end: 57569585 }
-
-            # lifted off from hg38 stratification above
-            MHC:
-              bed:
-                dip:
-                  lines:
-                    - { chr: 6, hap: 0, start: 28466613, end: 33509399 }
-                    - { chr: 6, hap: 1, start: 28463469, end: 33412256 }
-                    
+            - {length: 50, mismatches: 0, indels: 0}                    
 
       test-xy:
         chr_filter: [23, 24]
@@ -798,8 +820,12 @@ diploid2_stratifications:
           low_complexity: false
           xy: false
           gc: null
-          functional: false
+          cds: false
           telomeres: false
+          cds: false
+          vdj: false
+          kir: false
+          mhc: false
           hets: []
           mappability: []
 

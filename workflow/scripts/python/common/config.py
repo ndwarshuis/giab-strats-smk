@@ -124,6 +124,7 @@ from typing import (
     Protocol,
 )
 from typing_extensions import Self, assert_never
+from itertools import chain
 from more_itertools import duplicates_everseen
 from common.functional import (
     fmap_maybe,
@@ -142,12 +143,6 @@ from common.functional import (
 )
 from common.io import is_gzip, is_bgzip
 import common.bed as bed
-
-################################################################################
-# Constants
-
-CHR_INDEX_PLACEHOLDER = "%i"
-CHR_HAP_PLACEHOLDER = "%h"
 
 
 ################################################################################
@@ -516,18 +511,44 @@ def bd_to_si(
     return f(x.refdata.strat_inputs)
 
 
-def si_to_functional(x: StratInputs[AnyBedT]) -> Functional[AnyBedT] | None:
-    return x.functional
+def si_to_cds(x: StratInputs[AnyBedT]) -> CDS[AnyBedT] | None:
+    return x.functional.cds
 
 
-def bd_to_functional(
+def si_to_mhc(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
+    return x.functional.mhc
+
+
+def si_to_kir(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
+    return x.functional.kir
+
+
+def si_to_vdj(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
+    return x.functional.vdj
+
+
+def bd_to_cds(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
-) -> Functional[AnyBedT] | None:
-    return (
-        si_to_functional(x.refdata.strat_inputs)
-        if x.want_functional or x.want_vdj
-        else None
-    )
+) -> CDS[AnyBedT] | None:
+    return si_to_cds(x.refdata.strat_inputs) if x.want_cds else None
+
+
+def bd_to_mhc(
+    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
+) -> BedFile[AnyBedT] | None:
+    return si_to_mhc(x.refdata.strat_inputs) if x.want_mhc else None
+
+
+def bd_to_kir(
+    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
+) -> BedFile[AnyBedT] | None:
+    return si_to_kir(x.refdata.strat_inputs) if x.want_kir else None
+
+
+def bd_to_vdj(
+    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
+) -> BedFile[AnyBedT] | None:
+    return si_to_vdj(x.refdata.strat_inputs) if x.want_vdj else None
 
 
 def si_to_simreps(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
@@ -872,6 +893,57 @@ def read_write_filter_sort_dip2to2_bed(
     bed.write_bed(opath, g(df))
 
 
+def filter_sort_bed_main_inner(
+    sconf: GiabStrats,
+    rk: RefKey,
+    bk: BuildKey,
+    inputs: list[Path],
+    output: Path,
+    output_pattern: str,
+    f: BuildDataToBed,
+    g: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x,
+) -> list[Path]:
+    def hap(i: Path, o: Path, bd: HapBuildData, bf: HapBedFile) -> list[Path]:
+        read_write_filter_sort_hap_bed(i, o, bd, bf, g)
+        return [o]
+
+    def dip1to1(i: Path, o: Path, bd: Dip1BuildData, bf: Dip1BedFile) -> list[Path]:
+        read_write_filter_sort_dip1to1_bed(i, o, bd, bf, g)
+        return [o]
+
+    def dip1to2(
+        i: Path, o: tuple[Path, Path], bd: Dip2BuildData, bf: Dip1BedFile
+    ) -> list[Path]:
+        read_write_filter_sort_dip1to2_bed(i, o, bd, bf, g)
+        return [*o]
+
+    def dip2to1(
+        i: tuple[Path, Path], o: Path, bd: Dip1BuildData, bf: Dip2BedFile
+    ) -> list[Path]:
+        read_write_filter_sort_dip2to1_bed(i, o, bd, bf, g)
+        return [o]
+
+    def dip2to2(
+        i: Path, o: Path, hap: Haplotype, bd: Dip2BuildData, bf: Dip2BedFile
+    ) -> list[Path]:
+        read_write_filter_sort_dip2to2_bed(i, o, hap, bd, bf, g)
+        return [o]
+
+    return sconf.with_build_data_and_bed_io(
+        rk,
+        bk,
+        inputs,
+        output,
+        output_pattern,
+        f,
+        hap,
+        dip1to1,
+        dip1to2,
+        dip2to1,
+        dip2to2,
+    )
+
+
 def filter_sort_bed_main(
     f: BuildDataToBed,
     smk: Any,
@@ -895,20 +967,15 @@ def filter_sort_bed_main(
     if not isinstance(output_pattern := smk.params["output_pattern"], str):
         raise DesignError(f"Output pattern must be a string, got {output_pattern}")
 
-    sconf.with_build_data_and_bed_io(
+    filter_sort_bed_main_inner(
+        sconf,
         wc_to_refkey(ws),
         wc_to_buildkey(ws),
         [Path(i) for i in ins],
         smk.output[0],
         output_pattern,
         f,
-        lambda i, o, bd, bf: read_write_filter_sort_hap_bed(i, o, bd, bf, g),
-        lambda i, o, bd, bf: read_write_filter_sort_dip1to1_bed(i, o, bd, bf, g),
-        lambda i, o, bd, bf: read_write_filter_sort_dip1to2_bed(i, o, bd, bf, g),
-        lambda i, o, bd, bf: read_write_filter_sort_dip2to1_bed(i, o, bd, bf, g),
-        lambda i, o, hap, bd, bf: read_write_filter_sort_dip2to2_bed(
-            i, o, hap, bd, bf, g
-        ),
+        g,
     )
 
 
@@ -1265,7 +1332,21 @@ class RefDirs(NamedTuple):
     inter: RefInterDirs
 
 
-# types to enumerate all possible cases for ref and build data operations
+################################################################################
+# Constants
+
+CHR_INDEX_PLACEHOLDER = "%i"
+CHR_HAP_PLACEHOLDER = "%h"
+
+MHC_CHR = ChrIndex(6)
+KIR_CHR = ChrIndex(19)
+
+VDJ_CHRS = {ChrIndex(i) for i in [2, 7, 14, 22]}
+
+# strats in "OtherDifficult" that are built-in and should not be included
+# manually using the "other_strats" directive in "build"
+BUILTIN_OTHER = {"VDJ", "KIR", "MHC", "gaps_slop15kb"}
+
 
 ################################################################################
 # Snakemake configuration model
@@ -2023,9 +2104,9 @@ class SatFile(BedFile[X], Generic[X]):
 class LowComplexity(GenericModel, Generic[X]):
     """Configuration for low complexity stratification."""
 
-    rmsk: RMSKFile[X] | None
-    simreps: BedFile[X] | None
-    satellites: SatFile[X] | None
+    rmsk: RMSKFile[X] | None = None
+    simreps: BedFile[X] | None = None
+    satellites: SatFile[X] | None = None
 
 
 class XYFile(HapBedFile):
@@ -2084,9 +2165,9 @@ class XYPar(BaseModel):
 class XY(BaseModel):
     """Configuration for the XY stratification."""
 
-    features: XYFeatures | None
-    x_par: XYPar | None
-    y_par: XYPar | None
+    features: XYFeatures | None = None
+    x_par: XYPar | None = None
+    y_par: XYPar | None = None
 
     def fmt_x_par(self, pattern: HapChrPattern) -> str | None:
         return fmap_maybe(lambda x: x.fmt(ChrIndex.CHRX, pattern), self.x_par)
@@ -2122,7 +2203,7 @@ class Mappability(BaseModel):
 class SegDups(GenericModel, Generic[X]):
     """Configuration for Segdup stratifications."""
 
-    superdups: BedFile[X] | None
+    superdups: BedFile[X] | None = None
 
 
 class LowMapParams(BaseModel):
@@ -2212,12 +2293,13 @@ class Include(BaseModel):
 
     low_complexity: bool = True
     xy: bool = True
-    functional: bool = True
     segdups: bool = True
     union: bool = True
     telomeres: bool = True
-    # TODO also add KIR and MHC since these should be derivable from refseq
+    cds: bool = True
     vdj: bool = True
+    mhc: bool = False  # default to false since this isn't implemented yet
+    kir: bool = False  # ditto
     mappability: set[LowMapParams] = {
         LowMapParams(length=250, mismatches=0, indels=0),
         LowMapParams(length=100, mismatches=2, indels=1),
@@ -2314,6 +2396,9 @@ class Malloc(BaseModel):
     runHappy: int = 48000
 
 
+OtherDict = dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT]]]
+
+
 class Build(GenericModel, Generic[AnyBedT, AnyVcfT]):
     chr_filter: set[ChrIndex]
     comparison: BuildCompare | None = None
@@ -2329,8 +2414,18 @@ class Build(GenericModel, Generic[AnyBedT, AnyVcfT]):
     def compare_key(self) -> CompareKey | None:
         return fmap_maybe(lambda x: x.other, self.comparison)
 
+    @validator("other_strats")
+    def valid_other(
+        cls, os: dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT]]]
+    ) -> dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT]]]:
+        for k, v in os.items():
+            if k == CoreLevel.OTHER_DIFFICULT:
+                bs = v.keys() & BUILTIN_OTHER
+                assert len(bs) == 0, f"unallowed built-in: {', '.join(bs)}"
+        return os
 
-class FunctionalParams(BaseModel):
+
+class CDSParams(BaseModel):
     # Defaults for a for a "normal" gff file with Refseq and CDS for source and
     # type columns respectively
     source_match: tuple[str, int] | None = (".*RefSeq", 1)
@@ -2338,29 +2433,47 @@ class FunctionalParams(BaseModel):
     attr_col: int = 8
 
 
-class Functional(BedFile[X], Generic[X]):
-    """Configuration for Functional stratifications."""
+class CDS(BedFile[X], Generic[X]):
+    """Configuration for CDS stratifications."""
 
     bed: X
-    fparams: FunctionalParams = FunctionalParams()
+    cds_params: CDSParams = CDSParams()
 
     def read(self, path: Path) -> pd.DataFrame:
         """Read a bed file at 'path' on disk and return dataframe"""
         mempty: list[int] = []
-        fps = self.fparams
+        fps = self.cds_params
         r = fmap_maybe_def(mempty, lambda x: [x[1]], fps.source_match)
         c = fmap_maybe_def(mempty, lambda x: [x[1]], fps.type_match)
         # comment needed here since GFF files have ### at the end (womp)
         return super()._read(path, r + c + [fps.attr_col], "#")
 
 
+# TODO move these to the Functional directory given that the non-cds stuff
+# describes "genes" anyways?
+class Functional(GenericModel, Generic[X]):
+    """Configuration for all Functional-ish bed files.
+
+    If not given, and the build has vdj/mhc/kir regions, attempt to get these
+    regions from the bed files in 'cds' when parsing the functional genes.
+
+    The 'mhc/kir/vdj' slots below are to override the above method in case it
+    doesn't work (these regions are strange after all).
+    """
+
+    cds: CDS[X] | None = None
+    mhc: BedFile[X] | None = None
+    kir: BedFile[X] | None = None
+    vdj: BedFile[X] | None = None
+
+
 class StratInputs(GenericModel, Generic[AnyBedT]):
     gap: BedFile[AnyBedT] | None
-    low_complexity: LowComplexity[AnyBedT]
-    xy: XY
+    low_complexity: LowComplexity[AnyBedT] = LowComplexity()
+    xy: XY = XY()
     mappability: Mappability | None
-    segdups: SegDups[AnyBedT]
-    functional: Functional[AnyBedT] | None
+    segdups: SegDups[AnyBedT] = SegDups()
+    functional: Functional[AnyBedT] = Functional()
 
     @property
     def xy_features_unsafe(self) -> XYFeatures:
@@ -2518,13 +2631,6 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
         return self.build.include.gc is not None
 
     @property
-    def want_functional(self) -> bool:
-        return (
-            self.build.include.functional
-            and self.refdata.strat_inputs.functional is not None
-        )
-
-    @property
     def want_telomeres(self) -> bool:
         return self.build.include.telomeres
 
@@ -2561,17 +2667,6 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
     @property
     def want_gaps(self) -> bool:
         return self.refdata.strat_inputs.gap is not None
-
-    # TODO this is technically haplotype specific but probably won't matter in
-    # the long run because both haps should always have 2, 7, 14, and 22
-    @property
-    def want_vdj(self) -> bool:
-        vdj_chrs = {ChrIndex(i) for i in [2, 7, 14, 22]}
-        return (
-            self.build.include.vdj
-            and self.refdata.strat_inputs.functional is not None
-            and len(self.build_chrs & vdj_chrs) > 0
-        )
 
     @property
     def want_hets(self) -> bool:
@@ -2632,6 +2727,85 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
         return fmap_maybe_def(
             False, lambda x: x.ampliconic, self.refdata.strat_inputs.xy.features
         )
+
+    # functional regions
+    #
+    # this is tricky because we can deriving the VDJ/KIR/MHC regions from
+    # several places, and we need to distinguish b/t "wanting" these regions
+    # in the build and "wanting" to download the individual sources. In other
+    # cases this is much more straightforward because there is a 1-1
+    # correspondence b/t the include field in the build and whether or not that
+    # file gets downloaded.
+
+    @property
+    def _has_cds_src(self) -> bool:
+        return self.refdata.strat_inputs.functional.cds is not None
+
+    @property
+    def _has_kir_src(self) -> bool:
+        return self.refdata.strat_inputs.functional.kir is not None
+
+    @property
+    def _has_vdj_src(self) -> bool:
+        return self.refdata.strat_inputs.functional.vdj is not None
+
+    @property
+    def _has_mhc_src(self) -> bool:
+        return self.refdata.strat_inputs.functional.mhc is not None
+
+    @property
+    def _include_mhc(self) -> bool:
+        return self.build.include.mhc and MHC_CHR in self.build_chrs
+
+    @property
+    def _include_kir(self) -> bool:
+        return self.build.include.kir and KIR_CHR in self.build_chrs
+
+    @property
+    def _include_vdj(self) -> bool:
+        return self.build.include.vdj and len(VDJ_CHRS & self.build_chrs) > 0
+
+    @property
+    def want_cds_src(self) -> bool:
+        """Download CDS file if we have a configuration for it and if
+        we want to build either the CDS regions themselves or any of the MHC,
+        KIR, or VDJ regions which don't themselves have a source. In these
+        cases the CDS fill will be the source.
+        """
+        return (
+            self.build.include.cds
+            or (self._include_vdj and not self._has_vdj_src)
+            or (self._include_mhc and not self._has_mhc_src)
+            or (self._include_kir and not self._has_kir_src)
+        ) and self._has_cds_src
+
+    @property
+    def want_mhc_src(self) -> bool:
+        return self._include_mhc and self._has_mhc_src
+
+    @property
+    def want_kir_src(self) -> bool:
+        return self._include_kir and self._has_kir_src
+
+    @property
+    def want_vdj_src(self) -> bool:
+        return self._include_vdj and self._has_vdj_src
+
+    @property
+    def want_cds(self) -> bool:
+        return self.build.include.cds and self._has_cds_src
+
+    @property
+    def want_mhc(self) -> bool:
+        return self._include_mhc and (self._has_cds_src | self._has_mhc_src)
+
+    @property
+    def want_kir(self) -> bool:
+        return self._include_kir and (self._has_cds_src | self._has_kir_src)
+
+    @property
+    def want_vdj(self) -> bool:
+        return self._include_vdj and (self._has_cds_src | self._has_vdj_src)
 
 
 class Stratification(GenericModel, Generic[RefSrcT, AnyBedT, AnyVcfT]):
@@ -3651,12 +3825,18 @@ class GiabStrats(BaseModel):
         output: Path,
         output_pattern: str,
         get_bed_f: BuildDataToBed,
-        hap_f: Callable[[X, Path, HapBuildData, HapBedFile], None],
-        dip_1to1_f: Callable[[X, Path, Dip1BuildData, Dip1BedFile], None],
-        dip_1to2_f: Callable[[X, tuple[Path, Path], Dip2BuildData, Dip1BedFile], None],
-        dip_2to1_f: Callable[[tuple[X, X], Path, Dip1BuildData, Dip2BedFile], None],
-        dip_2to2_f: Callable[[X, Path, Haplotype, Dip2BuildData, Dip2BedFile], None],
-    ) -> None:
+        hap_f: Callable[[X, Path, HapBuildData, HapBedFile], list[Path]],
+        dip_1to1_f: Callable[[X, Path, Dip1BuildData, Dip1BedFile], list[Path]],
+        dip_1to2_f: Callable[
+            [X, tuple[Path, Path], Dip2BuildData, Dip1BedFile], list[Path]
+        ],
+        dip_2to1_f: Callable[
+            [tuple[X, X], Path, Dip1BuildData, Dip2BedFile], list[Path]
+        ],
+        dip_2to2_f: Callable[
+            [X, Path, Haplotype, Dip2BuildData, Dip2BedFile], list[Path]
+        ],
+    ) -> list[Path]:
         """Like 'with_build_data_and_bed_io' with the following differences.
 
         * This function takes an input pattern to be used to generate the list
@@ -3679,7 +3859,7 @@ class GiabStrats(BaseModel):
             with open(output, "w") as f:
                 json.dump([str(p) for p in ps], f)
 
-        self.with_build_data_and_bed_io2(
+        return self.with_build_data_and_bed_io2(
             rk,
             bk,
             inputs,
@@ -3690,7 +3870,9 @@ class GiabStrats(BaseModel):
             dip_1to1_f,
             dip_1to2_f,
             dip_2to1_f,
-            lambda i, o, bd, bf: wrap_dip_2to2_io_f(dip_2to2_f, i, o, bd, bf),
+            lambda i, o, bd, bf: list(
+                chain(*wrap_dip_2to2_io_f(dip_2to2_f, i, o, bd, bf))
+            ),
         )
 
     # final refkey/buildkey lists (for the "all" target and related)
@@ -3770,9 +3952,27 @@ class GiabStrats(BaseModel):
         )
 
     @property
-    def all_refkey_functional(self) -> list[RefKeyFullS]:
+    def all_refkey_cds(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_functional(bd))
+            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_cds(bd))
+        )
+
+    @property
+    def all_refkey_mhc(self) -> list[RefKeyFullS]:
+        return self._all_bed_refsrckeys(
+            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_mhc(bd))
+        )
+
+    @property
+    def all_refkey_kir(self) -> list[RefKeyFullS]:
+        return self._all_bed_refsrckeys(
+            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_kir(bd))
+        )
+
+    @property
+    def all_refkey_vdj(self) -> list[RefKeyFullS]:
+        return self._all_bed_refsrckeys(
+            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_vdj(bd))
         )
 
     # other nice functions

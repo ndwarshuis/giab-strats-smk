@@ -25,13 +25,15 @@ def expand_strat_targets_inner(ref_final_key, build_key):
     ]
     rule_targets = [
         (rules.filter_autosomes.output, bd.want_xy_auto),
-        (rules.all_functional.input, bd.want_functional),
         (rules.all_segdups.input, bd.want_segdups),
         (rules.find_telomeres.output, bd.want_telomeres),
         (rules.all_segdup_and_map.input, bd.want_segdup_and_map),
         (rules.all_alldifficult.input, bd.want_alldifficult),
         (rules.get_gaps.output, bd.want_gaps),
+        (rules.all_cds.input, bd.want_cds),
         (rules.remove_vdj_gaps.output, bd.want_vdj),
+        (rules.remove_kir_gaps.output, bd.want_kir),
+        (rules.remove_mhc_gaps.output, bd.want_mhc),
     ]
     all_function = [f(ref_final_key, build_key) for f, test in function_targets if test]
     all_rule = [tgt for tgt, test in rule_targets if test]

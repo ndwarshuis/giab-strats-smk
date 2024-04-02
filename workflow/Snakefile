@@ -58,9 +58,10 @@ rule all_resources:
         expand(rules.download_simreps.output, ref_src_key=config.all_refkey_simreps),
         expand(rules.download_censat.output, ref_src_key=config.all_refkey_censat),
         expand(rules.download_superdups.output, ref_src_key=config.all_refkey_segdups),
-        expand(
-            rules.download_functional.output, ref_src_key=config.all_refkey_functional
-        ),
+        expand(rules.download_cds.output, ref_src_key=config.all_refkey_cds),
+        expand(rules.download_mhc.output, ref_src_key=config.all_refkey_mhc),
+        expand(rules.download_kir.output, ref_src_key=config.all_refkey_kir),
+        expand(rules.download_vdj.output, ref_src_key=config.all_refkey_vdj),
         expand(
             rules.download_bench_vcf.output
             + rules.download_bench_bed.output
