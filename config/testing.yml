@@ -753,14 +753,27 @@ diploid2_stratifications:
             - {length: 50, mismatches: 0, indels: 0}
         other_strats:
           OtherDifficult:
-            test_hap:
+            VDJ:
               bed:
-                dip:
+                hap1:
+                  # NOTE: both IGK loci are rearranged and inactivated so this
+                  # regions actually starts at IGKDEL
                   lines:
-                    - {chr: 2, hap: 0, start: 10, end: 50}
-                    - {chr: 2, hap: 1, start: 12, end: 60}
-                    - {chr: 21, hap: 0, start: 10, end: 50}
-                    - {chr: 21, hap: 1, start: 15, end: 55}
+                    - {chr: 2,  start: 88868026,  end: 90383962  } # IGK
+                    - {chr: 7,  start: 38373031,  end: 38494619  } # TRB
+                    - {chr: 7,  start: 142831130, end: 143396923 } # TRG
+                    - {chr: 14, start: 21320868,  end: 22186895  } # TRA/D
+                    - {chr: 14, start: 105296423, end: 105793951 } # IGH
+                    - {chr: 22, start: 20560551,  end: 21469623  } # IGL
+                hap2:
+                  lines:
+                    - {chr: 2,  start: 88855565,  end: 90457524  } # IGK
+                    - {chr: 7,  start: 38345243,  end: 38476020  } # TRB
+                    - {chr: 7,  start: 143849923, end: 144425197 } # TRG
+                    - {chr: 14, start: 23572455,  end: 24503858  } # TRA/D
+                    - {chr: 14, start: 107586021, end: 108649328 } # IGH
+                    - {chr: 22, start: 24652429,  end: 25418532  } # IGL
+                    
             test_dip:
               bed:
                 hap1:
