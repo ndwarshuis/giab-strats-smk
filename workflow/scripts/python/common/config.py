@@ -2434,10 +2434,17 @@ class CDSParams(BaseModel):
 
 
 class CDS(BedFile[X], Generic[X]):
-    """Configuration for CDS stratifications."""
+    """Configuration for CDS stratifications.
+
+    Note that the "bed" parameter actually expects a gff-ish formatted
+    file by default as its "bed" file.
+    """
 
     bed: X
     cds_params: CDSParams = CDSParams()
+    params: BedFileParams = BedFileParams(
+        bed_cols=BedColumns(chr=0, start=3, end=4),
+    )
 
     def read(self, path: Path) -> pd.DataFrame:
         """Read a bed file at 'path' on disk and return dataframe"""
@@ -2446,7 +2453,7 @@ class CDS(BedFile[X], Generic[X]):
         r = fmap_maybe_def(mempty, lambda x: [x[1]], fps.source_match)
         c = fmap_maybe_def(mempty, lambda x: [x[1]], fps.type_match)
         # comment needed here since GFF files have ### at the end (womp)
-        return super()._read(path, r + c + [fps.attr_col], "#")
+        return super()._read(path, [fps.attr_col] + r + c, "#")
 
 
 # TODO move these to the Functional directory given that the non-cds stuff

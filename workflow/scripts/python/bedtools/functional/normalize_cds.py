@@ -42,22 +42,32 @@ def main(smk: Any) -> None:
 
     # functions to convert the GFF dataframe to whatever we feel like
 
+    def keep_bed_columns(df: pd.DataFrame) -> pd.DataFrame:
+        return df[[0, 1, 2]].copy()
+
     def filter_cds(df: pd.DataFrame) -> pd.DataFrame:
-        source_mask = fmap_maybe(lambda x: df[3].str.match(x[0]), fps.source_match)
-        offset = 0 if source_mask is None else 1
-        type_mask = fmap_maybe(lambda x: df[3 + offset].str.match(x[0]), fps.type_match)
+        # ASSUME: income dataframe has the following format:
+        # 0: chrom
+        # 1: start
+        # 2: end
+        # 3: attributes
+        # 4: source, or type if source is not given
+        # 5: type (if given)
+        source_mask = fmap_maybe(lambda x: df[4].str.match(x[0]), fps.source_match)
+        type_col = 4 + (0 if source_mask is None else 1)
+        type_mask = fmap_maybe(lambda x: df[type_col].str.match(x[0]), fps.type_match)
         if source_mask is None:
             if type_mask is None:
                 return df
             elif type_mask is not None:
-                return df[type_mask].copy()
+                return df[type_mask]
             else:
                 assert_never(type_mask)
         elif source_mask is not None:
             if type_mask is None:
-                return df[source_mask].copy()
+                return df[source_mask]
             elif type_mask is not None:
-                return df[source_mask & type_mask].copy()
+                return df[source_mask & type_mask]
             else:
                 assert_never(type_mask)
         else:
@@ -70,9 +80,7 @@ def main(smk: Any) -> None:
         raise DesignError("I'm asleep")
 
     def filter_vdj(df: pd.DataFrame) -> pd.DataFrame:
-        source_offset = 0 if fps.source_match is None else 1
-        type_offset = 1 if fps.type_match is None else 1
-        return df[df[3 + source_offset + type_offset].str.match(VDJ_PAT)].copy()
+        return df[df[3].str.match(VDJ_PAT)]
 
     # functions to read the GFF dataframe
 
@@ -119,7 +127,7 @@ def main(smk: Any) -> None:
 
             def write1(res: GFFOut) -> list[Path]:
                 bedpath = cfg.sub_output_path(g.pattern, res.rk)
-                write_bed(bedpath, g.gff2bed(res.df))
+                write_bed(bedpath, keep_bed_columns(g.gff2bed(res.df)))
                 return [bedpath]
 
             def write2(res1: GFFOut, res2: GFFOut) -> list[Path]:
