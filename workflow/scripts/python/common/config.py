@@ -2408,7 +2408,7 @@ class Build(GenericModel, Generic[AnyBedT, AnyVcfT]):
     # politely alerted in case they specify any diploid params for a haploid
     # config.
     include: Include = Include()
-    malloc: Malloc | None = Malloc()
+    malloc: Malloc | None = None
 
     @property
     def compare_key(self) -> CompareKey | None:
