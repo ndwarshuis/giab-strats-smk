@@ -5,8 +5,8 @@ telo = config.to_bed_dirs(CoreLevel.TELOMERES)
 
 rule find_telomeres:
     input:
-        ref=rules.filter_sort_ref.output,
-        genome=rules.get_genome.output,
+        ref=rules.filter_sort_ref.output["fa"],
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         telo.final("telomeres"),

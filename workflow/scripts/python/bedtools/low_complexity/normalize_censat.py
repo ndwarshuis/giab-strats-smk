@@ -4,7 +4,7 @@ import common.config as cfg
 
 
 def filter_ct(df: pd.DataFrame) -> pd.DataFrame:
-    return df[~df[3].str.startswith("ct_")]
+    return df[~df[3].str.startswith("ct")]
 
 
 def main(smk: Any) -> None:

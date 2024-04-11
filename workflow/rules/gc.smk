@@ -7,11 +7,10 @@ import json
 gc = config.to_bed_dirs(CoreLevel.GC)
 
 
-# TODO this can take a gzipped fa file
 rule find_gc_content:
     input:
-        ref=rules.filter_sort_ref.output,
-        genome=rules.get_genome.output,
+        ref=rules.filter_sort_ref.output["fa"],
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         gc.inter.postsort.data / "gc{frac}.bed.gz",
@@ -63,10 +62,12 @@ def range_inputs(wildcards):
 checkpoint intersect_gc_ranges:
     input:
         unpack(range_inputs),
-        genome=rules.get_genome.output[0],
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         gc.inter.postsort.data / "intersect_output.json",
+    log:
+        gc.inter.postsort.log / "intersect_ranges.txt",
     conda:
         "../envs/bedtools.yml"
     # hack together a format pattern that will be used for output

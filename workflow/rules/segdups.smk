@@ -3,7 +3,7 @@ from common.config import CoreLevel, si_to_superdups
 segdup = config.to_bed_dirs(CoreLevel.SEGDUPS)
 
 
-use rule download_ref as download_superdups with:
+use rule download_gaps as download_superdups with:
     output:
         segdup.src.data / "superdups.txt.gz",
     log:
@@ -22,6 +22,12 @@ checkpoint normalize_superdups:
         output_pattern=lambda w: to_output_pattern(segdup, "segdups", w),
     conda:
         "../envs/bedtools.yml"
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_key, w.build_key, lambda m: m.normalizeSuperdups
+        ),
+    benchmark:
+        segdup.inter.filtersort.bench / "normalize_segdups.txt"
     script:
         "../scripts/python/bedtools/segdups/normalize_superdups.py"
 
@@ -29,7 +35,7 @@ checkpoint normalize_superdups:
 rule merge_superdups:
     input:
         bed=lambda w: read_checkpoint("normalize_superdups", w),
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         segdup.final("segdups"),
@@ -58,28 +64,16 @@ rule filter_long_superdups:
         """
 
 
-rule notin_superdups:
+use rule _invert_autosomal_regions as notin_superdups with:
     input:
-        bed=rules.merge_superdups.output,
-        genome=rules.get_genome.output,
-        gapless=rules.get_gapless.output.auto,
+        rules.merge_superdups.output,
     output:
         segdup.final("notinsegdups"),
-    conda:
-        "../envs/bedtools.yml"
-    shell:
-        """
-        complementBed -i {input.bed} -g {input.genome} | \
-        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
-        bgzip -c > {output}
-        """
 
 
 use rule notin_superdups as notin_long_superdups with:
     input:
-        bed=rules.filter_long_superdups.output,
-        genome=rules.get_genome.output,
-        gapless=rules.get_gapless.output.auto,
+        rules.filter_long_superdups.output,
     output:
         segdup.final("notinsegdups_gt10kb"),
 

@@ -1,17 +1,15 @@
-from common.config import si_to_gaps, bd_to_bench_bed, bd_to_bench_vcf, bd_to_query_vcf
+from common.config import (
+    si_to_gaps,
+    bd_to_bench_bed,
+    bd_to_bench_vcf,
+    bd_to_query_vcf,
+    refkey_config_to_prefix,
+    ChrIndex,
+)
 
 ref = config.ref_dirs
 
-
-# lots of things depend on PAR which is why this isn't part of the XY module
-rule write_PAR_intermediate:
-    output:
-        ref.inter.build.data / "chr{sex_chr}_PAR.bed.gz",
-    conda:
-        "../envs/bedtools.yml"
-    localrule: True
-    script:
-        "../scripts/python/bedtools/xy/write_par.py"
+# reference
 
 
 rule download_ref:
@@ -25,10 +23,12 @@ rule download_ref:
         "../envs/bedtools.yml"
     localrule: True
     script:
-        "../scripts/python/bedtools/misc/get_file.py"
+        "../scripts/python/bedtools/misc/get_ref.py"
 
 
-rule index_ref:
+# note this is only needed for mappability where we need all chromosome names;
+# for anything else we can get an index for the filtered and sorted FASTA
+rule index_full_ref:
     input:
         lambda w: expand_final_to_src(rules.download_ref.output, w),
     output:
@@ -39,43 +39,77 @@ rule index_ref:
         ref.inter.prebuild.log / "index_ref.log",
     shell:
         """
-        gunzip -c {input} | \
-        samtools faidx - -o - \
-        2> {log} > {output}
+        samtools faidx {input} -o - 2> {log} > {output}
         """
 
 
-rule get_genome:
-    input:
-        rules.index_ref.output,
-    output:
-        ref.inter.build.data / "genome.txt",
-    conda:
-        "../envs/bedtools.yml"
-    log:
-        ref.inter.build.data / "get_genome.log",
-    script:
-        "../scripts/python/bedtools/ref/get_genome.py"
+# filtered/sorted reference + index + genome
+#
+# For each build, select the chromosomes we actually want and sort them in in
+# numerical order. If we do this here, nearly all downstream steps won't need to
+# be sorted, since they will query the reference in the order presented within.
+# Additionally, make and index and genome file corresponding to each of these
+# sorted/filtered references.
+#
+# Note that in the case of dip1 the reference can be split into two separate
+# haplotypes or not. When split, there are also instances where we want to
+# enforce diploid-only references (so either dip1 or dip2) and disallow hap
+# references. Encode these three possibilities here
+
+
+def filter_sort_ref_outputs(split, nohap):
+    prefix = refkey_config_to_prefix(split, nohap)
+    fa = f"{prefix}_filtered_ref.fa"
+    parent = ref.inter.build.data
+    return {
+        "fa": parent / fa,
+        "index": parent / (fa + ".fai"),
+        "genome": parent / f"{prefix}_genome.txt",
+    }
 
 
 rule filter_sort_ref:
     input:
-        fa=lambda w: expand_final_to_src(rules.download_ref.output, w),
-        genome=rules.get_genome.output,
+        lambda w: expand_final_to_src(rules.download_ref.output, w),
     output:
-        ref.inter.build.data / "ref_filtered.fa",
+        **filter_sort_ref_outputs(False, False),
     conda:
         "../envs/utils.yml"
     log:
         ref.inter.build.log / "filter_sort_ref.log",
-    shell:
-        """
-        samtools faidx {input.fa} $(cut -f1 {input.genome} | tr '\n' ' ') 2> {log} | \
-        bgzip -c > {output}
-        """
+    script:
+        "../scripts/python/bedtools/ref/filter_sort_ref.py"
 
 
-use rule download_ref as download_gaps with:
+use rule filter_sort_ref as filter_sort_split_ref with:
+    input:
+        lambda w: expand(
+            rules.download_ref.output,
+            allow_missing=True,
+            ref_src_key=config.refkey_strip_if_dip1(w["ref_final_key"], False),
+        ),
+    output:
+        **filter_sort_ref_outputs(True, False),
+    log:
+        ref.inter.build.log / "filter_sort_split_ref.log",
+
+
+use rule filter_sort_ref as filter_sort_split_ref_nohap with:
+    input:
+        lambda w: expand(
+            rules.download_ref.output,
+            allow_missing=True,
+            ref_src_key=config.refkey_strip_if_dip1(w["ref_final_key"], True),
+        ),
+    output:
+        **filter_sort_ref_outputs(True, True),
+    log:
+        ref.inter.build.log / "filter_sort_split_ref_nohap.log",
+
+
+rule download_gaps:
+    input:
+        rules.build_kent.output,
     output:
         ref.src.reference.data / "gap.bed.gz",
     params:
@@ -83,47 +117,67 @@ use rule download_ref as download_gaps with:
     localrule: True
     log:
         ref.src.reference.log / "download_gaps.log",
+    conda:
+        "../envs/bedtools.yml"
+    script:
+        "../scripts/python/bedtools/misc/get_bedlike.py"
 
 
 def gapless_input(wildcards):
     rk = wildcards.ref_final_key
-    si = config.to_ref_data(strip_full_refkey(rk)).strat_inputs
-    if si.gap is not None:
-        gaps = {
-            "gaps": expand(
-                rules.download_gaps.output,
-                ref_src_key=config.refkey_to_bed_refsrckeys(si_to_gaps, rk),
-            )
-        }
-        if si.xy.y_par is None:
-            return gaps
-        else:
-            return {
-                **gaps,
-                "parY": expand(
-                    rules.write_PAR_intermediate.output[0],
-                    allow_missing=True,
-                    sex_chr="Y",
-                )[0],
-            }
-    else:
-        return {}
+    bk = wildcards.build_key
+
+    bd = config.to_build_data_full(rk, bk)
+    sex_chrs = config.buildkey_to_wanted_xy(rk, bk)
+
+    gaps_target = (
+        expand(
+            rules.download_gaps.output,
+            ref_src_key=config.refkey_to_bed_refsrckeys(si_to_gaps, rk),
+        )
+        if bd.want_gaps
+        else None
+    )
+
+    par_target = (
+        expand(
+            rules.write_PAR_intermediate.output[0],
+            allow_missing=True,
+            sex_chr="Y",
+        )[0]
+        if bd.want_y_PAR and ChrIndex.CHRY in sex_chrs
+        else None
+    )
+
+    return {
+        k: v
+        for k, v in [
+            ("gaps", gaps_target),
+            ("parY", par_target),
+        ]
+        if v is not None
+    }
 
 
 rule get_gapless:
     input:
         unpack(gapless_input),
-        genome=rules.get_genome.output[0],
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         auto=ref.inter.build.data / "genome_gapless.bed.gz",
         parY=ref.inter.build.data / "genome_gapless_parY.bed.gz",
+    log:
+        ref.inter.build.log / "get_gapless.txt",
     conda:
         "../envs/bedtools.yml"
     script:
         "../scripts/python/bedtools/ref/get_gapless.py"
 
 
-use rule download_ref as download_bench_vcf with:
+# benchmark
+
+
+use rule download_gaps as download_bench_vcf with:
     output:
         ref.src.benchmark.data / "bench.vcf.gz",
     params:
@@ -137,7 +191,7 @@ use rule download_ref as download_bench_vcf with:
         ref.src.benchmark.log / "download_bench_vcf.log",
 
 
-use rule download_ref as download_bench_bed with:
+use rule download_gaps as download_bench_bed with:
     output:
         ref.src.benchmark.data / "bench.bed.gz",
     params:
@@ -151,7 +205,7 @@ use rule download_ref as download_bench_bed with:
         ref.src.benchmark.log / "download_bench_bed.log",
 
 
-use rule download_ref as download_query_vcf with:
+use rule download_gaps as download_query_vcf with:
     output:
         ref.src.benchmark.data / "query.vcf.gz",
     params:
@@ -179,3 +233,36 @@ checkpoint normalize_bench_bed:
         )[0],
     script:
         "../scripts/python/bedtools/ref/normalize_bench_bed.py"
+
+
+# misc
+
+
+# lots of things depend on PAR which is why this isn't part of the XY module
+rule write_PAR_intermediate:
+    output:
+        ref.inter.build.data / "chr{sex_chr}_PAR.bed.gz",
+    conda:
+        "../envs/bedtools.yml"
+    localrule: True
+    script:
+        "../scripts/python/bedtools/xy/write_par.py"
+
+
+# skeleton rules (meant to be overridden elsewhere)
+
+
+rule _invert_autosomal_regions:
+    # this is a nice trick to avoid specifying input files for rule overrides
+    # when they never change
+    params:
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+    conda:
+        "../envs/bedtools.yml"
+    shell:
+        """
+        complementBed -i {input} -g {params.genome} | \
+        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
+        bgzip -c > {output}
+        """

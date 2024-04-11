@@ -1,12 +1,16 @@
 from pathlib import Path
 from typing import Any, NamedTuple, Callable
-import subprocess as sp
 import common.config as cfg
 from common.functional import DesignError
+from common.io import bgzip_file, gunzip, check_processes
+from common.bed import (
+    complementBed,
+    subtractBed,
+    intersectBed,
+    multiIntersectBed,
+    mergeBed,
+)
 import json
-
-# use subprocess here because I don't see an easy way to stream a bedtools
-# python object to a bgzip file (it only seems to do gzip...oh well)
 
 
 class GCInput(NamedTuple):
@@ -18,7 +22,9 @@ class GCInput(NamedTuple):
 def write_simple_range_beds(
     final_path: Callable[[str], Path],
     gs: list[GCInput],
+    genome: Path,
     is_low: bool,
+    log: Path,
 ) -> list[str]:
     def fmt_out(bigger_frac: int, smaller_frac: int) -> Path:
         lower_frac, upper_frac = (
@@ -32,15 +38,10 @@ def write_simple_range_beds(
         for bigger, smaller in pairs
     ]
     for out, bigger, smaller in torun:
-        with open(out, "wb") as f:
-            p0 = sp.Popen(
-                ["subtractBed", "-a", bigger.bed, "-b", smaller.bed],
-                stdout=sp.PIPE,
-            )
-            p1 = sp.run(["bgzip", "-c"], stdin=p0.stdout, stdout=f)
-            p0.wait()
-            if not (p0.returncode == p1.returncode == 0):
-                exit(1)
+        p1, o1 = gunzip(bigger.bed)
+        p2, o2 = subtractBed(o1, smaller.bed, genome)
+        bgzip_file(o2, out)
+        check_processes([p1, p2], log)
     return [str(t[0]) for t in torun]
 
 
@@ -50,29 +51,15 @@ def write_middle_range_bed(
     upper: GCInput,
     genome: Path,
     gapless: Path,
+    log: Path,
 ) -> str:
     out = final_path(f"gc{lower.fraction}to{upper.fraction}_slop50")
-    with open(out, "wb") as f:
-        p0 = sp.Popen(
-            ["complementBed", "-i", upper.bed, "-g", genome],
-            stdout=sp.PIPE,
-        )
-        p1 = sp.Popen(
-            ["subtractBed", "-a", "stdin", "-b", lower.bed],
-            stdin=p0.stdout,
-            stdout=sp.PIPE,
-        )
-        p2 = sp.Popen(
-            ["intersectBed", "-a", "stdin", "-b", gapless, "-sorted", "-g", genome],
-            stdin=p1.stdout,
-            stdout=sp.PIPE,
-        )
-        p3 = sp.run(["bgzip", "-c"], stdin=p2.stdout, stdout=f)
-        p0.wait()
-        p1.wait()
-        p2.wait()
-        if not (p0.returncode == p1.returncode == p2.returncode == p3.returncode == 0):
-            exit(1)
+    with open(upper.bed, "rb") as i:
+        p1, o0 = complementBed(i, genome)
+        p2, o1 = subtractBed(o0, lower.bed, genome)
+        p3, o2 = intersectBed(o1, gapless, genome)
+        bgzip_file(o2, out)
+        check_processes([p1, p2, p3], log)
     return str(out)
 
 
@@ -80,6 +67,7 @@ def write_intersected_range_beds(
     final_path: Callable[[str], Path],
     low: list[GCInput],
     high: list[GCInput],
+    log: Path,
 ) -> list[str]:
     pairs = zip(
         [x for x in low if x.is_range_bound],
@@ -90,27 +78,24 @@ def write_intersected_range_beds(
         for i, (b1, b2) in enumerate(pairs)
     ]
     for i, bed_out, b1, b2 in torun:
-        with open(bed_out, "wb") as f:
-            p0 = sp.Popen(
-                ["multiIntersectBed", "-i", b1.bed, b2.bed],
-                stdout=sp.PIPE,
-            )
-            p1 = sp.Popen(
-                ["mergeBed", "-i", "stdin"],
-                stdin=p0.stdout,
-                stdout=sp.PIPE,
-            )
-            p2 = sp.run(["bgzip", "-c"], stdin=p1.stdout, stdout=f)
-            p0.wait()
-            p1.wait()
-            if not (p0.returncode == p1.returncode == p2.returncode == 0):
-                exit(1)
-
+        p1, o1 = multiIntersectBed([b1.bed, b2.bed])
+        p2, o2 = mergeBed(o1, [])
+        bgzip_file(o2, bed_out)
+        check_processes([p1, p2], log)
     return [str(t[1]) for t in torun]
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
+    path_pattern = cfg.smk_to_param_str(smk, "path_pattern")
+
+    low_paths = cfg.smk_to_inputs_name(smk, "low")
+    high_paths = cfg.smk_to_inputs_name(smk, "high")
+    genome_path = cfg.smk_to_input_name(smk, "genome")
+    gapless_path = cfg.smk_to_input_name(smk, "gapless")
+    log_path = cfg.smk_to_log(smk)
+    out_path = cfg.smk_to_output(smk)
+
     rfk = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)
     bd = sconf.to_build_data(cfg.strip_full_refkey(rfk), bk)
@@ -118,42 +103,45 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     if gps is None:
         raise DesignError
     # ASSUME both of these input lists are sorted by GC fraction
-    low = [GCInput(p, f, r) for p, (f, r) in zip(smk.input.low, gps.low)]
-    high = [GCInput(p, f, r) for p, (f, r) in zip(smk.input.high, gps.high)]
-    genome = Path(smk.input.genome)
-    gapless = Path(smk.input.gapless)
+    low = [GCInput(p, f, r) for p, (f, r) in zip(low_paths, gps.low)]
+    high = [GCInput(p, f, r) for p, (f, r) in zip(high_paths, gps.high)]
+    genome = Path(genome_path)
+    gapless = Path(gapless_path)
 
     def final_path(name: str) -> Path:
-        p = Path(str(smk.params.path_pattern).format(name))
+        p = Path(path_pattern.format(name))
         p.parent.mkdir(exist_ok=True, parents=True)
         return p
 
-    low_strats = write_simple_range_beds(final_path, low, True)
-    high_strats = write_simple_range_beds(final_path, high, False)
+    low_strats = write_simple_range_beds(final_path, low, genome, True, log_path)
+    high_strats = write_simple_range_beds(final_path, high, genome, False, log_path)
     range_strat = write_middle_range_bed(
         final_path,
         low[-1],
         high[0],
         genome,
         gapless,
+        log_path,
     )
     inter_strats = write_intersected_range_beds(
         final_path,
         low,
         high,
+        log_path,
     )
 
-    with open(smk.output[0], "w") as f:
+    with open(out_path, "w") as f:
         # put the first low and last high input here since these are already
         # in the final directory
+        ranges: list[str] = [
+            str(low[0].bed),
+            *low_strats,
+            range_strat,
+            *high_strats,
+            str(high[-1].bed),
+        ]
         obj = {
-            "gc_ranges": [
-                low[0][0],
-                *low_strats,
-                range_strat,
-                *high_strats,
-                high[-1][0],
-            ],
+            "gc_ranges": ranges,
             "widest_extreme": inter_strats[0],
             "other_extremes": inter_strats[1:],
         }

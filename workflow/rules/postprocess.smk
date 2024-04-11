@@ -1,11 +1,12 @@
 from os.path import dirname, basename
 from more_itertools import unique_everseen, unzip
 from os import scandir
-from common.config import CoreLevel, strip_full_refkey
-from bedtools.postprocess.helpers import write_chr_mapper
+from common.config import CoreLevel
+from common.functional import DesignError
 
 post_inter_dir = config.intermediate_build_dir / "postprocess"
 post_log_dir = config.log_build_dir / "postprocess"
+post_bench_dir = config.bench_build_dir / "postprocess"
 validation_dir = config.final_root_dir / "validation"
 
 
@@ -13,23 +14,26 @@ def expand_strat_targets_inner(ref_final_key, build_key):
     # TODO this is crude
     # NOTE we need to do this because despite the final key potentially having
     # one or two haps, the configuration applies to both haps simultaneously
-    bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
+    bd = config.to_build_data_full(ref_final_key, build_key)
     function_targets = [
-        (all_low_complexity, bd.want_low_complexity),
+        (lambda rk, _: all_low_complexity(rk), bd.want_low_complexity),
         (gc_inputs_flat, bd.want_gc),
         (mappabilty_inputs, bd.want_mappability),
+        (het_hom_inputs, bd.want_hets),
         (all_xy_sex, True),
         (all_other, True),
     ]
     rule_targets = [
         (rules.filter_autosomes.output, bd.want_xy_auto),
-        (rules.all_functional.input, bd.want_functional),
         (rules.all_segdups.input, bd.want_segdups),
         (rules.find_telomeres.output, bd.want_telomeres),
         (rules.all_segdup_and_map.input, bd.want_segdup_and_map),
         (rules.all_alldifficult.input, bd.want_alldifficult),
-        (rules.get_gaps.output, lambda r, _: bd.want_gaps(r)),
+        (rules.get_gaps.output, bd.want_gaps),
+        (rules.all_cds.input, bd.want_cds),
         (rules.remove_vdj_gaps.output, bd.want_vdj),
+        (rules.remove_kir_gaps.output, bd.want_kir),
+        (rules.remove_mhc_gaps.output, bd.want_mhc),
     ]
     all_function = [f(ref_final_key, build_key) for f, test in function_targets if test]
     all_rule = [tgt for tgt, test in rule_targets if test]
@@ -37,7 +41,8 @@ def expand_strat_targets_inner(ref_final_key, build_key):
     # combine and ensure that all "targets" refer to final bed files
     all_targets = [y for xs in all_function + all_rule for y in xs]
     invalid = [f for f in all_targets if not f.startswith(str(config.final_root_dir))]
-    assert len(invalid) == 0, f"invalid targets: {invalid}"
+    if len(invalid) > 0:
+        raise DesignError(f"invalid targets: {invalid}")
     return all_targets
 
 
@@ -78,19 +83,36 @@ rule generate_tsv_list:
 
 rule unit_test_strats:
     input:
-        strats=rules.list_all_strats.output,
+        strats=rules.list_all_strats.output[0],
         gapless_auto=rules.get_gapless.output.auto,
         gapless_parY=rules.get_gapless.output.parY,
+        genome=rules.filter_sort_ref.output["genome"],
         strat_list=rules.generate_tsv_list.output[0],
         checksums=rules.generate_md5sums.output[0],
     output:
         touch(post_inter_dir / "unit_tests.done"),
     log:
-        post_log_dir / "unit_tests.log",
+        error=post_log_dir / "unit_tests_errors.log",
+        failed=post_log_dir / "failed_tests.log",
+    benchmark:
+        post_bench_dir / "unit_test_strats.txt"
     conda:
         "../envs/bedtools.yml"
     script:
         "../scripts/python/bedtools/postprocess/run_unit_tests.py"
+
+
+rule get_coverage_table:
+    input:
+        _test=rules.unit_test_strats.output,
+        bedlist=rules.list_all_strats.output[0],
+        gapless=rules.get_gapless.output.auto,
+    output:
+        touch(post_inter_dir / "coverage.tsv.gz"),
+    benchmark:
+        post_bench_dir / "get_coverage_table.txt"
+    script:
+        "../scripts/python/bedtools/postprocess/get_coverage_table.py"
 
 
 rule download_comparison_strat_tarball:
@@ -131,6 +153,7 @@ rule compare_strats:
         validation_dir / "{ref_final_key}@{build_key}" / "diagnostics.tsv",
     log:
         post_log_dir / "comparison.log",
+    # ASSUME this env will have pandas and bedtools (only real deps for this)
     conda:
         "../envs/bedtools.yml"
     threads: 8
@@ -148,18 +171,6 @@ rule all_comparisons:
     localrule: True
 
 
-# Rule to make a dataframe which maps chromosome names to a common nomenclature
-# (for the validation markdown). The only reason this exists is because
-# snakemake flattens this list of tuples when I pass it as a param to the rmd
-# script...dataframe in IO monad it is :/
-rule write_chr_name_mapper:
-    output:
-        config.intermediate_root_dir / ".validation" / "chr_mapper.tsv",
-    localrule: True
-    run:
-        write_chr_mapper(config, output[0])
-
-
 rule make_coverage_plots:
     input:
         # this first input isn't actually used, but ensures the unit tests pass
@@ -171,20 +182,13 @@ rule make_coverage_plots:
                 ref_final_key=(t := config.all_full_build_keys)[0],
                 build_key=t[1],
             ),
-            "strats": expand(
-                rules.list_all_strats.output,
-                zip,
-                ref_final_key=t[0],
-                build_key=t[1],
-            ),
-            "nonN": expand(
-                rules.get_gapless.output.auto,
+            "coverage": expand(
+                rules.get_coverage_table.output,
                 zip,
                 ref_final_key=t[0],
                 build_key=t[1],
             ),
         },
-        chr_mapper=rules.write_chr_name_mapper.output,
     output:
         validation_dir / "coverage_plots.html",
     conda:
@@ -196,37 +200,14 @@ rule make_coverage_plots:
         "../scripts/rmarkdown/rmarkdown/coverage_plots.Rmd"
 
 
-rule unzip_ref:
-    input:
-        rules.filter_sort_ref.output,
-    output:
-        post_log_dir / "happy" / "ref.fa",
-    shell:
-        "gunzip -c {input} > {output}"
-
-
-rule index_unzipped_ref:
-    input:
-        rules.unzip_ref.output,
-    output:
-        rules.unzip_ref.output[0] + ".fai",
-    conda:
-        "../envs/bedtools.yml"
-    shell:
-        """
-        samtools faidx {input}
-        """
-
-
 rule run_happy:
     input:
         _test=rules.unit_test_strats.output,
-        refi=rules.index_unzipped_ref.output,
-        ref=rules.unzip_ref.output,
-        bench_vcf=lambda w: expand_final_to_src(rules.download_bench_vcf.output, w),
+        ref=rules.filter_sort_ref.output["fa"],
+        bench_vcf=lambda w: expand_final_to_src(rules.download_bench_vcf.output, w)[0],
         bench_bed=lambda w: read_checkpoint("normalize_bench_bed", w),
-        query_vcf=lambda w: expand_final_to_src(rules.download_query_vcf.output, w),
-        strats=rules.generate_tsv_list.output,
+        query_vcf=lambda w: expand_final_to_src(rules.download_query_vcf.output, w)[0],
+        strats=rules.generate_tsv_list.output[0],
     output:
         post_inter_dir / "happy" / "happy.extended.csv",
     params:
@@ -236,6 +217,12 @@ rule run_happy:
     log:
         post_log_dir / "happy" / "happy.log",
     threads: 8
+    benchmark:
+        post_bench_dir / "run_happy.txt"
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.runHappy
+        ),
     script:
         "../scripts/python/bedtools/postprocess/run_happy.py"
 

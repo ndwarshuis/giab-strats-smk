@@ -1,10 +1,13 @@
 from pathlib import Path
 from typing import Any
 import re
+import common.config as cfg
 
 
 def main(smk: Any) -> None:
-    with open(smk.input[0], "r") as i, open(smk.output[0], "w") as o:
+    ip = cfg.smk_to_input(smk)
+    op = cfg.smk_to_output(smk)
+    with open(ip, "r") as i, open(op, "w") as o:
         for f in i:
             fp = Path(f.strip())
             level = re.sub("^[^_]+_", "", fp.name.replace(".bed.gz", ""))

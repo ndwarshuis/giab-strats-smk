@@ -1,12 +1,6 @@
 from more_itertools import unzip, flatten
 from collections import namedtuple
-from common.config import (
-    CoreLevel,
-    si_to_rmsk,
-    si_to_simreps,
-    si_to_satellites,
-    strip_full_refkey,
-)
+from common.config import CoreLevel, si_to_rmsk, si_to_simreps, si_to_satellites
 from functools import partial
 
 lc = config.to_bed_dirs(CoreLevel.LOWCOMPLEXITY)
@@ -27,7 +21,7 @@ unit_name_constraint = f"({'|'.join(uniform_repeats)})"
 
 bases_constraint = "[ATGC]{2}"
 
-COMPLIMENTS = ["AT", "GC"]
+COMPLEMENTS = ["AT", "GC"]
 IMPERFECT_LENS = [11, 21]
 
 
@@ -35,7 +29,7 @@ IMPERFECT_LENS = [11, 21]
 # refs we might miss a repeat like "AAaa"
 rule find_perfect_uniform_repeats:
     input:
-        ref=rules.filter_sort_ref.output,
+        ref=rules.filter_sort_ref.output["fa"],
         bin=rules.build_repseq.output,
     output:
         lc.inter.postsort.data / "uniform_repeats_R{unit_len}_T{total_len}.bed",
@@ -48,7 +42,7 @@ rule find_perfect_uniform_repeats:
         "../envs/bedtools.yml"
     shell:
         """
-        gunzip -c {input.ref} | \
+        cat {input.ref} | \
         sed 's/^[A-Za-z]\\+$/\\U&/' | \
         {input.bin} {wildcards.unit_len} {wildcards.total_len} - 2> {log} \
         > {output} 
@@ -93,7 +87,7 @@ rule all_perfect_uniform_repeats:
             )
             for u in uniform_repeats.values()
             for t in u.total_lens
-            for bs in COMPLIMENTS
+            for bs in COMPLEMENTS
         },
     localrule: True
 
@@ -103,7 +97,7 @@ def lookup_perfect_uniform_repeat(unit_name, total_len):
     return rules.all_perfect_uniform_repeats.input[f"R{ul}_T{total_len}"]
 
 
-def lookup_perfect_uniform_repeat_compliment(unit_name, total_len, bases):
+def lookup_perfect_uniform_repeat_complement(unit_name, total_len, bases):
     ul = uniform_repeats[unit_name].unit_len
     return rules.all_perfect_uniform_repeats.input[f"R{ul}_T{total_len}_{bases}"]
 
@@ -133,12 +127,12 @@ rule subtract_uniform_repeats:
         total_lenA="\d+",
         total_lenb="\d+",
     shell:
-        "subtractBed -a {input.a} -b {input.b} > {output}"
+        "subtractBed -a {input.a} -b {input.b} -sorted > {output}"
 
 
-def repeat_range_compliment_inputs(wildcards):
+def repeat_range_complement_inputs(wildcards):
     return {
-        k: lookup_perfect_uniform_repeat_compliment(
+        k: lookup_perfect_uniform_repeat_complement(
             wildcards.unit_name, t, wildcards.bases
         )
         for k, t in zip(
@@ -148,9 +142,9 @@ def repeat_range_compliment_inputs(wildcards):
     }
 
 
-rule subtract_uniform_repeat_compliment:
+rule subtract_uniform_repeat_complement:
     input:
-        unpack(repeat_range_compliment_inputs),
+        unpack(repeat_range_complement_inputs),
     output:
         lc.inter.postsort.data
         / "uniform_repeat_range_{bases}_{unit_name}_{total_lenA}to{total_lenB}.bed",
@@ -164,7 +158,7 @@ rule subtract_uniform_repeat_compliment:
         total_lenb="\d+",
         bases=bases_constraint,
     shell:
-        "subtractBed -a {input.a} -b {input.b} > {output}"
+        "subtractBed -a {input.a} -b {input.b} -sorted > {output}"
 
 
 rule slop_uniform_repeats:
@@ -178,7 +172,7 @@ rule slop_uniform_repeats:
         unit_name=unit_name_constraint,
         total_len="\d+",
     params:
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     shell:
         """
@@ -209,9 +203,9 @@ use rule slop_uniform_repeats as slop_uniform_repeat_ranges with:
         total_lenB="\d+",
 
 
-use rule slop_uniform_repeats as slop_uniform_repeats_compliment with:
+use rule slop_uniform_repeats as slop_uniform_repeats_complement with:
     input:
-        lambda w: lookup_perfect_uniform_repeat_compliment(
+        lambda w: lookup_perfect_uniform_repeat_complement(
             w.unit_name,
             int(w.total_len),
             w.bases,
@@ -224,10 +218,10 @@ use rule slop_uniform_repeats as slop_uniform_repeats_compliment with:
         bases=bases_constraint,
 
 
-use rule slop_uniform_repeats as slop_uniform_repeat_ranges_compliment with:
+use rule slop_uniform_repeats as slop_uniform_repeat_ranges_complement with:
     input:
         lambda w: expand(
-            rules.subtract_uniform_repeat_compliment.output,
+            rules.subtract_uniform_repeat_complement.output,
             allow_missing=True,
             unit_name=w.unit_name,
             total_lenA=int(w.total_lenA),
@@ -275,19 +269,19 @@ rule merge_imperfect_uniform_repeats:
     wildcard_constraints:
         merged_len="\d+",
     params:
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     shell:
         """
         multiIntersectBed -i {input} | \
         slopBed -i stdin -b 5 -g {params.genome} | \
         mergeBed -i stdin | \
-        intersectBed -a stdin -b {params.gapless} -sorted | \
+        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
         bgzip -c > {output}
         """
 
 
-use rule merge_imperfect_uniform_repeats as merge_imperfect_uniform_repeats_compliment with:
+use rule merge_imperfect_uniform_repeats as merge_imperfect_uniform_repeats_complement with:
     input:
         lambda w: expand(
             rules.merge_perfect_uniform_repeats.output,
@@ -316,11 +310,11 @@ rule all_uniform_repeats:
             )
             + (
                 expand(
-                    rules.slop_uniform_repeats_compliment.output,
+                    rules.slop_uniform_repeats_complement.output,
                     allow_missing=True,
                     unit_name=k,
                     total_len=x,
-                    bases=COMPLIMENTS,
+                    bases=COMPLEMENTS,
                 )
                 if k == "homopolymer"
                 else []
@@ -343,12 +337,12 @@ rule all_uniform_repeats:
             )
             + (
                 expand(
-                    rules.slop_uniform_repeat_ranges_compliment.output,
+                    rules.slop_uniform_repeat_ranges_complement.output,
                     allow_missing=True,
                     unit_name=k,
                     total_lenA=a,
                     total_lenB=b - 1,
-                    bases=COMPLIMENTS,
+                    bases=COMPLEMENTS,
                 )
                 if k == "homopolymer"
                 else []
@@ -356,10 +350,10 @@ rule all_uniform_repeats:
         ],
         # Imperfect (greater than X)
         expand(
-            rules.merge_imperfect_uniform_repeats_compliment.output,
+            rules.merge_imperfect_uniform_repeats_complement.output,
             allow_missing=True,
             merged_len=IMPERFECT_LENS,
-            bases=COMPLIMENTS,
+            bases=COMPLEMENTS,
         ),
         **{
             f"imperfect_ge{x}": expand(
@@ -376,7 +370,7 @@ rule all_uniform_repeats:
 ## simple repeats
 
 
-use rule download_ref as download_simreps with:
+use rule download_gaps as download_simreps with:
     output:
         lc.src.data / "simreps.txt.gz",
     log:
@@ -395,6 +389,12 @@ checkpoint normalize_simreps:
         output_pattern=lambda w: to_output_pattern(lc, "simreps", w),
     conda:
         "../envs/bedtools.yml"
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_key, w.build_key, lambda m: m.normalizeSimreps
+        ),
+    benchmark:
+        lc.inter.filtersort.bench / "normalize_simreps.txt"
     script:
         "../scripts/python/bedtools/low_complexity/normalize_simreps.py"
 
@@ -418,7 +418,7 @@ rule merge_simreps:
 ## rmsk
 
 
-use rule download_ref as download_rmsk with:
+use rule download_gaps as download_rmsk with:
     output:
         lc.src.data / "rmsk.txt.gz",
     log:
@@ -439,6 +439,10 @@ checkpoint normalize_rmsk:
         "../envs/bedtools.yml"
     benchmark:
         lc.inter.filtersort.bench / "normalize_rmsk.txt"
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_key, w.build_key, lambda m: m.normalizeRmsk
+        ),
     script:
         "../scripts/python/bedtools/low_complexity/normalize_rmsk.py"
 
@@ -475,7 +479,7 @@ all_rmsk_classes = {
 ## Satellites (censat, alternative to RMSK as in above)
 
 
-use rule download_ref as download_censat with:
+use rule download_gaps as download_censat with:
     output:
         lc.src.data / "censat.txt.gz",
     log:
@@ -485,6 +489,9 @@ use rule download_ref as download_censat with:
     localrule: True
 
 
+# TODO add config directives to override the mem_mb in each of these since the
+# input sizes can vary wildly depending on how many columns/rows/datatypes are
+# actually in them. 2-4k is probably a safe default
 checkpoint normalize_censat:
     input:
         lambda w: bed_src_inputs(rules.download_censat.output, si_to_satellites, w),
@@ -492,6 +499,12 @@ checkpoint normalize_censat:
         lc.inter.filtersort.data / "censat.json",
     params:
         output_pattern=lambda w: to_output_pattern(lc, "censat", w),
+    benchmark:
+        lc.inter.filtersort.bench / "normalize_censat.txt"
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_key, w.build_key, lambda m: m.normalizeCensat
+        ),
     conda:
         "../envs/bedtools.yml"
     script:
@@ -502,11 +515,14 @@ checkpoint normalize_censat:
 # bed file but add slop of their own, so this avoids adding slop twice
 rule merge_satellites_intermediate:
     input:
-        lambda w: read_checkpoint("normalize_censat", w)
-        if config.to_build_data(
-            strip_full_refkey(w.ref_final_key), w.build_key
-        ).refdata.has_low_complexity_censat
-        else all_rmsk_classes["Satellite"],
+        lambda w: (
+            read_checkpoint("normalize_censat", w)
+            if config.to_build_data_full(
+                w.ref_final_key,
+                w.build_key,
+            ).refdata.has_low_complexity_censat
+            else all_rmsk_classes["Satellite"]
+        ),
     output:
         lc.inter.postsort.data / "merged_satellites.bed.gz",
     conda:
@@ -518,7 +534,7 @@ rule merge_satellites_intermediate:
 rule merge_satellites:
     input:
         bed=rules.merge_satellites_intermediate.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         lc.final("satellites_slop5"),
@@ -533,24 +549,12 @@ rule merge_satellites:
         """
 
 
-rule invert_satellites:
+# TODO not DRY (we "invert" things all the time with this exact same rule)
+use rule _invert_autosomal_regions as invert_satellites with:
     input:
-        bed=rules.merge_satellites.output,
+        rules.merge_satellites.output,
     output:
         lc.final("notinsatellites_slop5"),
-    conda:
-        "../envs/bedtools.yml"
-    # this is a nice trick to avoid specifying input files for rule overrides
-    # when they never change
-    params:
-        gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
-    shell:
-        """
-        complementBed -i {input.bed} -g {params.genome} |
-        intersectBed -a stdin -b {params.gapless} -sorted | \
-        bgzip -c > {output}
-        """
 
 
 ################################################################################
@@ -561,7 +565,7 @@ rule merge_all_uniform_repeats:
     input:
         imperfect=rules.all_uniform_repeats.input.imperfect_ge11,
         perfect=rules.all_perfect_uniform_repeats.input.R1_T7,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         lc.final("AllHomopolymers_ge7bp_imperfectge11bp_slop5"),
@@ -581,7 +585,7 @@ rule merge_all_uniform_repeats:
 
 use rule invert_satellites as invert_all_uniform_repeats with:
     input:
-        bed=rules.merge_all_uniform_repeats.output,
+        rules.merge_all_uniform_repeats.output,
     output:
         lc.final("notinAllHomopolymers_ge7bp_imperfectge11bp_slop5"),
 
@@ -595,7 +599,7 @@ rule merge_repeats:
         + rules.all_perfect_uniform_repeats.input.R3_T14
         + rules.all_perfect_uniform_repeats.input.R4_T19
         + rules.merge_satellites_intermediate.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         lc.inter.postsort.data / "AllTandemRepeats_intermediate.bed",
     conda:
@@ -622,7 +626,7 @@ rule filter_TRs:
     input:
         tr=rules.merge_repeats.output,
         hp=rules.merge_all_uniform_repeats.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         lc.final("AllTandemRepeats_{tr_bound}bp_slop5"),
@@ -637,7 +641,7 @@ rule filter_TRs:
     shell:
         """
         awk '({params.lower}+10)<=($3-$2) && ($3-$2)<({params.upper}+10)' {input.tr} | \
-        subtractBed -a stdin -b {input.hp} | \
+        subtractBed -a stdin -b {input.hp} -sorted | \
         intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
         bgzip -c > {output}
         """
@@ -677,7 +681,7 @@ rule merge_filtered_TRs:
 
 use rule invert_satellites as invert_TRs with:
     input:
-        bed=rules.merge_filtered_TRs.output,
+        rules.merge_filtered_TRs.output,
     output:
         lc.final("notinallTandemRepeats"),
 
@@ -696,7 +700,7 @@ use rule merge_filtered_TRs as merge_HPs_and_TRs with:
 
 use rule invert_satellites as invert_HPs_and_TRs with:
     input:
-        bed=rules.merge_HPs_and_TRs.output,
+        rules.merge_HPs_and_TRs.output,
     output:
         lc.final("notinAllTandemRepeatsandHomopolymers_slop5"),
 
@@ -720,8 +724,8 @@ use rule invert_satellites as invert_HPs_and_TRs with:
 #     localrule: True
 
 
-def all_low_complexity(ref_final_key, _):
-    rd = config.to_ref_data(strip_full_refkey(ref_final_key))
+def all_low_complexity(ref_final_key):
+    rd = config.to_ref_data_full(ref_final_key)
     rmsk = rd.has_low_complexity_rmsk
     simreps = rd.has_low_complexity_simreps
     censat = rd.has_low_complexity_censat
