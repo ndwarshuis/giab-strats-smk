@@ -4,6 +4,7 @@ import os
 import contextlib
 import pandas as pd
 import subprocess as sp
+from dataclasses import dataclass
 from typing import NewType, IO, Generator
 from pathlib import Path
 from common.functional import not_none_unsafe, noop, DesignError
@@ -34,6 +35,28 @@ FinalMapper = dict[InternalChrIndex, ChrName]
 SplitMapper = dict[str, bool]
 
 BedColumns = tuple[int, int, int]
+
+
+@dataclass(frozen=True)
+class BedLine:
+    """A struct-like representation of one line in a bed file.
+
+    'more' are any columns after the chrom/start/end coord columns and are
+    referenced in the order they appear.
+    """
+
+    chr: ChrName
+    start: int
+    end: int
+    more: list[str]
+
+    @property
+    def txt(self) -> str:
+        xs = [self.chr, str(self.start), str(self.end), *self.more]
+        return "\t".join(xs)
+
+
+BedLines = list[BedLine]
 
 
 def make_split_mapper(im: InitMapper, fm: FinalMapper) -> SplitMapper:

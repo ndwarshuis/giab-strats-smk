@@ -1,13 +1,16 @@
 from more_itertools import unzip
-from common.config import bd_to_other
+from common.config import bd_to_other, BUILTIN_OTHER
 
 # make sure the wildcards here can match everything except the "built-in" other-
 # difficult beds (listed here)
-builtin_other_targets = ["gaps_slop15kb", "VDJ"]
+#
+# NOTE: this is necessary because while I have a validator in the config to
+# prevent built-in bed files to be added, snakemake doesn't know about these
+# and will give an ambiguous file exception without a constraint.
 
 other_constraints = {
     "other_level_key": f"({'|'.join(config.other_levels)})",
-    "other_strat_key": f"(?!({'|'.join(builtin_other_targets)}))[A-Za-z0-9-._]+",
+    "other_strat_key": f"(?!({'|'.join(BUILTIN_OTHER)}))[A-Za-z0-9-._]+",
 }
 
 

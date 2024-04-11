@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any
+import subprocess as sp
 from typing_extensions import assert_never
 import common.io as io
 from common.functional import DesignError
@@ -10,11 +11,19 @@ def main(smk: Any) -> None:
     bbBin = cfg.smk_to_input(smk)
     opath = cfg.smk_to_output(smk)
     log = cfg.smk_to_log(smk)
-    src: cfg.BedSrc | None = smk.params.src
+    src: cfg.AnyBedSrc | None = smk.params.src
+
+    def check_md5(src: cfg.BedFileSrc) -> None:
+        if src.md5 is not None and src.md5 != (actual := io.get_md5(opath, True)):
+            with open(log, "a") as f:
+                f.write(f"md5s don't match; wanted {src.md5}, actual {actual}\n")
+            exit(1)
+
     if isinstance(src, cfg.FileSrc_):
         # ASSUME these are already tested via the pydantic class for the
         # proper file format
         opath.symlink_to(Path(src.filepath).resolve())
+        check_md5(src)
 
     elif isinstance(src, cfg.HttpSrc_):
         with open(opath, "wb") as f:
@@ -35,15 +44,18 @@ def main(smk: Any) -> None:
             else:
                 io.curl_gzip(src.url, f, log, False)
 
+        check_md5(src)
+
+    elif isinstance(src, list):
+        with open(opath, "wb") as f:
+            out = "\n".join([x.txt for x in src])
+            sp.run(["bgzip", "-c"], input=out, stdout=f, text=True)
+
     elif src is None:
         raise DesignError("file src is null; this should not happen")
+
     else:
         assert_never(src)
-
-    if src.md5 is not None and src.md5 != (actual := io.get_md5(opath, True)):
-        with open(log, "a") as f:
-            f.write(f"md5s don't match; wanted {src.md5}, actual {actual}\n")
-        exit(1)
 
 
 main(snakemake)  # type: ignore

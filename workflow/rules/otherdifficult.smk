@@ -36,3 +36,21 @@ rule remove_vdj_gaps:
         intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
         bgzip -c > {output}
         """
+
+
+use rule remove_vdj_gaps as remove_mhc_gaps with:
+    input:
+        bed=lambda w: read_named_checkpoint("normalize_cds", "mhc", w),
+        genome=rules.filter_sort_ref.output["genome"],
+        gapless=rules.get_gapless.output.auto,
+    output:
+        odiff.final("MHC"),
+
+
+use rule remove_vdj_gaps as remove_kir_gaps with:
+    input:
+        bed=lambda w: read_named_checkpoint("normalize_cds", "kir", w),
+        genome=rules.filter_sort_ref.output["genome"],
+        gapless=rules.get_gapless.output.auto,
+    output:
+        odiff.final("KIR"),
