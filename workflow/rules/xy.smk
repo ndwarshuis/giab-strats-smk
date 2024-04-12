@@ -110,8 +110,8 @@ def all_xy_features(ref_final_key, build_key):
     bd = config.to_build_data_full(ref_final_key, build_key)
     sex_chrs = config.buildkey_to_wanted_xy_names(ref_final_key, build_key)
     all_targets = [
-        (rules.filter_XTR_features.output[0], bd.want_xy_XTR),
-        (rules.filter_ampliconic_features.output[0], bd.want_xy_ampliconic),
+        (rules.filter_XTR_features.output[0], bd.have_xy_XTR),
+        (rules.filter_ampliconic_features.output[0], bd.have_xy_ampliconic),
     ]
     targets = [x for x, y in all_targets if y]
     return expand(
@@ -123,15 +123,15 @@ def all_xy_features(ref_final_key, build_key):
     )
 
 
-def all_xy_PAR(ref_final_key, build_key):
+def _all_xy_PAR_from_rule(rulename, ref_final_key, build_key):
     bd = config.to_build_data_full(ref_final_key, build_key)
     sex_chrs = [
         c
         for c in config.buildkey_to_wanted_xy_names(ref_final_key, build_key)
-        if bd.want_xy_PAR(c)
+        if bd.have_xy_PAR(c)
     ]
     return expand(
-        rules.invert_PAR.output + rules.write_PAR_final.output,
+        rulename,
         allow_missing=True,
         sex_chr=sex_chrs,
         ref_final_key=ref_final_key,
@@ -139,7 +139,25 @@ def all_xy_PAR(ref_final_key, build_key):
     )
 
 
+def all_xy_PAR(ref_final_key, build_key):
+    return _all_xy_PAR_from_rule(
+        rules.write_PAR_final.output,
+        ref_final_key,
+        build_key,
+    )
+
+
+def all_xy_nonPAR(ref_final_key, build_key):
+    return _all_xy_PAR_from_rule(
+        rules.invert_PAR.output,
+        ref_final_key,
+        build_key,
+    )
+
+
 def all_xy_sex(ref_final_key, build_key):
-    return all_xy_PAR(ref_final_key, build_key) + all_xy_features(
-        ref_final_key, build_key
+    return (
+        all_xy_PAR(ref_final_key, build_key)
+        + all_xy_nonPAR(ref_final_key, build_key)
+        + all_xy_features(ref_final_key, build_key)
     )

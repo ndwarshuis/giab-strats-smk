@@ -27,6 +27,7 @@ use rule _invert_autosomal_regions as invert_segdup_and_map with:
         uni.final("notinalllowmapandsegdupregions"),
 
 
+# TODO include other difficult in here as well
 use rule intersect_segdup_and_map as intersect_alldifficult with:
     input:
         rules.intersect_segdup_and_map.output,

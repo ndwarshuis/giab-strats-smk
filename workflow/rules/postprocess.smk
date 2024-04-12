@@ -18,22 +18,22 @@ def expand_strat_targets_inner(ref_final_key, build_key):
     function_targets = [
         (lambda rk, _: all_low_complexity(rk), bd.want_low_complexity),
         (gc_inputs_flat, bd.want_gc),
-        (mappabilty_inputs, bd.want_mappability),
+        (mappabilty_inputs, bd.have_and_want_mappability),
         (het_hom_inputs, bd.want_hets),
         (all_xy_sex, True),
         (all_other, True),
     ]
     rule_targets = [
         (rules.filter_autosomes.output, bd.want_xy_auto),
-        (rules.all_segdups.input, bd.want_segdups),
+        (rules.all_segdups.input, bd.have_and_want_segdups),
         (rules.find_telomeres.output, bd.want_telomeres),
-        (rules.all_segdup_and_map.input, bd.want_segdup_and_map),
-        (rules.all_alldifficult.input, bd.want_alldifficult),
-        (rules.get_gaps.output, bd.want_gaps),
-        (rules.all_cds.input, bd.want_cds),
-        (rules.remove_vdj_gaps.output, bd.want_vdj),
-        (rules.remove_kir_gaps.output, bd.want_kir),
-        (rules.remove_mhc_gaps.output, bd.want_mhc),
+        (rules.all_segdup_and_map.input, bd.have_and_want_segdup_and_map),
+        (rules.all_alldifficult.input, bd.have_and_want_alldifficult),
+        (rules.get_gaps.output, bd.have_gaps),
+        (rules.all_cds.input, bd.have_and_want_cds),
+        (rules.remove_vdj_gaps.output, bd.have_and_want_vdj),
+        (rules.remove_kir_gaps.output, bd.have_and_want_kir),
+        (rules.remove_mhc_gaps.output, bd.have_and_want_mhc),
     ]
     all_function = [f(ref_final_key, build_key) for f, test in function_targets if test]
     all_rule = [tgt for tgt, test in rule_targets if test]
@@ -236,7 +236,7 @@ rule summarize_happy:
                 build_key=bk,
             )
             for rk, bk in zip(*config.all_build_keys)
-            if config.to_build_data(rk, bk).want_benchmark
+            if config.to_build_data(rk, bk).have_benchmark
         ],
     output:
         validation_dir / "benchmark_summary.html",

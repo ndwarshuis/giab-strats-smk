@@ -530,25 +530,25 @@ def si_to_vdj(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
 def bd_to_cds(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> CDS[AnyBedT] | None:
-    return si_to_cds(x.refdata.strat_inputs) if x.want_cds else None
+    return si_to_cds(x.refdata.strat_inputs) if x.have_and_want_cds else None
 
 
 def bd_to_mhc(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
-    return si_to_mhc(x.refdata.strat_inputs) if x.want_mhc else None
+    return si_to_mhc(x.refdata.strat_inputs) if x.have_and_want_mhc else None
 
 
 def bd_to_kir(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
-    return si_to_kir(x.refdata.strat_inputs) if x.want_kir else None
+    return si_to_kir(x.refdata.strat_inputs) if x.have_and_want_kir else None
 
 
 def bd_to_vdj(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
-    return si_to_vdj(x.refdata.strat_inputs) if x.want_vdj else None
+    return si_to_vdj(x.refdata.strat_inputs) if x.have_and_want_vdj else None
 
 
 def si_to_simreps(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
@@ -588,7 +588,7 @@ def si_to_superdups(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
 def bd_to_superdups(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
-    return si_to_superdups(x.refdata.strat_inputs) if x.want_segdups else None
+    return si_to_superdups(x.refdata.strat_inputs) if x.have_and_want_segdups else None
 
 
 def si_to_gaps(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
@@ -598,7 +598,7 @@ def si_to_gaps(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
 def bd_to_gaps(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
-    return si_to_gaps(x.refdata.strat_inputs) if x.want_gaps else None
+    return si_to_gaps(x.refdata.strat_inputs) if x.have_gaps else None
 
 
 def bd_to_other(
@@ -2317,7 +2317,7 @@ class Include(BaseModel):
     # this in the haploid case; it technically should be a validation error
     # since it makes no sense in the case of haploid, but here it is setup to
     # not hurt anything.
-    hets: set[int] = {10, 20, 50, 100, 500}
+    hets: set[int] = {5, 10, 25, 50, 250}
 
 
 class OtherBedFile(BedFile[AnyBedT], Generic[AnyBedT]):
@@ -2642,37 +2642,46 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
         return self.build.include.telomeres
 
     @property
-    def want_segdups(self) -> bool:
-        return (
-            self.refdata.strat_inputs.segdups.superdups is not None
-            and self.build.include.segdups
-        )
+    def have_segdups(self) -> bool:
+        return self.refdata.strat_inputs.segdups.superdups is not None
 
     @property
-    def _want_union(self) -> bool:
+    def have_and_want_segdups(self) -> bool:
+        return self.have_segdups and self.build.include.segdups
+
+    @property
+    def want_union(self) -> bool:
         return self.build.include.union
 
     @property
-    def want_mappability(self) -> bool:
+    def have_and_want_mappability(self) -> bool:
         return (
             self.refdata.strat_inputs.mappability is not None
             and len(self.build.include.mappability) > 0
         )
 
     @property
-    def want_segdup_and_map(self) -> bool:
-        return self.build.include.union and self.want_segdups and self.want_mappability
+    def have_and_want_segdup_and_map(self) -> bool:
+        return (
+            self.build.include.union
+            and self.have_and_want_segdups
+            and self.have_and_want_mappability
+        )
 
     @property
-    def want_alldifficult(self) -> bool:
-        return self.want_segdup_and_map and self.want_low_complexity and self.want_gc
+    def have_and_want_alldifficult(self) -> bool:
+        return (
+            self.have_and_want_segdup_and_map
+            and self.want_low_complexity
+            and self.want_gc
+        )
 
     @property
-    def want_benchmark(self) -> bool:
+    def have_benchmark(self) -> bool:
         return self.build.bench is not None
 
     @property
-    def want_gaps(self) -> bool:
+    def have_gaps(self) -> bool:
         return self.refdata.strat_inputs.gap is not None
 
     @property
@@ -2709,28 +2718,28 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
     # chromosomes, inherit rules based on this, and then filter those rules
     # based on the following functions.
     @property
-    def want_x_PAR(self) -> bool:
+    def have_x_PAR(self) -> bool:
         return self.refdata.strat_inputs.xy.x_par is not None
 
     @property
-    def want_y_PAR(self) -> bool:
+    def have_y_PAR(self) -> bool:
         return self.refdata.strat_inputs.xy.y_par is not None
 
-    def want_xy_PAR(self, s: str) -> bool:
+    def have_xy_PAR(self, s: str) -> bool:
         return choose_xy_unsafe(
             ChrIndex.from_name(s),
-            self.want_x_PAR,
-            self.want_y_PAR,
+            self.have_x_PAR,
+            self.have_y_PAR,
         )
 
     @property
-    def want_xy_XTR(self) -> bool:
+    def have_xy_XTR(self) -> bool:
         return fmap_maybe_def(
             False, lambda x: x.xtr, self.refdata.strat_inputs.xy.features
         )
 
     @property
-    def want_xy_ampliconic(self) -> bool:
+    def have_xy_ampliconic(self) -> bool:
         return fmap_maybe_def(
             False, lambda x: x.ampliconic, self.refdata.strat_inputs.xy.features
         )
@@ -2745,31 +2754,35 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
     # file gets downloaded.
 
     @property
-    def _has_cds_src(self) -> bool:
+    def _have_cds_src(self) -> bool:
         return self.refdata.strat_inputs.functional.cds is not None
 
     @property
-    def _has_kir_src(self) -> bool:
+    def _have_kir_src(self) -> bool:
         return self.refdata.strat_inputs.functional.kir is not None
 
     @property
-    def _has_vdj_src(self) -> bool:
+    def _have_vdj_src(self) -> bool:
         return self.refdata.strat_inputs.functional.vdj is not None
 
     @property
-    def _has_mhc_src(self) -> bool:
+    def _have_mhc_src(self) -> bool:
         return self.refdata.strat_inputs.functional.mhc is not None
 
     @property
-    def _include_mhc(self) -> bool:
+    def want_cds(self) -> bool:
+        return self.build.include.cds
+
+    @property
+    def want_mhc(self) -> bool:
         return self.build.include.mhc and MHC_CHR in self.build_chrs
 
     @property
-    def _include_kir(self) -> bool:
+    def want_kir(self) -> bool:
         return self.build.include.kir and KIR_CHR in self.build_chrs
 
     @property
-    def _include_vdj(self) -> bool:
+    def want_vdj(self) -> bool:
         return self.build.include.vdj and len(VDJ_CHRS & self.build_chrs) > 0
 
     @property
@@ -2781,38 +2794,38 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
         """
         return (
             self.build.include.cds
-            or (self._include_vdj and not self._has_vdj_src)
-            or (self._include_mhc and not self._has_mhc_src)
-            or (self._include_kir and not self._has_kir_src)
-        ) and self._has_cds_src
+            or (self.want_vdj and not self._have_vdj_src)
+            or (self.want_mhc and not self._have_mhc_src)
+            or (self.want_kir and not self._have_kir_src)
+        ) and self._have_cds_src
 
     @property
     def want_mhc_src(self) -> bool:
-        return self._include_mhc and self._has_mhc_src
+        return self.want_mhc and self._have_mhc_src
 
     @property
     def want_kir_src(self) -> bool:
-        return self._include_kir and self._has_kir_src
+        return self.want_kir and self._have_kir_src
 
     @property
     def want_vdj_src(self) -> bool:
-        return self._include_vdj and self._has_vdj_src
+        return self.want_vdj and self._have_vdj_src
 
     @property
-    def want_cds(self) -> bool:
-        return self.build.include.cds and self._has_cds_src
+    def have_and_want_cds(self) -> bool:
+        return self.want_cds and self._have_cds_src
 
     @property
-    def want_mhc(self) -> bool:
-        return self._include_mhc and (self._has_cds_src | self._has_mhc_src)
+    def have_and_want_mhc(self) -> bool:
+        return self.want_mhc and (self._have_cds_src | self._have_mhc_src)
 
     @property
-    def want_kir(self) -> bool:
-        return self._include_kir and (self._has_cds_src | self._has_kir_src)
+    def have_and_want_kir(self) -> bool:
+        return self.want_kir and (self._have_cds_src | self._have_kir_src)
 
     @property
-    def want_vdj(self) -> bool:
-        return self._include_vdj and (self._has_cds_src | self._has_vdj_src)
+    def have_and_want_vdj(self) -> bool:
+        return self.want_vdj and (self._have_cds_src | self._have_vdj_src)
 
 
 class Stratification(GenericModel, Generic[RefSrcT, AnyBedT, AnyVcfT]):
@@ -3146,6 +3159,8 @@ class GiabStrats(BaseModel):
         bk: BuildKey,
     ) -> HapChrs:
         cis = self.buildkey_to_chrs(rk, bk, False, False)
+        # NOTE order matters here since this will be used to create sorted bed
+        # files
         return HapChrs({i for i in [ChrIndex.CHRX, ChrIndex.CHRY] if i in cis})
 
     def buildkey_to_wanted_xy_names(

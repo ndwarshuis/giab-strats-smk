@@ -135,7 +135,7 @@ def gapless_input(wildcards):
             rules.download_gaps.output,
             ref_src_key=config.refkey_to_bed_refsrckeys(si_to_gaps, rk),
         )
-        if bd.want_gaps
+        if bd.have_gaps
         else None
     )
 
@@ -145,7 +145,7 @@ def gapless_input(wildcards):
             allow_missing=True,
             sex_chr="Y",
         )[0]
-        if bd.want_y_PAR and ChrIndex.CHRY in sex_chrs
+        if bd.have_y_PAR and ChrIndex.CHRY in sex_chrs
         else None
     )
 

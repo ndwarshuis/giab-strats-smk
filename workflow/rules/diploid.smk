@@ -256,16 +256,40 @@ use rule combine_dip1_hets as combine_SNVorSV_dip1_hets with:
         dip.inter.postsort.data / "combined_SNV_SV_het_regions.bed.gz",
 
 
+# This het/hom analysis only makes sense for diploid chromosomes, which X and Y
+# are not with the exception of PAR. Therefore, make dummy bed for use in taking
+# out the PAR. I don't necessarily want this to fail in the case of not
+# providing PAR coordinates, so if X/Y are not provided, simply don't include
+# that region. This obviously might result in a blank file, but this shouldn't
+# matter when input to the second argument of substractBed (ie "subtract
+# nothing").
+rule concat_xy_nonpar:
+    input:
+        lambda w: all_xy_nonPAR(w.ref_final_key, w.build_key),
+    output:
+        dip.inter.postsort.data / "xy_nonpar.bed",
+    # /dev/null will keep cat from hanging in case there are no input files. The
+    # -f flag is necessary to prevent gunzip from whining when it doesn't see a
+    # header. Thus if we have no inputs, we get a blank file, which is what we
+    # want.
+    shell:
+        "cat {input} /dev/null | gunzip -c -f > {output}"
+
+
 rule merge_het_regions:
     input:
-        lambda w: if_dip1_else(False, True, "combine_dip1_hets", "merge_all_hets", w),
+        bed=lambda w: if_dip1_else(
+            False, True, "combine_dip1_hets", "merge_all_hets", w
+        ),
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+        xy_nonpar=rules.concat_xy_nonpar.output,
     output:
         dip.final("het_regions_{merge_len}k"),
     conda:
         "../envs/bedtools.yml"
     params:
-        gapless=rules.get_gapless.output.auto,
-        genome=rules.filter_sort_ref.output["genome"],
+        size=lambda w: int(w["merge_len"]) * 1000,
     wildcard_constraints:
         merge_len=f"\d+",
     # NOTE: The initial gunzip is very necessary despite the fact that mergeBed
@@ -275,36 +299,56 @@ rule merge_het_regions:
     # Unzipping first to a text stream will solve this issue.
     shell:
         """
-        gunzip -c {input} | \
-        mergeBed -i stdin -d $(({wildcards.merge_len}*1000)) | \
-        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
+        gunzip -c {input.bed} | \
+        slopBed -i stdin -g {input.genome} -b {params.size} | \
+        mergeBed -i stdin | \
+        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
+        subtractBed -a stdin -b {input.xy_nonpar} -sorted | \
         bgzip -c > {output}
         """
 
 
 use rule merge_het_regions as merge_het_SNVorSV_regions with:
     input:
-        lambda w: if_dip1_else(
+        bed=lambda w: if_dip1_else(
             False, True, "combine_SNVorSV_dip1_hets", "merge_SNVorSV_hets", w
         ),
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+        xy_nonpar=rules.concat_xy_nonpar.output,
     output:
         dip.final("het_SNVorSV_regions_{merge_len}k"),
     wildcard_constraints:
         merge_len=f"\d+",
 
 
-use rule _invert_autosomal_regions as invert_het_regions with:
+rule invert_het_regions:
     input:
-        rules.merge_het_regions.output,
+        bed=rules.merge_het_regions.output,
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+        xy_nonpar=rules.concat_xy_nonpar.output,
     output:
         dip.final("hom_regions_{merge_len}k"),
+    conda:
+        "../envs/bedtools.yml"
     wildcard_constraints:
         merge_len=f"\d+",
+    shell:
+        """
+        complementBed -i {input.bed} -g {input.genome} | \
+        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
+        subtractBed -a stdin -b {input.xy_nonpar} -sorted | \
+        bgzip -c > {output}
+        """
 
 
 use rule invert_het_regions as invert_het_SNVorSV_regions with:
     input:
-        rules.merge_het_SNVorSV_regions.output,
+        bed=rules.merge_het_SNVorSV_regions.output,
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+        xy_nonpar=rules.concat_xy_nonpar.output,
     output:
         dip.final("hom_SNVorSV_regions_{merge_len}k"),
     wildcard_constraints:
