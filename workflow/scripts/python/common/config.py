@@ -2317,7 +2317,7 @@ class Include(BaseModel):
     # this in the haploid case; it technically should be a validation error
     # since it makes no sense in the case of haploid, but here it is setup to
     # not hurt anything.
-    hets: set[int] = {5, 10, 25, 50, 250}
+    hets: set[int] = {5, 10, 25, 50, 100}
 
 
 class OtherBedFile(BedFile[AnyBedT], Generic[AnyBedT]):
