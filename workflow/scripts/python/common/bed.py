@@ -69,6 +69,7 @@ def read_bed(
     skip_lines: int,
     sep: str,
     more: list[int],
+    one_indexed: bool,
     comment: str | None,
 ) -> pd.DataFrame:
     """Read a bed file as a pandas dataframe.
@@ -95,7 +96,7 @@ def read_bed(
                 total_skip += 1
             else:
                 break
-    return read_bed_raw(path, columns, total_skip, sep, more, comment)
+    return read_bed_raw(path, columns, total_skip, sep, one_indexed, more, comment)
 
 
 def read_bed_raw(
@@ -103,6 +104,7 @@ def read_bed_raw(
     columns: BedColumns,
     skip_lines: int,
     sep: str,
+    one_indexed: bool,
     more: list[int],
     comment: str | None,
 ) -> pd.DataFrame:
@@ -120,11 +122,18 @@ def read_bed_raw(
             **{m: str for m in more},
         },
     )[bedcols]
-    return df.set_axis(range(len(bedcols)), axis=1)
+    df = df.set_axis(range(len(bedcols)), axis=1)
+    # If the incoming "bed file" is actually a GFF file (or something) which is
+    # 1-indexed instead of 0-indexed, subtract off 1 from each coordinate to put
+    # in 0-indexed coordinates (ie, a "real" bed file)
+    if one_indexed:
+        df[1] = df[1] - 1
+        df[2] = df[2] - 1
+    return df
 
 
 def read_bed_default(h: IO[bytes] | Path) -> pd.DataFrame:
-    return read_bed_raw(h, (0, 1, 2), 0, "\t", [], None)
+    return read_bed_raw(h, (0, 1, 2), 0, "\t", False, [], None)
 
 
 def bed_to_text(df: pd.DataFrame) -> Generator[str, None, None]:

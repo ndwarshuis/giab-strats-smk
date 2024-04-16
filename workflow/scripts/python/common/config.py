@@ -1988,11 +1988,13 @@ class BedFileParams(BaseModel):
     bed_cols - the columns for the bed coordinates
     skip_lines - how many input lines to skip
     sep - column separator regexp (for "beds" with spaces instead of tabs)
+    one_indexed - starting index is considered 0 if False, and 1 if True
     """
 
     bed_cols: BedColumns = BedColumns()
     skip_lines: NonNegativeInt = 0
     sep: str = "\t"
+    one_indexed: bool = False
 
 
 class BedFile(GenericModel, Generic[X]):
@@ -2444,6 +2446,7 @@ class CDS(BedFile[X], Generic[X]):
     cds_params: CDSParams = CDSParams()
     params: BedFileParams = BedFileParams(
         bed_cols=BedColumns(chr=0, start=3, end=4),
+        one_indexed=True,
     )
 
     def read(self, path: Path) -> pd.DataFrame:
