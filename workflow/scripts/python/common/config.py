@@ -2016,7 +2016,13 @@ class BedFile(GenericModel, Generic[X]):
         "Read bed file with params from Path, optionally with 'more' columns."
         p = self.params
         return bed.read_bed(
-            path, p.bed_cols.columns, p.skip_lines, p.sep, more, comment
+            path,
+            p.bed_cols.columns,
+            p.skip_lines,
+            p.sep,
+            p.one_indexed,
+            more,
+            comment,
         )
 
 

@@ -68,8 +68,8 @@ def read_bed(
     columns: BedColumns,
     skip_lines: int,
     sep: str,
-    more: list[int],
     one_indexed: bool,
+    more: list[int],
     comment: str | None,
 ) -> pd.DataFrame:
     """Read a bed file as a pandas dataframe.
