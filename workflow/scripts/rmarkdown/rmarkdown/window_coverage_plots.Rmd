@@ -49,7 +49,7 @@ coverage_plot_haplotype <- function(df, haplotype) {
   p <- df %>%
     ggplot(aes(position, coverage, width = width)) +
     geom_col(just = 0) +
-    facet_wrap(c("chrom")) +
+    facet_wrap(c("chrom"), ncol = 6) +
     scale_x_continuous(limits = c(0, 1.05)) +
     scale_y_continuous(labels = scales::percent) +
     theme(text = element_text(size = 30),
