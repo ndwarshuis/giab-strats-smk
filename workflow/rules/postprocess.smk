@@ -107,8 +107,13 @@ rule get_coverage_table:
         _test=rules.unit_test_strats.output,
         bedlist=rules.list_all_strats.output[0],
         gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+    # TODO don't hardcode in the future
+    params:
+        window_size=int(1e6),
     output:
-        touch(post_inter_dir / "coverage.tsv.gz"),
+        full=touch(post_inter_dir / "coverage_full.tsv.gz"),
+        window=touch(post_inter_dir / "coverage_window.tsv.gz"),
     benchmark:
         post_bench_dir / "get_coverage_table.txt"
     script:
@@ -183,7 +188,7 @@ rule make_coverage_plots:
                 build_key=t[1],
             ),
             "coverage": expand(
-                rules.get_coverage_table.output,
+                rules.get_coverage_table.output.full,
                 zip,
                 ref_final_key=t[0],
                 build_key=t[1],
@@ -198,6 +203,34 @@ rule make_coverage_plots:
         other_levels=config.other_levels,
     script:
         "../scripts/rmarkdown/rmarkdown/coverage_plots.Rmd"
+
+
+rule make_window_coverage_plots:
+    input:
+        _tests=rules.unit_test_strats.output,
+        coverage=rules.get_coverage_table.output.window,
+    output:
+        validation_dir / "window_coverages" / "{ref_final_key}@{build_key}.html",
+    conda:
+        "../envs/rmarkdown.yml"
+    params:
+        core_levels=[c.value for c in CoreLevel],
+        other_levels=config.other_levels,
+    script:
+        "../scripts/rmarkdown/rmarkdown/window_coverage_plots.Rmd"
+
+
+rule all_window_coverage_plots:
+    input:
+        [
+            expand(
+                rules.make_window_coverage_plots.output,
+                ref_final_key=rk,
+                build_key=bk,
+            )[0]
+            for rk, bk in zip(*config.all_full_build_keys)
+        ],
+    localrule: True
 
 
 rule run_happy:
@@ -284,6 +317,7 @@ rule checksum_everything:
         rules.make_coverage_plots.output,
         rules.summarize_happy.output,
         rules.all_comparisons.input,
+        rules.all_window_coverage_plots.input,
         [
             expand(rules.generate_tarballs.output, ref_final_key=rk, build_key=bk)
             for rk, bk in zip(*config.all_full_build_keys)
