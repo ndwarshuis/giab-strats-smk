@@ -104,7 +104,7 @@ These plots show the coverage within each stratification on each chromosome
 within 1Mb windows. Use this in addition to the other coverage plots to
 sanity-check the output.
 
-The assumptions are the same as the other covergae plots.
+The assumptions are the same as the other coverage plots.
 
 Ref key: `r rk`
 
