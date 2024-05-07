@@ -1,3 +1,38 @@
+# 5.0.0
+
+Pipeline now works on diploid genomes. This is a major release and many previous
+configuration options will totally break due to the way the yaml file needed to
+be represented for the diploid case. However, the output for the haploid case
+should not change.
+
+Also added a new stratification group "Diploid" which contains heterozygous and
+homozygous regions between two diploid haplotypes.
+
+Other new features:
+
+- validation now includes intra-chromosomal coverage plots showing the coverage
+  of each bed file within 1Mbp windows
+- bed files can now be specified directly in the yaml config
+- bigbeds can now be imported directly
+- numerous speed and memory improvements; most rules will now run in constant
+  memory, and those that don't can be allocated more memory on a per-build basis
+  using the "malloc" directive in yaml
+
+Other breaking changes:
+
+- In the yaml config, there are now three toplevel stratification categories
+  corresponding to "haploid" (self explanatory), "diploid1" (two haplotypes in
+  one diploid bed file/fasta), or "diploid2" (one haplotype per bed/fasta
+  diploid pair). In the latter two cases, the 1 or 2 designates how the final
+  stratification beds will be split (ie into one file or two files).
+  Furthermore, the two diploid configurations can take either diploid1 or
+  diploid2 beds as input (they will be split/combined as needed), which makes
+  the configuration very flexible but also more complex. See
+  `config/testing.yaml` for examples.
+- CDS regions no longer require the "feature table" file; instead use the
+  chromosomal pattern directly to map chromosome accession numbers in the GFF to
+  chromosomal indices
+
 # 4.1.1
 
 - remove extra tarball parent directories
