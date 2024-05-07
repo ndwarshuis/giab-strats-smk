@@ -20,25 +20,14 @@ rule intersect_segdup_and_map:
         """
 
 
-rule invert_segdup_and_map:
+use rule _invert_autosomal_regions as invert_segdup_and_map with:
     input:
-        bed=rules.intersect_segdup_and_map.output,
+        rules.intersect_segdup_and_map.output,
     output:
         uni.final("notinalllowmapandsegdupregions"),
-    conda:
-        "../envs/bedtools.yml"
-    params:
-        genome=rules.get_genome.output,
-        gapless=rules.get_gapless.output.auto,
-    shell:
-        """
-        complementBed -i {input.bed} -g {params.genome} |
-        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
-        bgzip -c \
-        > {output}
-        """
 
 
+# TODO include other difficult in here as well
 use rule intersect_segdup_and_map as intersect_alldifficult with:
     input:
         rules.intersect_segdup_and_map.output,

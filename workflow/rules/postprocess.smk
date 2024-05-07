@@ -1,7 +1,7 @@
 from os.path import dirname, basename
 from more_itertools import unique_everseen, unzip
 from os import scandir
-from common.config import CoreLevel, strip_full_refkey
+from common.config import CoreLevel
 from common.functional import DesignError
 
 post_inter_dir = config.intermediate_build_dir / "postprocess"
@@ -14,24 +14,26 @@ def expand_strat_targets_inner(ref_final_key, build_key):
     # TODO this is crude
     # NOTE we need to do this because despite the final key potentially having
     # one or two haps, the configuration applies to both haps simultaneously
-    bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
+    bd = config.to_build_data_full(ref_final_key, build_key)
     function_targets = [
-        (all_low_complexity, bd.want_low_complexity),
+        (lambda rk, _: all_low_complexity(rk), bd.want_low_complexity),
         (gc_inputs_flat, bd.want_gc),
-        (mappabilty_inputs, bd.want_mappability),
+        (mappabilty_inputs, bd.have_and_want_mappability),
         (het_hom_inputs, bd.want_hets),
         (all_xy_sex, True),
         (all_other, True),
     ]
     rule_targets = [
         (rules.filter_autosomes.output, bd.want_xy_auto),
-        (rules.all_functional.input, bd.want_functional),
-        (rules.all_segdups.input, bd.want_segdups),
+        (rules.all_segdups.input, bd.have_and_want_segdups),
         (rules.find_telomeres.output, bd.want_telomeres),
-        (rules.all_segdup_and_map.input, bd.want_segdup_and_map),
-        (rules.all_alldifficult.input, bd.want_alldifficult),
-        (rules.get_gaps.output, lambda r, _: bd.want_gaps(r)),
-        (rules.remove_vdj_gaps.output, bd.want_vdj),
+        (rules.all_segdup_and_map.input, bd.have_and_want_segdup_and_map),
+        (rules.all_alldifficult.input, bd.have_and_want_alldifficult),
+        (rules.get_gaps.output, bd.have_gaps),
+        (rules.all_cds.input, bd.have_and_want_cds),
+        (rules.remove_vdj_gaps.output, bd.have_and_want_vdj),
+        (rules.remove_kir_gaps.output, bd.have_and_want_kir),
+        (rules.remove_mhc_gaps.output, bd.have_and_want_mhc),
     ]
     all_function = [f(ref_final_key, build_key) for f, test in function_targets if test]
     all_rule = [tgt for tgt, test in rule_targets if test]
@@ -81,15 +83,17 @@ rule generate_tsv_list:
 
 rule unit_test_strats:
     input:
-        strats=rules.list_all_strats.output,
+        strats=rules.list_all_strats.output[0],
         gapless_auto=rules.get_gapless.output.auto,
         gapless_parY=rules.get_gapless.output.parY,
+        genome=rules.filter_sort_ref.output["genome"],
         strat_list=rules.generate_tsv_list.output[0],
         checksums=rules.generate_md5sums.output[0],
     output:
         touch(post_inter_dir / "unit_tests.done"),
     log:
-        post_log_dir / "unit_tests.log",
+        error=post_log_dir / "unit_tests_errors.log",
+        failed=post_log_dir / "failed_tests.log",
     benchmark:
         post_bench_dir / "unit_test_strats.txt"
     conda:
@@ -103,8 +107,13 @@ rule get_coverage_table:
         _test=rules.unit_test_strats.output,
         bedlist=rules.list_all_strats.output[0],
         gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+    # TODO don't hardcode in the future
+    params:
+        window_size=int(1e6),
     output:
-        touch(post_inter_dir / "coverage.tsv.gz"),
+        full=touch(post_inter_dir / "coverage_full.tsv.gz"),
+        window=touch(post_inter_dir / "coverage_window.tsv.gz"),
     benchmark:
         post_bench_dir / "get_coverage_table.txt"
     script:
@@ -149,8 +158,9 @@ rule compare_strats:
         validation_dir / "{ref_final_key}@{build_key}" / "diagnostics.tsv",
     log:
         post_log_dir / "comparison.log",
+    # ASSUME this env will have pandas and bedtools (only real deps for this)
     conda:
-        "../envs/diff.yml"
+        "../envs/bedtools.yml"
     threads: 8
     script:
         "../scripts/python/bedtools/postprocess/diff_previous_strats.py"
@@ -178,7 +188,7 @@ rule make_coverage_plots:
                 build_key=t[1],
             ),
             "coverage": expand(
-                rules.get_coverage_table.output,
+                rules.get_coverage_table.output.full,
                 zip,
                 ref_final_key=t[0],
                 build_key=t[1],
@@ -195,15 +205,42 @@ rule make_coverage_plots:
         "../scripts/rmarkdown/rmarkdown/coverage_plots.Rmd"
 
 
+rule make_window_coverage_plots:
+    input:
+        _tests=rules.unit_test_strats.output,
+        coverage=rules.get_coverage_table.output.window,
+    output:
+        validation_dir / "window_coverages" / "{ref_final_key}@{build_key}.html",
+    conda:
+        "../envs/rmarkdown.yml"
+    params:
+        core_levels=[c.value for c in CoreLevel],
+        other_levels=config.other_levels,
+    script:
+        "../scripts/rmarkdown/rmarkdown/window_coverage_plots.Rmd"
+
+
+rule all_window_coverage_plots:
+    input:
+        [
+            expand(
+                rules.make_window_coverage_plots.output,
+                ref_final_key=rk,
+                build_key=bk,
+            )[0]
+            for rk, bk in zip(*config.all_full_build_keys)
+        ],
+    localrule: True
+
+
 rule run_happy:
     input:
         _test=rules.unit_test_strats.output,
-        refi=rules.index_unzipped_ref.output,
-        ref=rules.unzip_ref.output,
-        bench_vcf=lambda w: expand_final_to_src(rules.download_bench_vcf.output, w),
+        ref=rules.filter_sort_ref.output["fa"],
+        bench_vcf=lambda w: expand_final_to_src(rules.download_bench_vcf.output, w)[0],
         bench_bed=lambda w: read_checkpoint("normalize_bench_bed", w),
-        query_vcf=lambda w: expand_final_to_src(rules.download_query_vcf.output, w),
-        strats=rules.generate_tsv_list.output,
+        query_vcf=lambda w: expand_final_to_src(rules.download_query_vcf.output, w)[0],
+        strats=rules.generate_tsv_list.output[0],
     output:
         post_inter_dir / "happy" / "happy.extended.csv",
     params:
@@ -232,7 +269,7 @@ rule summarize_happy:
                 build_key=bk,
             )
             for rk, bk in zip(*config.all_build_keys)
-            if config.to_build_data(rk, bk).want_benchmark
+            if config.to_build_data(rk, bk).have_benchmark
         ],
     output:
         validation_dir / "benchmark_summary.html",
@@ -280,6 +317,7 @@ rule checksum_everything:
         rules.make_coverage_plots.output,
         rules.summarize_happy.output,
         rules.all_comparisons.input,
+        rules.all_window_coverage_plots.input,
         [
             expand(rules.generate_tarballs.output, ref_final_key=rk, build_key=bk)
             for rk, bk in zip(*config.all_full_build_keys)

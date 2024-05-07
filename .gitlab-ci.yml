@@ -92,6 +92,7 @@ snakemake_resources:
 
 snakemake_results:
   needs: [snakemake_resources]
+  timeout: 2 hours
   stage: test
   <<: *activate_smk
   script:

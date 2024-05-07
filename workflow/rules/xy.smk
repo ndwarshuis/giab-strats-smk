@@ -1,9 +1,9 @@
-from common.config import CoreLevel, strip_full_refkey
+from common.config import CoreLevel
 
 xy = config.to_bed_dirs(CoreLevel.XY)
 
 
-use rule download_ref as download_genome_features_bed with:
+use rule download_gaps as download_genome_features_bed with:
     output:
         xy.src.data / "genome_features_{sex_chr}.bed.gz",
     log:
@@ -21,7 +21,7 @@ rule write_PAR_final:
     input:
         bed=rules.write_PAR_intermediate.output,
         gapless=rules.get_gapless.output.parY,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         xy.final("chr{sex_chr}_PAR"),
     conda:
@@ -39,9 +39,11 @@ rule filter_XTR_features:
             rules.download_genome_features_bed.output, w
         )[0],
         gapless=rules.get_gapless.output.parY,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
         xy.final("chr{sex_chr}_XTR"),
+    log:
+        xy.inter.postsort.log / "{sex_chr}_filter_XTR_features.txt",
     conda:
         "../envs/bedtools.yml"
     params:
@@ -53,6 +55,8 @@ rule filter_XTR_features:
 use rule filter_XTR_features as filter_ampliconic_features with:
     output:
         xy.final("chr{sex_chr}_ampliconic"),
+    log:
+        xy.inter.postsort.log / "{sex_chr}_filter_ampliconic_features.txt",
     params:
         level="Ampliconic",
 
@@ -69,7 +73,7 @@ use rule filter_XTR_features as filter_ampliconic_features with:
 rule invert_PAR:
     input:
         bed=rules.write_PAR_final.output,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.parY,
     output:
         xy.final("chr{sex_chr}_nonPAR"),
@@ -86,56 +90,74 @@ rule invert_PAR:
 
 rule filter_autosomes:
     input:
-        bed=rules.get_genome.output,
-        gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
+        rules.get_gapless.output.auto,
     output:
         xy.final("AllAutosomes"),
     conda:
         "../envs/bedtools.yml"
     shell:
         """
-        awk -v OFS='\t' {{'print $1,\"0\",$2'}} {input.bed} | \
+        gunzip -c {input} | \
         grep -v \"X\|Y\" | \
-        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
         bgzip -c > {output}
         """
 
 
-# helper functions for build targets
+# helper functions for build targets; note that for each of these we need to
+# first get a list of the X/Y chromosomes required (in the case of dip2, for
+# the haplotype at hand)
 def all_xy_features(ref_final_key, build_key):
-    bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
-    targets = [
-        (rules.filter_XTR_features.output[0], bd.want_xy_XTR),
-        (rules.filter_ampliconic_features.output[0], bd.want_xy_ampliconic),
+    bd = config.to_build_data_full(ref_final_key, build_key)
+    sex_chrs = config.buildkey_to_wanted_xy_names(ref_final_key, build_key)
+    all_targets = [
+        (rules.filter_XTR_features.output[0], bd.have_xy_XTR),
+        (rules.filter_ampliconic_features.output[0], bd.have_xy_ampliconic),
     ]
-    return [
-        t
-        for p, test in targets
-        if test
-        for t in expand(
-            p,
-            allow_missing=True,
-            sex_chr=bd.wanted_xy_chr_names,
-            ref_final_key=ref_final_key,
-            build_key=build_key,
-        )
-    ]
-
-
-def all_xy_PAR(ref_final_key, build_key):
-    bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
-    wanted_chrs = [c for (c, t) in [("X", bd.want_x_PAR), ("Y", bd.want_y_PAR)] if t]
+    targets = [x for x, y in all_targets if y]
     return expand(
-        rules.invert_PAR.output + rules.write_PAR_final.output,
+        targets,
         allow_missing=True,
-        sex_chr=wanted_chrs,
+        sex_chr=sex_chrs,
         ref_final_key=ref_final_key,
         build_key=build_key,
     )
 
 
+def _all_xy_PAR_from_rule(rulename, ref_final_key, build_key):
+    bd = config.to_build_data_full(ref_final_key, build_key)
+    sex_chrs = [
+        c
+        for c in config.buildkey_to_wanted_xy_names(ref_final_key, build_key)
+        if bd.have_xy_PAR(c)
+    ]
+    return expand(
+        rulename,
+        allow_missing=True,
+        sex_chr=sex_chrs,
+        ref_final_key=ref_final_key,
+        build_key=build_key,
+    )
+
+
+def all_xy_PAR(ref_final_key, build_key):
+    return _all_xy_PAR_from_rule(
+        rules.write_PAR_final.output,
+        ref_final_key,
+        build_key,
+    )
+
+
+def all_xy_nonPAR(ref_final_key, build_key):
+    return _all_xy_PAR_from_rule(
+        rules.invert_PAR.output,
+        ref_final_key,
+        build_key,
+    )
+
+
 def all_xy_sex(ref_final_key, build_key):
-    return all_xy_PAR(ref_final_key, build_key) + all_xy_features(
-        ref_final_key, build_key
+    return (
+        all_xy_PAR(ref_final_key, build_key)
+        + all_xy_nonPAR(ref_final_key, build_key)
+        + all_xy_features(ref_final_key, build_key)
     )

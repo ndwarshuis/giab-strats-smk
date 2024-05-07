@@ -1,17 +1,20 @@
 from more_itertools import unzip
-from common.config import strip_full_refkey, bd_to_other
+from common.config import bd_to_other, BUILTIN_OTHER
 
 # make sure the wildcards here can match everything except the "built-in" other-
 # difficult beds (listed here)
-builtin_other_targets = ["gaps_slop15kb", "VDJ"]
+#
+# NOTE: this is necessary because while I have a validator in the config to
+# prevent built-in bed files to be added, snakemake doesn't know about these
+# and will give an ambiguous file exception without a constraint.
 
 other_constraints = {
     "other_level_key": f"({'|'.join(config.other_levels)})",
-    "other_strat_key": f"(?!({'|'.join(builtin_other_targets)}))[A-Za-z0-9-._]+",
+    "other_strat_key": f"(?!({'|'.join(BUILTIN_OTHER)}))[A-Za-z0-9-._]+",
 }
 
 
-use rule download_ref as download_other with:
+use rule download_gaps as download_other with:
     output:
         config.ref_src_dir
         / "{build_key}"
@@ -78,7 +81,7 @@ rule remove_gaps_other:
             w,
             ["other_level_key", "other_strat_key"],
         ),
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
         config.build_final_strat_path("{other_level_key}", "{other_strat_key}"),

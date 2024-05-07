@@ -1,0 +1,120 @@
+---
+title: "Windowed Coverage plots"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    df_print: paged
+---
+    
+```{r, include=FALSE}
+library(tidyverse)
+
+knitr::opts_chunk$set(fig.width=25, fig.height=12, fig_caption=TRUE)
+
+rk <- snakemake@wildcards["ref_final_key"]
+bk <- snakemake@wildcards["build_key"]
+
+read_coverage_table <- function(path) {
+  read_tsv(
+    path,
+    col_types = "iccciddd",
+    col_names = c(
+      "haplotype",
+      "stype",
+      "strat",
+      "chrom",
+      "chromIndex",
+      "position",
+      "coverage",
+      "width"
+    )
+  )
+}
+
+read_coverage <- function(path) {
+  df <- read_coverage_table(path)
+  all_combos <- expand(df, nesting(haplotype, chrom, chromIndex, position), nesting(stype, strat))
+  df %>%
+    right_join(all_combos, by = c("chrom", "chromIndex", "haplotype", "stype", "strat", "position")) %>%
+    replace_na(list(coverage = 0, width = 0)) %>%
+    arrange(haplotype, stype, strat, chromIndex, position) %>%
+    mutate(chrom = fct_reorder(chrom, chromIndex))
+}
+
+coverage_plot_haplotype <- function(df, haplotype) {
+  cat(sprintf("##### haplotype %s\n\n", haplotype))
+  p <- df %>%
+    ggplot(aes(position, coverage, width = width)) +
+    geom_col(just = 0) +
+    facet_wrap(c("chrom"), ncol = 6) +
+    scale_x_continuous(limits = c(0, 1.05)) +
+    scale_y_continuous(labels = scales::percent) +
+    theme(text = element_text(size = 30),
+          axis.text.x = element_blank(),
+          panel.spacing.y = unit(2, "lines")) +
+    labs(x = "Postition",
+         y = "Coverage")
+  print(p)
+  cat("\n\n")
+}
+
+## read_coverage("/home/ndwar/Dvl/giab/strats/strats-smk/results/intermediates/HG002d1@test-autosome/postprocess/coverage_window.tsv.gz") %>%
+##   View()
+
+##   group_by(haplotype) %>%
+##   group_map(~ .x %>%
+##               ggplot(aes(position, coverage, width = width)) +
+##               geom_col(just = 0) +
+##               facet_wrap(c("chrom")) +
+##               scale_x_continuous(limits = c(0, 1.05)) +
+##               scale_y_continuous(labels = scales::percent) +
+##               theme(text = element_text(size = 30),
+##                     axis.text.x = element_blank(),
+##                     panel.spacing.y = unit(2, "lines")) +
+##               labs(x = "Postition",
+##                    y = .y))
+
+coverage_plot <- function(df, level) {
+  cat(sprintf("#### %s\n\n", level))
+  df %>%
+    group_by(haplotype) %>%
+    group_walk(coverage_plot_haplotype)
+}
+
+coverage_plots <- function(df, .stype) {
+  cat(sprintf("## %s\n\n", .stype))
+  .df <- filter(df, stype == .stype)
+  if (nrow(.df) == 0) {
+    cat("None\n\n")
+  } else {
+    .df %>%
+      group_by(strat) %>%
+      group_walk(coverage_plot)
+  }
+}
+
+```
+
+# Overview
+
+These plots show the coverage within each stratification on each chromosome
+within 1Mb windows. Use this in addition to the other coverage plots to
+sanity-check the output.
+
+The assumptions are the same as the other coverage plots.
+
+Ref key: `r rk`
+
+Build key: `r bk`
+
+# Coverage Plots
+
+```{r, echo = FALSE, results = "asis"}
+df <- read_coverage(snakemake@input$coverage)
+snakemake@params$core_levels %>%
+  union(snakemake@params$other_levels) %>%
+  walk(~ coverage_plots(df, .x))
+```

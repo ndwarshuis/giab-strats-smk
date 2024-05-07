@@ -4,11 +4,17 @@ import os
 import contextlib
 import pandas as pd
 import subprocess as sp
-from typing import Type, NewType, IO, Generator
+from dataclasses import dataclass
+from typing import NewType, IO, Generator
 from pathlib import Path
-from common.functional import not_none_unsafe, noop
-from Bio import bgzf  # type: ignore
+from common.functional import not_none_unsafe, noop, DesignError
+from common.io import spawn_stream, bgzip_file
+
+# from Bio import bgzf  # type: ignore
 import csv
+
+# A complete chromosome name like "chr1" or "chr21_PATERNAL"
+ChrName = NewType("ChrName", str)
 
 # An integer representing the order of a chromosome during the filter/sort
 # steps described below. Ranged 0-41 (all chromosomes for both haplotypes)
@@ -17,16 +23,40 @@ InternalChrIndex = NewType("InternalChrIndex", int)
 # A mapping b/t chromosome names found in a bed-like file or fasta file and the
 # internal sort order of each chromosome. Chromosomes that are not included here
 # correspond to those that are excluded from the build.
-InitMapper = dict[str, InternalChrIndex]
+InitMapper = dict[ChrName, InternalChrIndex]
 
 # A mapping b/t internal chromosome sort order and the chromosome names on the
 # target reference.
-FinalMapper = dict[InternalChrIndex, str]
+FinalMapper = dict[InternalChrIndex, ChrName]
 
 # A mapping b/t chromosome names and haplotype; used for splitting inputs that
 # contain both haplotypes into two files with one haplotype each. True =
 # paternal, False = maternal
 SplitMapper = dict[str, bool]
+
+BedColumns = tuple[int, int, int]
+
+
+@dataclass(frozen=True)
+class BedLine:
+    """A struct-like representation of one line in a bed file.
+
+    'more' are any columns after the chrom/start/end coord columns and are
+    referenced in the order they appear.
+    """
+
+    chr: ChrName
+    start: int
+    end: int
+    more: list[str]
+
+    @property
+    def txt(self) -> str:
+        xs = [self.chr, str(self.start), str(self.end), *self.more]
+        return "\t".join(xs)
+
+
+BedLines = list[BedLine]
 
 
 def make_split_mapper(im: InitMapper, fm: FinalMapper) -> SplitMapper:
@@ -35,10 +65,12 @@ def make_split_mapper(im: InitMapper, fm: FinalMapper) -> SplitMapper:
 
 def read_bed(
     path: Path,
-    columns: dict[int, Type[int | str]],
+    columns: BedColumns,
     skip_lines: int,
     sep: str,
+    one_indexed: bool,
     more: list[int],
+    comment: str | None,
 ) -> pd.DataFrame:
     """Read a bed file as a pandas dataframe.
 
@@ -64,15 +96,17 @@ def read_bed(
                 total_skip += 1
             else:
                 break
-    return read_bed_raw(path, columns, total_skip, sep, more)
+    return read_bed_raw(path, columns, total_skip, sep, one_indexed, more, comment)
 
 
 def read_bed_raw(
     h: IO[bytes] | Path,
-    columns: dict[int, Type[int | str]],
+    columns: BedColumns,
     skip_lines: int,
     sep: str,
+    one_indexed: bool,
     more: list[int],
+    comment: str | None,
 ) -> pd.DataFrame:
     bedcols = [*columns, *more]
     df = pd.read_table(
@@ -81,17 +115,25 @@ def read_bed_raw(
         usecols=bedcols,
         sep=sep,
         skiprows=skip_lines,
+        comment=comment,
         # satisfy type checker :/
         dtype={
-            **{k: v for k, v in columns.items()},
+            **{columns[0]: str, columns[1]: int, columns[2]: int},
             **{m: str for m in more},
         },
-    )
-    return df.set_axis(range(len(bedcols)), axis=1)
+    )[bedcols]
+    df = df.set_axis(range(len(bedcols)), axis=1)
+    # If the incoming "bed file" is actually a GFF file (or something) which is
+    # 1-indexed instead of 0-indexed, subtract off 1 from each coordinate to put
+    # in 0-indexed coordinates (ie, a "real" bed file)
+    if one_indexed:
+        df[1] = df[1] - 1
+        df[2] = df[2] - 1
+    return df
 
 
 def read_bed_default(h: IO[bytes] | Path) -> pd.DataFrame:
-    return read_bed_raw(h, {0: str, 1: int, 2: int}, 0, "\t", [])
+    return read_bed_raw(h, (0, 1, 2), 0, "\t", False, [], None)
 
 
 def bed_to_text(df: pd.DataFrame) -> Generator[str, None, None]:
@@ -119,38 +161,41 @@ def bed_to_stream(df: pd.DataFrame) -> Generator[IO[bytes], None, None]:
     _r = os.fdopen(r, "rb")
     _w = os.fdopen(w, "w")
 
+    # NOTE: python threads can't pass exceptions between themselves and the
+    # calling thread, so need to hack something to signal when something bad
+    # happens. Do this by closing read side of the thread (which will also make
+    # any process that depends on the pipe die since it can't be opened after
+    # we close it), and then testing if the read end is closed after the context
+    # block.
     def read_df() -> None:
-        write_bed_stream(_w, df)
-        _w.close()
+        try:
+            write_bed_stream(_w, df)
+        except Exception:
+            _r.close()
+        finally:
+            _w.close()
 
     t = threading.Thread(target=read_df)
     t.start()
 
     try:
         yield _r
+        if _r.closed:
+            raise DesignError("bed stream thread exited unexpectedly")
     finally:
-        _w.close()
         _r.close()
+        _w.close()
 
 
-def write_bed(path: Path, df: pd.DataFrame) -> None:
+def write_bed(path: Path, df: pd.DataFrame, parents: bool = True) -> None:
     """Write a bed file in bgzip format from a dataframe.
 
     Dataframe is not checked to make sure it is a "real" bed file.
     """
-    with bgzf.open(path, "w") as f:
-        write_bed_stream(f, df)
-
-
-def spawn_stream(
-    cmd: list[str],
-    i: IO[bytes] | int,
-) -> tuple[sp.Popen[bytes], IO[bytes]]:
-    p = sp.Popen(cmd, stdin=i, stdout=sp.PIPE)
-    # ASSUME since we typed the inputs so that the stdin/stdout can only take
-    # file descriptors or file streams, the return for each will never be
-    # none
-    return p, not_none_unsafe(p.stdout, noop)
+    with bed_to_stream(df) as s:
+        bgzip_file(s, path, parents)
+    # with bgzf.open(path, "w") as f:
+    #     write_bed_stream(f, df)
 
 
 def complementBed(
@@ -164,8 +209,9 @@ def complementBed(
 def subtractBed(
     i: IO[bytes] | int,
     b: Path,
+    genome: Path,
 ) -> tuple[sp.Popen[bytes], IO[bytes]]:
-    cmd = ["subtractBed", "-a", "stdin", "-b", str(b)]
+    cmd = ["subtractBed", "-a", "stdin", "-b", str(b), "-sorted", "-g", str(genome)]
     return spawn_stream(cmd, i)
 
 
@@ -189,20 +235,6 @@ def multiIntersectBed(ps: list[Path]) -> tuple[sp.Popen[bytes], IO[bytes]]:
     cmd = ["multiIntersectBed", "-i", *[str(p) for p in ps]]
     p = sp.Popen(cmd, stdout=sp.PIPE)
     return p, not_none_unsafe(p.stdout, noop)
-
-
-def bgzip_file(i: IO[bytes], p: Path) -> sp.CompletedProcess[bytes]:
-    with open(p, "wb") as f:
-        return bgzip(i, f)
-
-
-def bgzip(i: IO[bytes], o: IO[bytes]) -> sp.CompletedProcess[bytes]:
-    """Stream bgzip to endpoint.
-
-    NOTE: this will block since this is almost always going to be the
-    final step in a pipeline.
-    """
-    return sp.run(["bgzip", "-c"], stdin=i, stdout=o)
 
 
 def sort_bed_numerically(df: pd.DataFrame, n: int) -> pd.DataFrame:
@@ -246,7 +278,8 @@ def filter_sort_bed(
     df[chr_col] = df[chr_col].map(from_map)
     df = sort_bed_numerically(df.dropna(subset=[chr_col]), n)
     df[chr_col] = df[chr_col].map(to_map)
-    return df
+    # remove lines where the start and end are the same
+    return df[df[1] != df[2]].copy()
 
 
 def split_bed(
@@ -259,4 +292,4 @@ def split_bed(
     """
     chr_col = df.columns.tolist()[0]
     sp = df[chr_col].map(split_map)
-    return df[sp], df[~sp]
+    return df[sp.fillna(False)].copy(), df[~sp.fillna(True)].copy()

@@ -14,11 +14,11 @@ dip = config.to_bed_dirs(CoreLevel.DIPLOID)
 def minimap_inputs(wildcards):
     rk = wildcards["ref_final_key"]
     other_rk = flip_full_refkey(rk)
-    fa, idx = config.dip1_either(
-        (rules.split_ref.output, rules.index_split_ref.output),
-        (rules.unzip_ref.output, rules.index_unzipped_ref.output),
-        rk,
+    out = if_dip1_else(
+        True, True, "filter_sort_split_ref", "filter_sort_ref", wildcards
     )
+    fa = out["fa"]
+    idx = out["index"]
 
     def expand_rk(path, rk):
         return expand(path, allow_missing=True, ref_final_key=rk)
@@ -40,7 +40,7 @@ rule cross_align_breaks:
         unpack(minimap_inputs),
     output:
         dip.inter.postsort.data / "breaks_cross_align.paf.gz",
-    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 8)
+    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 8, True, True)
     log:
         dip.inter.postsort.log / "cross_align_breaks.log",
     benchmark:
@@ -65,11 +65,6 @@ rule breaks_cross_alignment_to_bed:
     input:
         paf=rules.cross_align_breaks.output,
         paftools_bin=rules.download_paftools.output,
-        genome=lambda w: config.dip1_either(
-            rules.get_split_genome.output,
-            rules.get_genome.output,
-            w["ref_final_key"],
-        ),
     output:
         dip.inter.postsort.data / "breaks_cross_align.bed.gz",
     log:
@@ -82,10 +77,33 @@ rule breaks_cross_alignment_to_bed:
         sort -k6,6 -k8,8n | \
         k8 {input.paftools_bin} call - 2> {log} | \
         grep ^R | \
-        cut -f2- | \
-        bedtools complement -i stdin -g {input.genome} | \
+        cut -f2,3,4 | \
         gzip -c > {output}
         """
+
+
+# These need to be sorted since the paftools call script needs a sorted input
+# but for convenience we don't sort numerically (doing so would require
+# threading complex python logic through the otherwise elegant pipeline above).
+# We could also presort (rather than sort twice) but this would require lots of
+# space to store the paf rather than a relatively small bed file (ie no sequence
+# strings)
+#
+# TODO misleading name since this also complements after sorting
+rule sort_breaks_bed:
+    input:
+        bed=rules.breaks_cross_alignment_to_bed.output[0],
+        genome=lambda w: if_dip1_else(
+            True, True, "filter_sort_split_ref", "filter_sort_ref", w
+        )["genome"],
+    output:
+        dip.inter.postsort.data / "sorted_breaks_cross_align.bed.gz",
+    log:
+        dip.inter.postsort.log / "sort_breaks_bed.txt",
+    conda:
+        "../envs/bedtools.yml"
+    script:
+        "../scripts/python/bedtools/diploid/sort_breaks.py"
 
 
 # Get variants (large and small) between the two haplotypes using the same
@@ -95,7 +113,7 @@ rule cross_align_variants:
         unpack(minimap_inputs),
     output:
         dip.inter.postsort.data / "variant_cross_align.sam.gz",
-    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 8)
+    threads: lambda w: config.thread_per_chromosome(w.ref_final_key, w.build_key, 8, True, True)
     log:
         dip.inter.postsort.log / "cross_align_variants.log",
     # this is what dipcall does to produce the pair file in one step
@@ -125,6 +143,8 @@ rule filter_sort_variant_cross_alignment:
         dip.inter.postsort.data / "sorted_variant_cross_alignments.bam",
     benchmark:
         dip.inter.postsort.bench / "filter_sort_variant_cross_alignment.txt"
+    log:
+        dip.inter.postsort.log / "filter_sort_variant_cross_alignment.txt",
     conda:
         "../envs/quasi-dipcall.yml"
     threads: 4
@@ -140,7 +160,7 @@ rule filter_sort_variant_cross_alignment:
         """
         k8 {input.aux_bin} samflt {input.sam} | \
         samtools sort -m{params.mem_per_thread}M --threads {threads} \
-        > {output}
+        2> {log} > {output}
         """
 
 
@@ -151,11 +171,9 @@ rule filter_sort_variant_cross_alignment:
 rule variant_cross_alignment_to_bed:
     input:
         bam=rules.filter_sort_variant_cross_alignment.output,
-        hap=lambda w: config.dip1_either(
-            rules.split_ref.output,
-            rules.unzip_ref.output,
-            w["ref_final_key"],
-        ),
+        hap=lambda w: if_dip1_else(
+            True, True, "filter_sort_split_ref", "filter_sort_ref", w
+        )["fa"],
     output:
         dip.inter.postsort.data / "variant_cross_align.bed.gz",
     conda:
@@ -195,10 +213,11 @@ rule filter_SNVorSV:
         """
 
 
+# gzip here so we can concatenate later without crossing the beams
 rule merge_all_hets:
     input:
         rules.variant_cross_alignment_to_bed.output,
-        rules.breaks_cross_alignment_to_bed.output,
+        rules.sort_breaks_bed.output,
     output:
         dip.inter.postsort.data / "het_regions.bed.gz",
     conda:
@@ -214,17 +233,9 @@ rule merge_all_hets:
 use rule merge_all_hets as merge_SNVorSV_hets with:
     input:
         rules.filter_SNVorSV.output,
-        rules.breaks_cross_alignment_to_bed.output,
+        rules.sort_breaks_bed.output,
     output:
         dip.inter.postsort.data / "SNV_or_SV_het_regions.bed.gz",
-
-
-def combine_dip_inputs(rule, wildcards):
-    # NOTE: the wildcard value of ref_final_key will not have a haplotype (as
-    # per logic of dip1 references)
-    k = cfg.RefKeyFull(wildcards.ref_final_key, h).name
-    r = getattr(rules, rule).output
-    return {h.name: expand(r, ref_final_key=k) for h in cfg.Haplotype}
 
 
 rule combine_dip1_hets:
@@ -245,34 +256,66 @@ use rule combine_dip1_hets as combine_SNVorSV_dip1_hets with:
         dip.inter.postsort.data / "combined_SNV_SV_het_regions.bed.gz",
 
 
-def dip1_either(left, right, wildcards):
-    left_ = getattr(rules, left).output
-    right_ = getattr(rules, right).output
-    return config.dip1_either(left_, right_, wildcards.ref_final_key)
+# This het/hom analysis only makes sense for diploid chromosomes, which X and Y
+# are not with the exception of PAR. Therefore, make dummy bed for use in taking
+# out the PAR. I don't necessarily want this to fail in the case of not
+# providing PAR coordinates, so if X/Y are not provided, simply don't include
+# that region. This obviously might result in a blank file, but this shouldn't
+# matter when input to the second argument of substractBed (ie "subtract
+# nothing").
+rule concat_xy_nonpar:
+    input:
+        lambda w: all_xy_nonPAR(w.ref_final_key, w.build_key),
+    output:
+        dip.inter.postsort.data / "xy_nonpar.bed",
+    # /dev/null will keep cat from hanging in case there are no input files. The
+    # -f flag is necessary to prevent gunzip from whining when it doesn't see a
+    # header. Thus if we have no inputs, we get a blank file, which is what we
+    # want.
+    shell:
+        "cat {input} /dev/null | gunzip -c -f > {output}"
 
 
 rule merge_het_regions:
     input:
-        lambda w: dip1_either("combine_dip1_hets", "merge_all_hets", w),
+        bed=lambda w: if_dip1_else(
+            False, True, "combine_dip1_hets", "merge_all_hets", w
+        ),
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+        xy_nonpar=rules.concat_xy_nonpar.output,
     output:
         dip.final("het_regions_{merge_len}k"),
     conda:
         "../envs/bedtools.yml"
     params:
-        gapless=rules.get_gapless.output.auto,
+        size=lambda w: int(w["merge_len"]) * 1000,
     wildcard_constraints:
         merge_len=f"\d+",
+    # NOTE: The initial gunzip is very necessary despite the fact that mergeBed
+    # can read gzip'ed files. For the dip1 case, the incoming bed will be two
+    # concat'ed gzip'ed beds, and for some reason bedtools will only read the
+    # first bed (probably because there's a header in the middle of the file?).
+    # Unzipping first to a text stream will solve this issue.
     shell:
         """
-        mergeBed -i {input} -d $(({wildcards.merge_len}*1000)) | \
-        intersectBed -a stdin -b {params.gapless} -sorted | \
+        gunzip -c {input.bed} | \
+        slopBed -i stdin -g {input.genome} -b {params.size} | \
+        mergeBed -i stdin | \
+        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
+        subtractBed -a stdin -b {input.xy_nonpar} -sorted | \
         bgzip -c > {output}
         """
 
 
 use rule merge_het_regions as merge_het_SNVorSV_regions with:
     input:
-        lambda w: dip1_either("combine_SNVorSV_dip1_hets", "merge_SNVorSV_hets", w),
+        bed=lambda w: if_dip1_else(
+            False, True, "combine_SNVorSV_dip1_hets", "merge_SNVorSV_hets", w
+        ),
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+        xy_nonpar=rules.concat_xy_nonpar.output,
     output:
         dip.final("het_SNVorSV_regions_{merge_len}k"),
     wildcard_constraints:
@@ -281,27 +324,31 @@ use rule merge_het_regions as merge_het_SNVorSV_regions with:
 
 rule invert_het_regions:
     input:
-        rules.merge_het_regions.output,
-    params:
+        bed=rules.merge_het_regions.output,
         gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
-    conda:
-        "../envs/bedtools.yml"
+        genome=rules.filter_sort_ref.output["genome"],
+        xy_nonpar=rules.concat_xy_nonpar.output,
     output:
         dip.final("hom_regions_{merge_len}k"),
+    conda:
+        "../envs/bedtools.yml"
     wildcard_constraints:
         merge_len=f"\d+",
     shell:
         """
-        complementBed -i {input} -g {params.genome} | \
-        intersectBed -a stdin -b {params.gapless} -sorted | \
+        complementBed -i {input.bed} -g {input.genome} | \
+        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
+        subtractBed -a stdin -b {input.xy_nonpar} -sorted | \
         bgzip -c > {output}
         """
 
 
 use rule invert_het_regions as invert_het_SNVorSV_regions with:
     input:
-        rules.merge_het_SNVorSV_regions.output,
+        bed=rules.merge_het_SNVorSV_regions.output,
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+        xy_nonpar=rules.concat_xy_nonpar.output,
     output:
         dip.final("hom_SNVorSV_regions_{merge_len}k"),
     wildcard_constraints:

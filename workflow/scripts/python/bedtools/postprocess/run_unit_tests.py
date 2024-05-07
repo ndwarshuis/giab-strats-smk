@@ -4,18 +4,18 @@ from pathlib import Path
 from os.path import dirname, basename
 from os import scandir
 import common.config as cfg
-from common.io import setup_logging, is_bgzip
-from common.bed import InternalChrIndex
+from common.io import is_bgzip, gunzip
+from common.bed import InternalChrIndex, subtractBed, ChrName
 import subprocess as sp
 
-log = setup_logging(snakemake.log[0])  # type: ignore
-
-RevMapper = dict[str, InternalChrIndex]
+RevMapper = dict[ChrName, InternalChrIndex]
 
 
 class GaplessBT(NamedTuple):
     auto: Path
     parY: Path
+    genome: Path
+    error_log: Path
 
 
 def test_bgzip(strat_file: Path) -> list[str]:
@@ -45,7 +45,7 @@ def test_bed_format(strat_file: Path, reverse_map: RevMapper) -> str | None:
 
             # chrom should be valid
             try:
-                chromIdx = reverse_map[chrom]
+                chromIdx = reverse_map[ChrName(chrom)]
             except KeyError:
                 return f"invalid chr: {chrom}"
 
@@ -83,13 +83,21 @@ def test_bed_not_in_gaps(strat_file: Path, gapless: GaplessBT) -> bool:
         gapless_path = gapless.parY if isXY else gapless.auto
         # gunzip needed here because subtract bed will output gibberish if we
         # give it an empty gzip file
-        p0 = sp.Popen(["gunzip", "-c", strat_file], stdout=sp.PIPE)
-        p1 = sp.run(
-            ["subtractBed", "-a", "stdin", "-b", gapless_path, "-sorted"],
-            stdin=p0.stdout,
-            stdout=sp.PIPE,
-        )
-        return len(p1.stdout) == 0
+        p1, o = gunzip(strat_file)
+        p2, _ = subtractBed(o, gapless_path, gapless.genome)
+        out, err = p2.communicate()
+        p1.wait()
+        with open(gapless.error_log, "a") as f:
+            haserror = False
+            if p1.returncode != 0:
+                f.write("gunzip error\n")
+                haserror = True
+            if p2.returncode != 0:
+                f.write(err.decode() + "\n")
+                haserror = True
+            if haserror:
+                exit(1)
+        return len(out) == 0
 
 
 def test_bed(
@@ -153,7 +161,7 @@ def run_all_tests(
     ]
 
 
-def strat_files(path: str) -> list[Path]:
+def strat_files(path: Path) -> list[Path]:
     with open(path, "r") as f:
         return [Path(s.strip()) for s in f]
 
@@ -166,14 +174,23 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     )[1]
     reverse_map = {v: k for k, v in fm.items()}
 
+    checksums_path = cfg.smk_to_input_name(smk, "checksums")
+    strat_list_path = cfg.smk_to_input_name(smk, "strat_list")
+    strats_path = cfg.smk_to_input_name(smk, "strats")
+    genome_path = cfg.smk_to_input_name(smk, "genome")
+    gapless_auto_path = cfg.smk_to_input_name(smk, "gapless_auto")
+    gapless_parY_path = cfg.smk_to_input_name(smk, "gapless_parY")
+
+    failed_tests_path = cfg.smk_to_log_name(smk, "failed")
+    error_path = cfg.smk_to_log_name(smk, "error")
+
     # check global stuff first (since this is faster)
 
-    global_failures: list[str] = test_checksums(
-        Path(smk.input["checksums"])
-    ) + test_tsv_list(Path(smk.input["strat_list"]))
+    global_failures = test_checksums(checksums_path) + test_tsv_list(strat_list_path)
 
-    for j in global_failures:
-        log.error(j)
+    with open(failed_tests_path, "w") as f:
+        for j in global_failures:
+            f.write(j + "\n")
 
     if len(global_failures) > 0:
         exit(1)
@@ -181,18 +198,21 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     # check individual stratification files
 
     gapless = GaplessBT(
-        auto=Path(smk.input["gapless_auto"]),
-        parY=Path(smk.input["gapless_parY"]),
+        auto=gapless_auto_path,
+        parY=gapless_parY_path,
+        genome=genome_path,
+        error_log=error_path,
     )
 
     strat_failures = [
         res
-        for p in strat_files(str(smk.input["strats"]))
+        for p in strat_files(strats_path)
         for res in run_all_tests(p, reverse_map, gapless)
     ]
 
-    for i in strat_failures:
-        log.error("%s: %s" % i)
+    with open(failed_tests_path, "a") as f:
+        for i in strat_failures:
+            f.write("%s: %s" % i + "\n")
 
     if len(strat_failures) > 0:
         exit(1)

@@ -17,19 +17,23 @@ knitr::opts_chunk$set(fig.width=25, fig.height=6, fig_caption=TRUE)
 read_coverage_table <- function(path) {
   read_tsv(
     path,
-    col_types = "ccccd",
-    col_names = c("key", "stype", "strat", "chrom", "coverage")
+    col_types = "ccccid",
+    col_names = c("key", "stype", "strat", "chrom", "chromIndex", "coverage")
   )
 }
 
 read_coverage <- function(paths) {
   df <- snakemake@input$coverage %>%
     map_dfr(read_coverage_table)
-  all_combos <- expand(df, key, chrom, nesting(stype, strat))
+  all_combos <- expand(df, key, nesting(chrom, chromIndex), nesting(stype, strat))
   df %>%
-    right_join(all_combos, by = c("chrom", "key", "stype", "strat")) %>%
+    right_join(all_combos, by = c("chrom", "chromIndex", "key", "stype", "strat")) %>%
     replace_na(list(coverage = 0)) %>%
-    arrange(stype, strat)
+    arrange(stype, strat) %>%
+    group_by(key, stype, strat) %>%
+    arrange(chromIndex) %>%
+    mutate(chrom = factor(chrom, levels = chrom)) %>%
+    ungroup()
 }
 
 coverage_plot <- function(df, level) {
