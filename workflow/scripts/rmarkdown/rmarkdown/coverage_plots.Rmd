@@ -1,0 +1,88 @@
+---
+title: "Stratification Validation"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    df_print: paged
+---
+    
+```{r, include=FALSE}
+library(tidyverse)
+
+knitr::opts_chunk$set(fig.width=25, fig.height=6, fig_caption=TRUE)
+
+read_coverage_table <- function(path) {
+  read_tsv(
+    path,
+    col_types = "ccccid",
+    col_names = c("key", "stype", "strat", "chrom", "chromIndex", "coverage")
+  )
+}
+
+read_coverage <- function(paths) {
+  df <- snakemake@input$coverage %>%
+    map_dfr(read_coverage_table)
+  all_combos <- expand(df, key, nesting(chrom, chromIndex), nesting(stype, strat))
+  df %>%
+    right_join(all_combos, by = c("chrom", "chromIndex", "key", "stype", "strat")) %>%
+    replace_na(list(coverage = 0)) %>%
+    arrange(stype, strat) %>%
+    group_by(key, stype, strat) %>%
+    arrange(chromIndex) %>%
+    mutate(chrom = factor(chrom, levels = chrom)) %>%
+    ungroup()
+}
+
+coverage_plot <- function(df, level) {
+  cat(sprintf("#### %s\n\n", level))
+  p <- df %>%
+    ggplot(aes(chrom, coverage, fill = key)) +
+    geom_col(position = "dodge") +
+    scale_y_continuous(labels = scales::percent) +
+    theme(legend.position = "top",
+          text = element_text(size = 30),
+          axis.text.x = element_text(angle = 90),
+          strip.text.y = element_text(angle = 0),
+          panel.spacing.y = unit(2, "lines")) +
+    labs(x = NULL,
+         fill = "build")
+  print(p)
+  cat("\n\n")
+}
+
+coverage_plots <- function(df, .stype) {
+  cat(sprintf("## %s\n\n", .stype))
+  .df <- filter(df, stype == .stype)
+  if (nrow(.df) == 0) {
+    cat("None\n\n")
+  } else {
+    .df %>%
+      group_by(strat) %>%
+      group_walk(coverage_plot)
+  }
+}
+
+```
+
+# Overview
+
+The following plots can be used to sanity-check the completed stratification bed
+files. These files can be assumed to:
+
+* be valid bed files
+* be sorted
+* have no overlapping regions
+* have only valid chromosomes
+* not intersect with gaps in the reference
+
+# Coverage Plots
+
+```{r, echo = FALSE, results = "asis"}
+df <- read_coverage(snakemake@input$coverage)
+snakemake@params$core_levels %>%
+  union(snakemake@params$other_levels) %>%
+  walk(~ coverage_plots(df, .x))
+```

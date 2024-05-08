@@ -1,19 +1,14 @@
 from common.config import CoreLevel
 
-otherdiff_dir = CoreLevel.OtherDifficult
-otherdiff_inter_dir = config.intermediate_build_dir / otherdiff_dir.value
-
-
-def other_difficult_final_path(name):
-    return config.build_strat_path(otherdiff_dir, name)
+odiff = config.to_bed_dirs(CoreLevel.OTHER_DIFFICULT)
 
 
 rule get_gaps:
     input:
         gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
-        other_difficult_final_path("gaps_slop15kb"),
+        odiff.final("gaps_slop15kb"),
     conda:
         "../envs/bedtools.yml"
     shell:
@@ -26,25 +21,13 @@ rule get_gaps:
         """
 
 
-rule filter_vdj:
-    input:
-        mapper=rules.ftbl_to_mapper.output[0],
-        bed=rules.gff_to_bed.output[0],
-    output:
-        otherdiff_inter_dir / "vdj.bed.gz",
-    conda:
-        "../envs/bedtools.yml"
-    script:
-        "../scripts/python/bedtools/otherdifficult/filter_vdj.py"
-
-
 rule remove_vdj_gaps:
     input:
-        bed=rules.filter_vdj.output,
-        genome=rules.get_genome.output,
+        bed=lambda w: read_named_checkpoint("normalize_cds", "vdj", w),
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
-        other_difficult_final_path("VDJ"),
+        odiff.final("VDJ"),
     conda:
         "../envs/bedtools.yml"
     shell:
@@ -53,3 +36,21 @@ rule remove_vdj_gaps:
         intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
         bgzip -c > {output}
         """
+
+
+use rule remove_vdj_gaps as remove_mhc_gaps with:
+    input:
+        bed=lambda w: read_named_checkpoint("normalize_cds", "mhc", w),
+        genome=rules.filter_sort_ref.output["genome"],
+        gapless=rules.get_gapless.output.auto,
+    output:
+        odiff.final("MHC"),
+
+
+use rule remove_vdj_gaps as remove_kir_gaps with:
+    input:
+        bed=lambda w: read_named_checkpoint("normalize_cds", "kir", w),
+        genome=rules.filter_sort_ref.output["genome"],
+        gapless=rules.get_gapless.output.auto,
+    output:
+        odiff.final("KIR"),

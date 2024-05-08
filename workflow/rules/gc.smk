@@ -1,42 +1,21 @@
 from functools import partial
 from common.config import CoreLevel
+from bedtools.gc.helpers import seqtk_args, range_bounds
 from more_itertools import unzip
 import json
 
-gc_dir = CoreLevel.GC
-gc_inter_dir = config.intermediate_build_dir / gc_dir.value
+gc = config.to_bed_dirs(CoreLevel.GC)
 
 
-def gc_final_path(name):
-    return config.build_strat_path(gc_dir, name)
-
-
-def seqtk_args(wildcards):
-    _frac = int(wildcards["frac"])
-    rk = wildcards.ref_key
-    bk = wildcards.build_key
-    gps = config.buildkey_to_include(rk, bk).gc
-
-    if _frac in gps.low_fractions:
-        switch, frac = ("w", 100 - _frac)
-    elif _frac in gps.high_fractions:
-        switch, frac = ("", _frac)
-    else:
-        assert False, "this should not happen"
-
-    return f"-{switch}f 0.{frac}"
-
-
-# TODO this can take a gzipped fa file
 rule find_gc_content:
     input:
-        ref=rules.filter_sort_ref.output,
-        genome=rules.get_genome.output,
+        ref=rules.filter_sort_ref.output["fa"],
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
-        gc_inter_dir / "gc{frac}.bed.gz",
+        gc.inter.postsort.data / "gc{frac}.bed.gz",
     params:
-        args=seqtk_args,
+        args=lambda w: seqtk_args(config, w["ref_final_key"], w["build_key"], w["frac"]),
     conda:
         "../envs/seqtk.yml"
     wildcard_constraints:
@@ -55,7 +34,7 @@ rule find_gc_content:
 
 use rule find_gc_content as find_gc_content_final with:
     output:
-        gc_final_path("gc{frac}_slop50"),
+        gc.final("gc{frac}_slop50"),
 
 
 def range_inputs(wildcards):
@@ -68,11 +47,11 @@ def range_inputs(wildcards):
     def expand_final(frac):
         return _expand(rules.find_gc_content_final.output, frac)
 
-    rk = wildcards.ref_key
-    bk = wildcards.build_key
-    gps = config.buildkey_to_include(rk, bk).gc
-    lowest, lower = gps.low_bounds
-    highest, higher = gps.high_bounds
+    lowest, lower, higher, highest = range_bounds(
+        config,
+        wildcards["ref_final_key"],
+        wildcards["build_key"],
+    )
 
     return {
         "low": expand_final(lowest) + expand_inter(lower),
@@ -83,29 +62,34 @@ def range_inputs(wildcards):
 checkpoint intersect_gc_ranges:
     input:
         unpack(range_inputs),
-        genome=rules.get_genome.output[0],
+        genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
     output:
-        gc_inter_dir / "intersect_output.json",
+        gc.inter.postsort.data / "intersect_output.json",
+    log:
+        gc.inter.postsort.log / "intersect_ranges.txt",
     conda:
         "../envs/bedtools.yml"
     # hack together a format pattern that will be used for output
     params:
         path_pattern=lambda w: expand(
-            gc_final_path("{{}}"),
-            ref_key=w.ref_key,
+            gc.final("{{}}"),
+            ref_final_key=w.ref_final_key,
             build_key=w.build_key,
         )[0],
     script:
         "../scripts/python/bedtools/gc/intersect_ranges.py"
 
 
-def gc_inputs(ref_key, build_key):
-    c = checkpoints.intersect_gc_ranges.get(ref_key=ref_key, build_key=build_key)
+def gc_inputs(ref_final_key, build_key):
+    c = checkpoints.intersect_gc_ranges.get(
+        ref_final_key=ref_final_key,
+        build_key=build_key,
+    )
     with c.output[0].open() as f:
         return json.load(f)
 
 
-def gc_inputs_flat(ref_key, build_key):
-    res = gc_inputs(ref_key, build_key)
+def gc_inputs_flat(ref_final_key, build_key):
+    res = gc_inputs(ref_final_key, build_key)
     return [*res["gc_ranges"], res["widest_extreme"], *res["other_extremes"]]

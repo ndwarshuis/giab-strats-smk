@@ -2,24 +2,7 @@ from os.path import splitext, basename
 from pathlib import Path
 from common.config import CoreLevel
 
-map_dir = CoreLevel.MAPPABILITY
-map_inter_dir = config.intermediate_build_dir / map_dir.value
-map_log_dir = config.log_build_dir / map_dir.value
-map_bench_dir = config.bench_build_dir / map_dir.value
-
-
-def map_final_path(name):
-    return config.build_strat_path(map_dir, name)
-
-
-################################################################################
-# download a bunch of stuff to run GEM
-#
-# NOTE: this is in bioconda, but the bioconda version does not have gem-2-wig
-# for some reason
-
-
-gemlib_bin = Path("GEM-binaries-Linux-x86_64-core_i3-20130406-045632/bin")
+mlty = config.to_bed_dirs(CoreLevel.MAPPABILITY)
 
 gem_wc_constraints = {
     "l": "\d+",
@@ -27,55 +10,44 @@ gem_wc_constraints = {
     "e": "\d+",
 }
 
-
-rule download_gem:
-    output:
-        config.tools_src_dir / "gemlib.tbz2",
-    params:
-        url=config.tools.gemlib,
-    conda:
-        "../envs/utils.yml"
-    localrule: True
-    shell:
-        "curl -sS -L -o {output} {params.url}"
-
-
-rule unpack_gem:
-    input:
-        rules.download_gem.output,
-    output:
-        # called by other binaries
-        config.tools_bin_dir / "gem-indexer_fasta2meta+cont",
-        config.tools_bin_dir / "gem-indexer_bwt-dna",
-        config.tools_bin_dir / "gem-indexer_generate",
-        # the things I actually need
-        indexer=config.tools_bin_dir / "gem-indexer",
-        mappability=config.tools_bin_dir / "gem-mappability",
-        gem2wig=config.tools_bin_dir / "gem-2-wig",
-    params:
-        bins=lambda wildcards, output: " ".join(
-            str(gemlib_bin / basename(o)) for o in output
-        ),
-    shell:
-        """
-        mkdir -p {config.tools_bin_dir} && \
-        tar xjf {input} \
-        --directory {config.tools_bin_dir} \
-        --strip-components=2 \
-        {params.bins}
-        """
-
-
 ################################################################################
 # index/align
 
 
+def plaid_mode(wildcards):
+    t = config.thread_per_chromosome(
+        wildcards.ref_final_key,
+        wildcards.build_key,
+        4,
+        True,
+        False,
+    )
+    return t * 1.5
+
+
+def filter_mappability_ref_inputs(wildcards):
+    rk = config.refkey_strip_if_dip1(wildcards["ref_final_key"], False)
+    return {
+        "fa": expand(
+            rules.download_ref.output,
+            allow_missing=True,
+            ref_src_key=rk,
+        )[0],
+        "idx": expand(
+            rules.index_full_ref.output,
+            allow_missing=True,
+            ref_final_key=rk,
+        )[0],
+    }
+
+
 rule filter_mappability_ref:
     input:
-        fa=rules.download_ref.output[0],
-        idx=rules.index_ref.output[0],
+        unpack(filter_mappability_ref_inputs),
     output:
-        map_inter_dir / "ref.fa",
+        mlty.inter.postsort.data / "ref.fa",
+    log:
+        mlty.inter.postsort.log / "filter_mappability_ref.txt",
     conda:
         "../envs/bedtools.yml"
     script:
@@ -87,14 +59,18 @@ rule gem_index:
         fa=rules.filter_mappability_ref.output,
         bin=rules.unpack_gem.output.indexer,
     output:
-        map_inter_dir / "index.gem",
+        mlty.inter.postsort.data / "index.gem",
     params:
         base=lambda wildcards, output: splitext(output[0])[0],
-    threads: 8
+    threads: plaid_mode
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.gemIndex
+        ),
     log:
-        map_log_dir / "index.log",
+        mlty.inter.postsort.log / "index.log",
     benchmark:
-        map_bench_dir / "index.txt"
+        mlty.inter.postsort.bench / "index.txt"
     shell:
         """
         PATH={config.tools_bin_dir}:$PATH
@@ -108,17 +84,21 @@ rule gem_index:
 
 rule gem_mappability:
     input:
-        fa=rules.gem_index.output,
+        idx=rules.gem_index.output[0],
         bin=rules.unpack_gem.output.mappability,
     output:
-        map_inter_dir / "unique_l{l}_m{m}_e{e}.mappability",
+        mlty.inter.postsort.data / "unique_l{l}_m{m}_e{e}.mappability",
     params:
         base=lambda wildcards, output: splitext(output[0])[0],
-    threads: 8
+    threads: plaid_mode
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.gemMappability
+        ),
     log:
-        map_log_dir / "mappability_l{l}_m{m}_e{e}.log",
+        mlty.inter.postsort.data / "mappability_l{l}_m{m}_e{e}.log",
     benchmark:
-        map_bench_dir / "mappability_l{l}_m{m}_e{e}.txt"
+        mlty.inter.postsort.bench / "mappability_l{l}_m{m}_e{e}.txt"
     wildcard_constraints:
         **gem_wc_constraints,
     shell:
@@ -128,7 +108,7 @@ rule gem_mappability:
         -e {wildcards.e} \
         -l {wildcards.l} \
         -T {threads} \
-        -I {input.fa} \
+        -I {input.idx} \
         -o {params.base} > {log} 2>&1
         """
 
@@ -136,16 +116,20 @@ rule gem_mappability:
 rule gem_to_wig:
     input:
         idx=rules.gem_index.output,
-        map=rules.gem_mappability.output,
+        map=rules.gem_mappability.output[0],
         bin=rules.unpack_gem.output.gem2wig,
     output:
-        map_inter_dir / "unique_l{l}_m{m}_e{e}.wig",
+        mlty.inter.postsort.data / "unique_l{l}_m{m}_e{e}.wig",
     params:
         base=lambda wildcards, output: splitext(output[0])[0],
     log:
-        map_log_dir / "gem2wig_l{l}_m{m}_e{e}.log",
+        mlty.inter.postsort.log / "gem2wig_l{l}_m{m}_e{e}.log",
     benchmark:
-        map_bench_dir / "gem2wig_l{l}_m{m}_e{e}.txt"
+        mlty.inter.postsort.bench / "gem2wig_l{l}_m{m}_e{e}.txt"
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.gemToWig
+        ),
     wildcard_constraints:
         **gem_wc_constraints,
     shell:
@@ -163,7 +147,7 @@ rule wig_to_bed:
     input:
         rules.gem_to_wig.output,
     output:
-        map_inter_dir / "unique_l{l}_m{m}_e{e}.bed.gz",
+        mlty.inter.postsort.data / "unique_l{l}_m{m}_e{e}.bed.gz",
     conda:
         "../envs/map.yml"
     wildcard_constraints:
@@ -179,66 +163,81 @@ rule wig_to_bed:
         """
 
 
+rule combine_dip1_nonunique_beds:
+    input:
+        unpack(lambda w: combine_dip_inputs("wig_to_bed", w)),
+    output:
+        mlty.inter.postsort.data / "combined_unique_l{l}_m{m}_e{e}.bed.gz",
+    shell:
+        """
+        cat {input.hap1} {input.hap2} > {output}
+        """
+
+
 ################################################################################
 # create stratifications
 
 
-def nonunique_inputs(wildcards):
-    rk = wildcards.ref_key
-    bk = wildcards.build_key
-    l, m, e = config.buildkey_to_mappability(rk, bk)
-    return expand(rules.wig_to_bed.output, zip, allow_missing=True, l=l, m=m, e=e)
+def merge_nonunique_inputs(wildcards):
+    rk = wildcards["ref_final_key"]
+    bk = wildcards["build_key"]
+    l, m, e = config.to_build_data_full(rk, bk).mappability_params
+    out = if_dip1_else(
+        False, False, "combine_dip1_nonunique_beds", "wig_to_bed", wildcards
+    )
+    return expand(out, zip, allow_missing=True, l=l, m=m, e=e)
 
 
 checkpoint merge_nonunique:
     input:
-        bed=nonunique_inputs,
+        bed=merge_nonunique_inputs,
         gapless=rules.get_gapless.output.auto,
-        genome=rules.get_genome.output,
+        genome=rules.filter_sort_ref.output["genome"],
     output:
-        map_inter_dir / "nonunique_output.json",
+        mlty.inter.postsort.data / "nonunique_output.json",
+    log:
+        mlty.inter.postsort.log / "nonunique_output.txt",
     params:
         path_pattern=lambda w: expand(
-            map_final_path("{{}}"),
-            ref_key=w.ref_key,
+            mlty.final("{{}}"),
+            ref_final_key=w.ref_final_key,
             build_key=w.build_key,
         )[0],
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.mergeNonunique
+        ),
+    benchmark:
+        mlty.inter.postsort.bench / "merge_nonunique.txt"
     conda:
         "../envs/bedtools.yml"
     script:
         "../scripts/python/bedtools/mappability/merge_nonunique.py"
 
 
-def nonunique_inputs(ref_key, build_key):
-    c = checkpoints.merge_nonunique.get(ref_key=ref_key, build_key=build_key)
+def nonunique_inputs(ref_final_key, build_key):
+    c = checkpoints.merge_nonunique.get(
+        ref_final_key=ref_final_key, build_key=build_key
+    )
     with c.output[0].open() as f:
         return json.load(f)
 
 
-rule invert_merged_nonunique:
+use rule _invert_autosomal_regions as invert_merged_nonunique with:
     input:
-        lambda w: nonunique_inputs(w.ref_key, w.build_key)["all_lowmap"],
+        lambda w: nonunique_inputs(w.ref_final_key, w.build_key)["all_lowmap"],
     output:
-        map_final_path("notinlowmappabilityall"),
-    conda:
-        "../envs/bedtools.yml"
-    params:
-        genome=rules.get_genome.output,
-        gapless=rules.get_gapless.output.auto,
-    shell:
-        """
-        complementBed -i {input} -g {params.genome} | \
-        intersectBed -a stdin -b {params.gapless} -sorted -g {params.genome} | \
-        bgzip -c > {output}
-        """
+        mlty.final("notinlowmappabilityall"),
 
 
-def nonunique_inputs_flat(ref_key, build_key):
-    res = nonunique_inputs(ref_key, build_key)
+def nonunique_inputs_flat(ref_final_key, build_key):
+    res = nonunique_inputs(ref_final_key, build_key)
     return [res["all_lowmap"], *res["single_lowmap"]]
 
 
-def mappabilty_inputs(ref_key, build_key):
-    return nonunique_inputs_flat(ref_key, build_key) + expand(
-        rules.invert_merged_nonunique.output, ref_key=ref_key, build_key=build_key
+def mappabilty_inputs(ref_final_key, build_key):
+    return nonunique_inputs_flat(ref_final_key, build_key) + expand(
+        rules.invert_merged_nonunique.output,
+        ref_final_key=ref_final_key,
+        build_key=build_key,
     )

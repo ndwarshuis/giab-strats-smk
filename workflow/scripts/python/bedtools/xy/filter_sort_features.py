@@ -1,37 +1,38 @@
 from typing import Any
 import common.config as cfg
-from pybedtools import BedTool as bt  # type: ignore
-from common.bed import read_bed, filter_sort_bed, write_bed
+from common.bed import filter_sort_bed, bed_to_stream, intersectBed
+from common.io import bgzip_file, check_processes
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
-    rk = cfg.RefKey(smk.wildcards["ref_key"])
-    bk = cfg.BuildKey(smk.wildcards["build_key"])
-    level = smk.params["level"]
-    i = cfg.ChrIndex.from_name(smk.wildcards["sex_chr"])
+    ws: dict[str, str] = smk.wildcards
+    bed_input = cfg.smk_to_input_name(smk, "bed")
+    gapless_input = cfg.smk_to_input_name(smk, "gapless")
+    genome_input = cfg.smk_to_input_name(smk, "genome")
+    bed_output = cfg.smk_to_output(smk)
+    log = cfg.smk_to_log(smk)
+    level = cfg.smk_to_param_str(smk, "level")
 
-    assert i in [cfg.ChrIndex.CHRX, cfg.ChrIndex.CHRY], "invalid sex chr"
+    i = cfg.ChrIndex.from_name_unsafe(ws["sex_chr"])
 
-    fs = sconf.refkey_to_strat(rk).xy.features
-    assert fs is not None, "this should not happen"
-    bedfile = fs.x_bed if i is cfg.ChrIndex.CHRX else fs.y_bed
-    ps = bedfile.params
+    rfk = cfg.wc_to_reffinalkey(ws)
+    rk = cfg.strip_full_refkey(rfk)
 
-    level_col = bedfile.level_col
-    conv = sconf.buildkey_to_chr_conversion(rk, bk, ps.chr_pattern)
+    pat = sconf.refkey_to_xy_ref_chr_pattern(rfk, i)
 
-    df = read_bed(smk.input["bed"], ps, [level_col])
-    filtsort = filter_sort_bed(conv, df)
-    filtsort = filtsort[filtsort[level_col].str.contains(level)].drop(
-        columns=[level_col]
-    )
-    gapless = bt(smk.input["gapless"])
-    nogaps = (
-        bt.from_dataframe(filtsort)
-        .intersect(b=gapless, sorted=True, g=str(smk.input["genome"]))
-        .to_dataframe()
-    )
-    write_bed(smk.output[0], nogaps)
+    bd = sconf.to_build_data(rk, cfg.wc_to_buildkey(ws))
+    bf = bd.refdata.strat_inputs.xy_feature_bed_unsafe(i)
+    conv = cfg.HapToHapChrConversion(bf.bed.chr_pattern, pat, bd.build_chrs)
+
+    df = bf.read(bed_input)
+    df_sorted = filter_sort_bed(conv.init_mapper, conv.final_mapper, df)
+    level_mask = df_sorted[bf.level_col].str.contains(level)
+    df_filtered = df_sorted[level_mask].drop(columns=[bf.level_col])
+    # TODO put this in its own rule to simplify script?
+    with bed_to_stream(df_filtered) as s:
+        p, o = intersectBed(s, gapless_input, genome_input)
+        bgzip_file(o, bed_output)
+        check_processes([p], log)
 
 
 main(snakemake, snakemake.config)  # type: ignore

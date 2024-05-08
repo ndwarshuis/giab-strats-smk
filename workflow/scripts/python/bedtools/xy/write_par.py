@@ -1,22 +1,24 @@
 from typing import Any
-from Bio import bgzf  # type: ignore
+import subprocess as sp
 import common.config as cfg
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
-    i = cfg.ChrIndex.from_name(smk.wildcards["sex_chr"])
-    k = cfg.RefKey(smk.wildcards["ref_key"])
-    pattern = sconf.refkey_to_final_chr_pattern(k)
-    cxy = sconf.stratifications[k].xy
+    ws: dict[str, Any] = smk.wildcards
+    out = cfg.smk_to_output(smk)
+    i = cfg.ChrIndex.from_name(cfg.wc_lookup(ws, "sex_chr"))
 
-    assert i in [cfg.ChrIndex.CHRX, cfg.ChrIndex.CHRY], "invalid sex chr"
+    # TODO this pattern is DRY?
+    rfk = cfg.wc_to_reffinalkey(ws)
+    rk, hap = cfg.parse_full_refkey(rfk)
+    pat = sconf.refkey_to_xy_ref_chr_pattern(rfk, i)
+    cxy = sconf.to_ref_data(rk).strat_inputs.xy
 
-    par_fun = cxy.fmt_x_par if i == cfg.ChrIndex.CHRX else cxy.fmt_y_par
-    out = par_fun(pattern)
-    assert out is not None, "this should not happen"
+    par_fun = cfg.choose_xy_unsafe(i, cxy.fmt_x_par_unsafe, cxy.fmt_y_par_unsafe)
 
-    with bgzf.BgzfWriter(smk.output[0], "w") as f:
-        f.write(out)
+    par = par_fun(pat)
+    with open(out, "wb") as f:
+        sp.run(["bgzip", "-c"], input=par, stdout=f, text=True)
 
 
 main(snakemake, snakemake.config)  # type: ignore

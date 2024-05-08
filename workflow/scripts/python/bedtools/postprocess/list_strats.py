@@ -1,8 +1,10 @@
 from typing import Any
+import common.config as cfg
 
 
 def main(smk: Any) -> None:
-    with open(smk.output[0], "w") as f:
+    o = cfg.smk_to_output(smk)
+    with open(o, "w") as f:
         for s in sorted(smk.input):
             f.write(s + "\n")
 

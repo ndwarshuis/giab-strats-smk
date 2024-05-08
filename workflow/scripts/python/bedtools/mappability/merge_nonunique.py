@@ -1,24 +1,39 @@
 import re
-from typing import Any
+import pandas as pd
+from typing import Any, IO
 from pathlib import Path
 import common.config as cfg
-from common.bed import read_bed, filter_sort_bed, write_bed
-from pybedtools import BedTool as bt  # type: ignore
+import subprocess as sp
+from common.bed import (
+    read_bed_default,
+    filter_sort_bed,
+    bed_to_stream,
+    mergeBed,
+    intersectBed,
+    complementBed,
+    multiIntersectBed,
+)
+from common.io import bgzip_file, check_processes
 import json
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
-    rk = cfg.RefKey(smk.wildcards["ref_key"])
+    ws: dict[str, str] = smk.wildcards
 
-    pattern = sconf.refkey_to_final_chr_pattern(rk)
-    conv = cfg.fullset_conv(pattern)
+    inputs = cfg.smk_to_inputs_name(smk, "bed")
+    genome = cfg.smk_to_input_name(smk, "genome")
+    gapless = cfg.smk_to_input_name(smk, "gapless")
+    log = cfg.smk_to_log(smk)
+    out = cfg.smk_to_output(smk)
+    path_pattern = cfg.smk_to_param_str(smk, "path_pattern")
 
-    inputs = smk.input["bed"]
-    genome = Path(smk.input["genome"][0])
-    gapless = bt(smk.input["gapless"])
+    im, fm = sconf.buildkey_to_ref_mappers(
+        cfg.wc_to_reffinalkey(ws),
+        cfg.wc_to_buildkey(ws),
+    )
 
     def final_path(name: str) -> Path:
-        p = Path(str(smk.params.path_pattern).format(name))
+        p = Path(path_pattern.format(name))
         p.parent.mkdir(exist_ok=True, parents=True)
         return p
 
@@ -27,20 +42,24 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         assert m is not None, f"malformed mappability file name: {basename}"
         return final_path(f"nonunique_{m[1]}")
 
-    def read_sort_bed(p: Path) -> bt:
-        df = read_bed(p)
+    def read_sort_bed(p: Path) -> pd.DataFrame:
         # Sort here because we can't assume wig2bed sorts its output. Also,
         # filtering is necessary because the output should have unplaced contigs
         # in it that we don't want.
-        return bt().from_dataframe(filter_sort_bed(conv, df))
+        return filter_sort_bed(im, fm, read_bed_default(p))
 
-    def merge_bed(bed: bt, out: Path) -> None:
-        df = bed.merge(d=100).intersect(b=gapless, sorted=True, g=genome).to_dataframe()
-        write_bed(out, df)
+    def merge_bed(bed: IO[bytes], out: Path) -> tuple[sp.Popen[bytes], sp.Popen[bytes]]:
+        p1, o1 = mergeBed(bed, ["-d", "100"])
+        p2, o2 = intersectBed(o1, gapless, genome)
+        bgzip_file(o2, out)
+        return p1, p2
 
-    def merge_single(bed: bt, out: Path) -> None:
-        comp = bed.complement(g=str(genome))
-        merge_bed(comp, out)
+    def merge_single(i: Path, o: Path) -> None:
+        bed = read_sort_bed(i)
+        with bed_to_stream(bed) as s:
+            p1, o1 = complementBed(s, genome)
+            p2, p3 = merge_bed(o1, o)
+            check_processes([p1, p2, p3], log)
 
     all_lowmap = final_path("lowmappabilityall")
     single_lowmap = []
@@ -49,24 +68,23 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     # Otherwise, merge each individual input and then combine these with
     # multi-intersect to make the "all_nonunique" bed.
     if len(inputs) == 1:
-        bed = read_sort_bed(Path(inputs[0]))
-        merge_single(bed, all_lowmap)
+        merge_single(Path(inputs[0]), all_lowmap)
     else:
-        single = [
-            (
-                to_single_output((p := Path(i)).name),
-                read_sort_bed(p),
-            )
-            for i in inputs
-        ]
-        for sout, bed in single:
-            merge_single(bed, sout)
-        mint = bt().multi_intersect(i=[s[0] for s in single])
-        merge_bed(mint, all_lowmap)
-        single_lowmap = [str(s[0]) for s in single]
+        # first read/sort/write all single bed files
+        single_lowmap = [to_single_output(Path(i).name) for i in inputs]
+        for i, o in zip(inputs, single_lowmap):
+            merge_single(i, o)
+        # once all the single files are on disk, stream them together; this
+        # allows us to avoid keeping multiple dataframes in memory at once
+        p1, mi_out = multiIntersectBed(single_lowmap)
+        p2, p3 = merge_bed(mi_out, all_lowmap)
+        check_processes([p1, p2, p3], log)
 
-    with open(smk.output[0], "w") as f:
-        obj = {"all_lowmap": str(all_lowmap), "single_lowmap": single_lowmap}
+    with open(out, "w") as f:
+        obj = {
+            "all_lowmap": str(all_lowmap),
+            "single_lowmap": [str(p) for p in single_lowmap],
+        }
         json.dump(obj, f)
 
 

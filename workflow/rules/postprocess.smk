@@ -2,46 +2,52 @@ from os.path import dirname, basename
 from more_itertools import unique_everseen, unzip
 from os import scandir
 from common.config import CoreLevel
+from common.functional import DesignError
 
 post_inter_dir = config.intermediate_build_dir / "postprocess"
 post_log_dir = config.log_build_dir / "postprocess"
+post_bench_dir = config.bench_build_dir / "postprocess"
 validation_dir = config.final_root_dir / "validation"
 
 
-def expand_strat_targets_inner(ref_key, build_key):
+def expand_strat_targets_inner(ref_final_key, build_key):
+    # TODO this is crude
+    # NOTE we need to do this because despite the final key potentially having
+    # one or two haps, the configuration applies to both haps simultaneously
+    bd = config.to_build_data_full(ref_final_key, build_key)
     function_targets = [
-        (all_low_complexity, config.want_low_complexity),
-        (gc_inputs_flat, config.want_gc),
-        (mappabilty_inputs, config.want_mappability),
-        (all_xy_sex, lambda *_: True),
-        (all_other, lambda *_: True),
+        (lambda rk, _: all_low_complexity(rk), bd.want_low_complexity),
+        (gc_inputs_flat, bd.want_gc),
+        (mappabilty_inputs, bd.have_and_want_mappability),
+        (het_hom_inputs, bd.want_hets),
+        (all_xy_sex, True),
+        (all_other, True),
     ]
     rule_targets = [
-        (rules.filter_autosomes.output, config.want_xy_auto),
-        (rules.all_functional.input, config.want_functional),
-        (rules.all_segdups.input, config.want_segdups),
-        (rules.find_telomeres.output, config.want_telomeres),
-        (rules.all_segdup_and_map.input, config.want_segdup_and_map),
-        (rules.all_alldifficult.input, config.want_alldifficult),
-        (rules.get_gaps.output, lambda r, _: config.want_gaps(r)),
-        (rules.remove_vdj_gaps.output, config.want_vdj),
+        (rules.filter_autosomes.output, bd.want_xy_auto),
+        (rules.all_segdups.input, bd.have_and_want_segdups),
+        (rules.find_telomeres.output, bd.want_telomeres),
+        (rules.all_segdup_and_map.input, bd.have_and_want_segdup_and_map),
+        (rules.all_alldifficult.input, bd.have_and_want_alldifficult),
+        (rules.get_gaps.output, bd.have_gaps),
+        (rules.all_cds.input, bd.have_and_want_cds),
+        (rules.remove_vdj_gaps.output, bd.have_and_want_vdj),
+        (rules.remove_kir_gaps.output, bd.have_and_want_kir),
+        (rules.remove_mhc_gaps.output, bd.have_and_want_mhc),
     ]
-    all_function = [
-        f(ref_key, build_key)
-        for f, test in function_targets
-        if test(ref_key, build_key)
-    ]
-    all_rule = [tgt for tgt, test in rule_targets if test(ref_key, build_key)]
+    all_function = [f(ref_final_key, build_key) for f, test in function_targets if test]
+    all_rule = [tgt for tgt, test in rule_targets if test]
 
     # combine and ensure that all "targets" refer to final bed files
     all_targets = [y for xs in all_function + all_rule for y in xs]
     invalid = [f for f in all_targets if not f.startswith(str(config.final_root_dir))]
-    assert len(invalid) == 0, f"invalid targets: {invalid}"
+    if len(invalid) > 0:
+        raise DesignError(f"invalid targets: {invalid}")
     return all_targets
 
 
 def expand_strat_targets(wildcards):
-    return expand_strat_targets_inner(wildcards.ref_key, wildcards.build_key)
+    return expand_strat_targets_inner(wildcards.ref_final_key, wildcards.build_key)
 
 
 rule list_all_strats:
@@ -58,7 +64,7 @@ rule generate_md5sums:
     input:
         rules.list_all_strats.output,
     output:
-        config.final_build_dir / "{ref_key}-genome-stratifications-md5s.txt",
+        config.final_build_dir / "{ref_final_key}-genome-stratifications-md5s.txt",
     conda:
         "../envs/bedtools.yml"
     script:
@@ -69,7 +75,7 @@ rule generate_tsv_list:
     input:
         rules.list_all_strats.output,
     output:
-        config.final_build_dir / "{ref_key}-all-stratifications.tsv",
+        config.final_build_dir / "{ref_final_key}-all-stratifications.tsv",
     localrule: True
     script:
         "../scripts/python/bedtools/postprocess/generate_tsv.py"
@@ -77,25 +83,41 @@ rule generate_tsv_list:
 
 rule unit_test_strats:
     input:
-        strats=rules.list_all_strats.output,
+        strats=rules.list_all_strats.output[0],
         gapless_auto=rules.get_gapless.output.auto,
         gapless_parY=rules.get_gapless.output.parY,
+        genome=rules.filter_sort_ref.output["genome"],
         strat_list=rules.generate_tsv_list.output[0],
         checksums=rules.generate_md5sums.output[0],
     output:
         touch(post_inter_dir / "unit_tests.done"),
     log:
-        post_log_dir / "unit_tests.log",
+        error=post_log_dir / "unit_tests_errors.log",
+        failed=post_log_dir / "failed_tests.log",
+    benchmark:
+        post_bench_dir / "unit_test_strats.txt"
     conda:
         "../envs/bedtools.yml"
     script:
         "../scripts/python/bedtools/postprocess/run_unit_tests.py"
 
 
-rks, bks = map(
-    list,
-    unzip([(rk, bk) for rk, r in config.stratifications.items() for bk in r.builds]),
-)
+rule get_coverage_table:
+    input:
+        _test=rules.unit_test_strats.output,
+        bedlist=rules.list_all_strats.output[0],
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+    # TODO don't hardcode in the future
+    params:
+        window_size=int(1e6),
+    output:
+        full=touch(post_inter_dir / "coverage_full.tsv.gz"),
+        window=touch(post_inter_dir / "coverage_window.tsv.gz"),
+    benchmark:
+        post_bench_dir / "get_coverage_table.txt"
+    script:
+        "../scripts/python/bedtools/postprocess/get_coverage_table.py"
 
 
 rule download_comparison_strat_tarball:
@@ -118,23 +140,25 @@ rule download_comparison_strat_tarball:
 
 rule compare_strats:
     input:
-        _test=expand(
-            rules.unit_test_strats.output,
-            zip,
-            ref_key=rks,
-            build_key=bks,
-        ),
+        # ensure tests are run before this rule
+        _test=rules.unit_test_strats.output,
+        # NOTE: in the case id dip2 configurations, each comparison key will
+        # correspond to one half of the diploid dataset (each tarball is one
+        # haplotype)
         old=lambda w: expand(
             rules.download_comparison_strat_tarball.output,
-            compare_key=config.buildkey_to_comparekey(w.ref_key, w.build_key),
+            compare_key=config.to_build_data(
+                w.ref_final_key, w.build_key
+            ).build.compare_key,
         )[0],
         # use this to target a specific rule to satisfy the snakemake scheduler,
         # the thing I actually need here is the parent directory
         new_list=rules.generate_tsv_list.output[0],
     output:
-        validation_dir / "{ref_key}@{build_key}" / "diagnostics.tsv",
+        validation_dir / "{ref_final_key}@{build_key}" / "diagnostics.tsv",
     log:
         post_log_dir / "comparison.log",
+    # ASSUME this env will have pandas and bedtools (only real deps for this)
     conda:
         "../envs/bedtools.yml"
     threads: 8
@@ -145,58 +169,31 @@ rule compare_strats:
 rule all_comparisons:
     input:
         [
-            expand(rules.compare_strats.output, ref_key=rk, build_key=bk)[0]
-            for rk, r in config.stratifications.items()
-            for bk in r.builds
-            if config.buildkey_to_comparekey(rk, bk) is not None
+            expand(rules.compare_strats.output, ref_final_key=rk, build_key=bk)[0]
+            for rk, bk in zip(*config.all_build_keys)
+            if config.to_build_data(rk, bk).build.compare_key is not None
         ],
     localrule: True
 
 
-# Silly rule to make a dataframe which maps chromosome names to a common
-# nomenclature (for the validation markdown). The only reason this exists is
-# because snakemake apparently mangles this elegant list of tuples when I pass
-# it as a param to the rmd script...dataframe in IO monad it is :/
-rule write_chr_name_mapper:
-    output:
-        config.intermediate_root_dir / ".validation" / "chr_mapper.tsv",
-    localrule: True
-    run:
-        with open(output[0], "w") as f:
-            for ref_key, build_key in zip(rks, bks):
-                for i in config.buildkey_to_chr_indices(ref_key, build_key):
-                    pattern = config.refkey_to_final_chr_pattern(ref_key)
-                    line = [
-                        str(i.value),
-                        f"{ref_key}@{build_key}",
-                        i.chr_name_full(pattern),
-                    ]
-                    f.write("\t".join(line) + "\n")
-
-
-rule validate_strats:
+rule make_coverage_plots:
     input:
         # this first input isn't actually used, but ensures the unit tests pass
         # before running the rmd script
-        _test=expand(
-            rules.unit_test_strats.output,
-            zip,
-            ref_key=rks,
-            build_key=bks,
-        ),
-        strats=expand(
-            rules.list_all_strats.output,
-            zip,
-            ref_key=rks,
-            build_key=bks,
-        ),
-        nonN=expand(
-            rules.get_gapless.output.auto,
-            zip,
-            ref_key=rks,
-            build_key=bks,
-        ),
-        chr_mapper=rules.write_chr_name_mapper.output,
+        **{
+            "_test": expand(
+                rules.unit_test_strats.output,
+                zip,
+                ref_final_key=(t := config.all_full_build_keys)[0],
+                build_key=t[1],
+            ),
+            "coverage": expand(
+                rules.get_coverage_table.output.full,
+                zip,
+                ref_final_key=t[0],
+                build_key=t[1],
+            ),
+        },
     output:
         validation_dir / "coverage_plots.html",
     conda:
@@ -205,46 +202,45 @@ rule validate_strats:
         core_levels=[c.value for c in CoreLevel],
         other_levels=config.other_levels,
     script:
-        "../scripts/rmarkdown/rmarkdown/validate.Rmd"
+        "../scripts/rmarkdown/rmarkdown/coverage_plots.Rmd"
 
 
-rule unzip_ref:
+rule make_window_coverage_plots:
     input:
-        rules.filter_sort_ref.output,
+        _tests=rules.unit_test_strats.output,
+        coverage=rules.get_coverage_table.output.window,
     output:
-        post_log_dir / "happy" / "ref.fa",
-    shell:
-        "gunzip -c {input} > {output}"
-
-
-rule index_unzipped_ref:
-    input:
-        rules.unzip_ref.output,
-    output:
-        rules.unzip_ref.output[0] + ".fai",
+        validation_dir / "window_coverages" / "{ref_final_key}@{build_key}.html",
     conda:
-        "../envs/bedtools.yml"
-    shell:
-        """
-        samtools faidx {input}
-        """
+        "../envs/rmarkdown.yml"
+    params:
+        core_levels=[c.value for c in CoreLevel],
+        other_levels=config.other_levels,
+    script:
+        "../scripts/rmarkdown/rmarkdown/window_coverage_plots.Rmd"
+
+
+rule all_window_coverage_plots:
+    input:
+        [
+            expand(
+                rules.make_window_coverage_plots.output,
+                ref_final_key=rk,
+                build_key=bk,
+            )[0]
+            for rk, bk in zip(*config.all_full_build_keys)
+        ],
+    localrule: True
 
 
 rule run_happy:
     input:
-        _test=expand(
-            rules.unit_test_strats.output,
-            zip,
-            ref_key=rks,
-            build_key=bks,
-        ),
-        refi=rules.index_unzipped_ref.output,
-        ref=rules.unzip_ref.output,
-        bench_vcf=rules.download_bench_vcf.output,
-        bench_bed=rules.filter_sort_bench_bed.output,
-        query_vcf=rules.download_query_vcf.output,
-        # query_bed=rules.run_dipcall.output.bed,
-        strats=rules.generate_tsv_list.output,
+        _test=rules.unit_test_strats.output,
+        ref=rules.filter_sort_ref.output["fa"],
+        bench_vcf=lambda w: expand_final_to_src(rules.download_bench_vcf.output, w)[0],
+        bench_bed=lambda w: read_checkpoint("normalize_bench_bed", w),
+        query_vcf=lambda w: expand_final_to_src(rules.download_query_vcf.output, w)[0],
+        strats=rules.generate_tsv_list.output[0],
     output:
         post_inter_dir / "happy" / "happy.extended.csv",
     params:
@@ -254,6 +250,12 @@ rule run_happy:
     log:
         post_log_dir / "happy" / "happy.log",
     threads: 8
+    benchmark:
+        post_bench_dir / "run_happy.txt"
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_final_key, w.build_key, lambda m: m.runHappy
+        ),
     script:
         "../scripts/python/bedtools/postprocess/run_happy.py"
 
@@ -263,11 +265,11 @@ rule summarize_happy:
         [
             expand(
                 rules.run_happy.output,
-                ref_key=rk,
+                ref_final_key=rk,
                 build_key=bk,
             )
-            for rk, bk in zip(rks, bks)
-            if config.want_benchmark(rk, bk)
+            for rk, bk in zip(*config.all_build_keys)
+            if config.to_build_data(rk, bk).have_benchmark
         ],
     output:
         validation_dir / "benchmark_summary.html",
@@ -298,7 +300,8 @@ rule generate_tarballs:
         all_strats=rules.generate_tsv_list.output,
         _checksums=rules.generate_md5sums.output,
     output:
-        config.final_root_dir / "genome-stratifications-{ref_key}@{build_key}.tar.gz",
+        config.final_root_dir
+        / "genome-stratifications-{ref_final_key}@{build_key}.tar.gz",
     params:
         parent=lambda _, input: Path(input.all_strats[0]).parent.parent,
         target=lambda _, input: Path(input.all_strats[0]).parent.name,
@@ -311,13 +314,13 @@ rule generate_tarballs:
 rule checksum_everything:
     input:
         rules.copy_READMEs.output,
-        rules.validate_strats.output,
+        rules.make_coverage_plots.output,
         rules.summarize_happy.output,
         rules.all_comparisons.input,
+        rules.all_window_coverage_plots.input,
         [
-            expand(rules.generate_tarballs.output, ref_key=rk, build_key=bk)
-            for rk, r in config.stratifications.items()
-            for bk in r.builds
+            expand(rules.generate_tarballs.output, ref_final_key=rk, build_key=bk)
+            for rk, bk in zip(*config.all_full_build_keys)
         ],
     output:
         config.final_root_dir / "genome-stratifications-md5s.txt",
