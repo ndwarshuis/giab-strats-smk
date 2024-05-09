@@ -241,3 +241,22 @@ def mappabilty_inputs(ref_final_key, build_key):
         ref_final_key=ref_final_key,
         build_key=build_key,
     )
+
+
+# TODO control whether or not we show the stuff for nonunique if we actually
+# have non-unique
+# TODO add versions for bedtools and bedops
+# TODO write what happens in the diploid case
+# TODO what is the >0.9 thing in awk above?
+rule mappability_readme:
+    input:
+        template="workflow/templates/mappability.md",
+    output:
+        mlty.readme(),
+    params:
+        file_list=lambda w: [
+            basename(x) for x in mappabilty_inputs(w.ref_final_key, w.build_key)
+        ],
+        gemurl=config.tools.gemlib,
+    template_engine:
+        "jinja2"

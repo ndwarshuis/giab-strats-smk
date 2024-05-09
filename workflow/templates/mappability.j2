@@ -1,0 +1,65 @@
+{% include "header.md" %}
+
+# DATA & FILE OVERVIEW
+
+## File List
+
+{% for f in params.file_list %}
+{{ f }}
+{% endfor %}
+
+## File Descriptions
+
+"Mappablity" files stratify variant calls based on genomic region short read
+mappability. These files represent regions with low mappability for two
+different read lengths and error rates.
+
+- `GRCh3X_nonunique_l*_m*_e*.bed.gz` contains only regions that are “low mappability”, meaning they have other homologous regions in the reference genome for the given read length, number of mismatches, and number
+ of indels.
+        * low mappability regions for low stringency parameters:  l100_m2_e1
+        * low mappability for high stringency parameters: l250_m0_e0
+- `GRCh3X_lowmappabilityall.bed.gz` and `GRCh3X_notinlowmappabilityall.bed.gz` is a union (and non-overlapping complement, "notin") of low and high stringency short read mappability.
+- `notin` are non-overlapping complements of the stratification regions (i.e., genome after excluding the regions)
+
+# METHODOLOGICAL INFORMATION
+
+## Description of methods used to generate the stratifications
+
+Regions with low mappability for different read lengths and error rates were
+generated using GEM (see below for source). The GEM mappability tool finds
+`l-bp` regions that match other regions in the reference genome with fewer than
+`m` mismatches (SNPs) and fewer than `e` indels < 15bp.
+
+We generated mappability files (`gem-indexer` and `gem-mappability`) using the
+following parameters:
+
+**TODO: ENTER PARAMETERS HERE**
+
+- low stringency: l-100, m-2, e-1 (2 mismatches and 1 indels)
+- high stringency: l-250, m-0, e-0 (0 mismatches and 0 indels)
+
+These were then converted to wig files using `gem-2-wig` which were then parsed
+into bed files.
+
+Each unique bed file was then complemented (`complementBed`) to find non-unique
+regions. Then non-unique regions <100bp in each bed file were merged together
+using `mergeBed`.
+
+The `lowmappabilityall` bed file was created by intersecting
+(`multiIntersectBed`) and merging (`mergeBed`) each individual non-unique bed
+together. This result was then complemented using `complementBed` to make the
+`notinlowmappabilityall`.
+
+## Dependencies
+
+These stratifications only depend on the reference.
+  
+## Software
+
+The GEM mappability program ([Derrien T, Estellé J, Marco Sola S, Knowles DG,
+Raineri E, Guigó R, et al. (2012) Fast Computation and Applications of Genome
+Mappability. PLoS ONE 7(1):
+e30377](https://doi.org/10.1371/journal.pone.0030377)) was downloaded from
+{{ params.gemurl }}.
+  
+{% include "footer.md" %}

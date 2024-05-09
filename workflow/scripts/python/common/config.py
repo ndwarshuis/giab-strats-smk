@@ -1314,6 +1314,7 @@ class BedDirs(NamedTuple):
     src: DataLogDirs
     inter: BedInterDirs
     final: Callable[[str], Path]
+    readme: Callable[[str], Path]
 
 
 class RefInterDirs(NamedTuple):
@@ -3061,8 +3062,14 @@ class GiabStrats(BaseModel):
     def build_final_strat_path(self, level: str, name: str) -> Path:
         return self.final_build_dir / level / f"{{ref_final_key}}_{name}.bed.gz"
 
+    def build_final_readme_path(self, level: str) -> Path:
+        return self.final_build_dir / level / f"{{ref_final_key}}_{level}_README.md"
+
     def build_strat_path(self, level: CoreLevel, name: str) -> Path:
         return self.build_final_strat_path(level.value, name)
+
+    def build_readme_path(self, level: CoreLevel) -> Path:
+        return self.build_final_readme_path(level.value)
 
     @property
     def ref_dirs(self) -> RefDirs:
@@ -3120,6 +3127,7 @@ class GiabStrats(BaseModel):
                 ),
             ),
             final=lambda name: self.build_strat_path(level, name),
+            readme=lambda name: self.build_readme_path(level),
         )
 
     # because smk doesn't check these for existence yet:

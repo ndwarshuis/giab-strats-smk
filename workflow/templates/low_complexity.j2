@@ -1,0 +1,60 @@
+# DATA & FILE OVERVIEW
+
+## File List and Descriptions
+
+Note that in all cases, 5bp slop is added to each repeat region. Slop does not
+count toward the length of a given region in the cases where a given bed subsets
+to a given range of region lengths.
+
+### Simple Repeats
+
+These represent continuous runs of perfectly repeating patterns with 1-4
+subunits:
+
+* SimpleRepeat_homopolymer = 1bp repeats
+* SimpleRepeat_diTR = 2bp repeats
+* SimpleRepeat_triTR = 3bp repeats
+* SimpleRepeat_quadTR = 4bp repeats
+
+In the case of subunits >1bp long, either end of the repeat may contain only
+part of the subunit.
+
+Each file represents a range of lengths either written as `XtoY` which means `X
+<= length <= Y` or `geX` which means `length >= X`.
+
+These are further subdivided into AT- and GC- specific regions.
+
+### Imperfect homopolymers
+
+These are a special case of homopolymers that are interrupted by 1 bp that is
+not the same base as the rest of the homopolymer (for example `AAAATAAAA`). The
+minimum length for any given perfect (uninterrupted) homopolymer is 4 bp.
+
+Here these are subset to different lower-length cutoffs.
+`SimpleRepeat_imperfecthomopolgeX` includes all imperfect homopolymers greater
+than or equal to X bp long.
+
+### Satellites
+
+TODO
+
+### etc etc etc
+
+# METHODOLOGICAL INFORMATION
+
+## Description of methods used to generate the stratifications
+
+ouch...
+
+## Dependencies
+
+* Repeat masker file: {{ rmsk_src }}
+* Tandem repeat finder: {{ trf_src }}
+* Censat: {{ censat_src }}
+
+Note that simple repeats and imperfect homopolymers were generated only using
+the reference fasta.
+
+## Software
+
+{# TODO include bedtools and stuff here #}
