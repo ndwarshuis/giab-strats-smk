@@ -27,26 +27,26 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         undefined=j2.StrictUndefined,
     )
     common = env.get_template("common.j2")
-    overview = env.get_template("mappability_overview.j2")
+    desc = env.get_template("mappability_overview.j2")
     methods = env.get_template("mappability_methods.j2")
 
-    otxt = overview.render(
+    dtxt = desc.render(
         single_lowmap_files=single_lowmap,
         all_lowmap_file=all_lowmap,
         not_all_lowmap_file=basename(notlowmap_path),
         params=map_params,
     )
 
-    mtxt = methods.render(gemurl=unquote(sconf.tools.gemlib))
+    mtxt = methods.render(
+        gemurl=unquote(sconf.tools.gemlib),
+        params=map_params,
+    )
 
     txt = common.render(
-        overview_text=otxt,
+        description_text=dtxt,
         methods_text=mtxt,
-        stratification_group=cfg.CoreLevel.MAPPABILITY.value,
-        pi_name=sconf.docs.pi_name,
-        pi_email=sconf.docs.pi_email,
-        contact_name=sconf.docs.contact_name,
-        contact_email=sconf.docs.contact_email,
+        group=cfg.CoreLevel.MAPPABILITY.value,
+        description="regions that are difficult to map for short reads",
     )
 
     with open(out, "w") as f:

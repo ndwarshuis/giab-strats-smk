@@ -252,6 +252,8 @@ rule mappability_readme:
     input:
         lowmap=rules.merge_nonunique.output[0],
         notinlowmap=rules.invert_merged_nonunique.output[0],
+        map_env="workflow/envs/map.yml",
+        bedtools_env="workflow/envs/bedtools.yml",
     output:
         mlty.readme,
     conda:

@@ -2,28 +2,47 @@
 
 Regions with low mappability for different read lengths and error rates were
 generated using GEM (see below for source). The GEM mappability tool finds
-`l-bp` regions that match other regions in the reference genome with fewer than
-`m` mismatches (SNPs) and fewer than `e` indels < 15bp.
+regions `l` basepairs long that match other regions in the reference genome with
+up to `m` mismatches (SNPs) and up to `e` indels < 15bp.
 
-We generated mappability files (`gem-indexer` and `gem-mappability`) using the
-following parameters:
+{%- if params|length > 1 %}
 
-**TODO: ENTER PARAMETERS HERE**
+We generated mappability files representing all unique regions using
+`gem-mappability` with the following parameters:
 
-- low stringency: l-100, m-2, e-1 (2 mismatches and 1 indels)
-- high stringency: l-250, m-0, e-0 (0 mismatches and 0 indels)
+{% for p in params %}
+- `l` = {{ p.length }}, `m` = {{ p.mismatches }}, `e` = {{ p.indels }}
+{% endfor %}
 
-These were then converted to wig files using `gem-2-wig` which were then parsed
-into bed files.
-
-Each unique bed file was then complemented (`complementBed`) to find non-unique
-regions. Then non-unique regions <100bp in each bed file were merged together
-using `mergeBed`.
+Each of these were then converted to wig files using `gem-2-wig` which were then
+parsed into bed files using `wig2bed` from BEDOPS and then filtered for
+mappability above 90%. These were then complemented (`complementBed`) to find
+non-unique regions. Then non-unique regions <100bp apart in each bed file were
+merged together using `mergeBed`. These are the 'Specific low-mappability
+regions' described above.
 
 The `lowmappabilityall` bed file was created by intersecting
 (`multiIntersectBed`) and merging (`mergeBed`) each individual non-unique bed
 together. This result was then complemented using `complementBed` to make the
 `notinlowmappabilityall`.
+
+{%- else %}
+
+We generated one mappability file representing all unique regions using
+`gem-mappability` with the following parameters:
+
+- `l` = {{ params[0].length }}, `m` = {{ params[0].mismatches }}, `e` = {{ params[0].indels }}
+
+This was then converted to a wig file using `gem-2-wig` which was then parsed
+into a bed file using `wig2bed` from BEDOPS and then filtered for mappability
+above 90%. This was then complemented (`complementBed`) to find non-unique
+regions. Then non-unique regions <100bp apart were merged together using
+`mergeBed`, makeing the `lowmappabilityall` bed file.
+
+This result was then complemented using `complementBed` to make the
+`notinlowmappabilityall`.
+
+{% endif -%}
 
 ## Dependencies
 
