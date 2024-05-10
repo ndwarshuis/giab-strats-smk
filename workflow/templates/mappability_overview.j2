@@ -1,0 +1,46 @@
+## File List
+
+### All low-mappability regions
+
+{%- if single_lowmap_files|length == 0 %}
+
+{%- set overview | replace("\n", " ") | wordwrap | trim %}
+
+This file represents all regions {{ params[0].length }} bases or less in the
+haplotype that align to at least one other location in the haplotype with up to
+{{ params[0].mismatches }} SNVs and up to {{ params[0].indels }} INDELs less
+than 15 bp long:
+
+{% endset %}
+
+{{ overview }}
+
+`{{ all_lowmap_file }}`
+
+Also included is the complement to this file:
+
+`{{ not_all_lowmap_file }}`
+
+{%- else %}
+
+This file is a union of all files in the next section.
+
+`{{ all_lowmap_file }}`
+
+Also included is the complement to this file.
+
+`{{ not_all_lowmap_file }}`
+
+### Specific low-mappability regions
+
+Each of these files represents regions that map to at least one other location
+in the genome with varying alignment parameters. The alignment paramters are
+encoded in the file name as `nonunique_l<L>_m<M>_e<E>` where `L`, `M` and `E`
+are the length, maximum allowed number of SNVs mismatches, and maximum allowed
+number of INDEL mismatches less than 15bp respectively.
+
+{% for file in single_lowmap_files %}
+`{{ file }}`
+{% endfor %}
+
+{% endif %}

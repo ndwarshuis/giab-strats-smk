@@ -250,13 +250,11 @@ def mappabilty_inputs(ref_final_key, build_key):
 # TODO what is the >0.9 thing in awk above?
 rule mappability_readme:
     input:
-        template="workflow/templates/mappability.md",
+        lowmap=rules.merge_nonunique.output[0],
+        notinlowmap=rules.invert_merged_nonunique.output[0],
     output:
-        mlty.readme(),
-    params:
-        file_list=lambda w: [
-            basename(x) for x in mappabilty_inputs(w.ref_final_key, w.build_key)
-        ],
-        gemurl=config.tools.gemlib,
-    template_engine:
-        "jinja2"
+        mlty.readme,
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_mappability.py"

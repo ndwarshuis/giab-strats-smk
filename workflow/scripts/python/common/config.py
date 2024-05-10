@@ -1314,7 +1314,7 @@ class BedDirs(NamedTuple):
     src: DataLogDirs
     inter: BedInterDirs
     final: Callable[[str], Path]
-    readme: Callable[[str], Path]
+    readme: Path
 
 
 class RefInterDirs(NamedTuple):
@@ -2857,6 +2857,13 @@ Dip1Strat = Stratification[Dip1RefSrc, DipBedSrc, Dip1VcfSrc]
 Dip2Strat = Stratification[Dip2RefSrc, DipBedSrc, Dip2VcfSrc]
 
 
+class Documentation(BaseModel):
+    pi_name: str
+    pi_email: str
+    contact_name: str
+    contact_email: str
+
+
 # TODO add validator to ensure none of the keys in the strat/build dicts overlap
 class GiabStrats(BaseModel):
     """Top level stratification object."""
@@ -2901,6 +2908,7 @@ class GiabStrats(BaseModel):
         "segdups",
     ]
     malloc: Malloc = Malloc()
+    docs: Documentation
 
     # TODO validate comparison keys
     @validator(
@@ -3127,7 +3135,7 @@ class GiabStrats(BaseModel):
                 ),
             ),
             final=lambda name: self.build_strat_path(level, name),
-            readme=lambda name: self.build_readme_path(level),
+            readme=self.build_readme_path(level),
         )
 
     # because smk doesn't check these for existence yet:
