@@ -294,14 +294,14 @@ def wrap_dip_2to2_io_f(
 # TODO mypy for some reason doesn't understand how to narrow a
 # Something[Union[X, Y]] to a Something[X] using 'isinstance'
 def is_dip1_bed(
-    x: BedFile[Dip1ChrFileSrc[X] | Dip2ChrFileSrc[X] | Dip1ChrTxtSrc | Dip2ChrTxtSrc],
-) -> TypeGuard[BedFile[Dip1ChrFileSrc[X] | Dip1ChrTxtSrc]]:
+    x: BedFile[Dip1ChrFileSrc[S] | Dip2ChrFileSrc[S] | Dip1ChrTxtSrc | Dip2ChrTxtSrc],
+) -> TypeGuard[BedFile[Dip1ChrFileSrc[S] | Dip1ChrTxtSrc]]:
     return isinstance(x.bed, Dip1ChrFileSrc) or isinstance(x.bed, Dip1ChrTxtSrc)
 
 
 def is_dip2_bed(
-    x: BedFile[Dip1ChrFileSrc[X] | Dip2ChrFileSrc[X] | Dip1ChrTxtSrc | Dip2ChrTxtSrc],
-) -> TypeGuard[BedFile[Dip2ChrFileSrc[X] | Dip2ChrTxtSrc]]:
+    x: BedFile[Dip1ChrFileSrc[S] | Dip2ChrFileSrc[S] | Dip1ChrTxtSrc | Dip2ChrTxtSrc],
+) -> TypeGuard[BedFile[Dip2ChrFileSrc[S] | Dip2ChrTxtSrc]]:
     return isinstance(x.bed, Dip2ChrFileSrc) or isinstance(x.bed, Dip2ChrTxtSrc)
 
 
@@ -309,9 +309,9 @@ def is_dip2_bed(
 
 
 def with_dip_bedfile(
-    bf: BedFile[Dip1ChrFileSrc[X] | Dip2ChrFileSrc[X] | Dip1ChrTxtSrc | Dip2ChrTxtSrc],
-    dip1: Callable[[BedFile[Dip1ChrFileSrc[X] | Dip1ChrTxtSrc]], Y],
-    dip2: Callable[[BedFile[Dip2ChrFileSrc[X] | Dip2ChrTxtSrc]], Y],
+    bf: BedFile[Dip1ChrFileSrc[S] | Dip2ChrFileSrc[S] | Dip1ChrTxtSrc | Dip2ChrTxtSrc],
+    dip1: Callable[[BedFile[Dip1ChrFileSrc[S] | Dip1ChrTxtSrc]], Y],
+    dip2: Callable[[BedFile[Dip2ChrFileSrc[S] | Dip2ChrTxtSrc]], Y],
 ) -> Y:
     if is_dip1_bed(bf):
         return dip1(bf)
@@ -1333,6 +1333,32 @@ class RefDirs(NamedTuple):
     inter: RefInterDirs
 
 
+# Documentation classes
+
+
+class LocalSrcDoc(NamedTuple):
+    comment: str
+    md5: str | None
+
+
+class TxtSrcDoc(NamedTuple):
+    comment: str
+
+
+class UrlSrcDoc(NamedTuple):
+    comment: str | None
+    md5: str | None
+    url: str
+
+
+BedSrcDoc = LocalSrcDoc | TxtSrcDoc | UrlSrcDoc
+
+
+class BedDoc(NamedTuple):
+    params: BedFileParams
+    bed: Single[BedSrcDoc] | Double[BedSrcDoc]
+
+
 ################################################################################
 # Constants
 
@@ -1377,6 +1403,50 @@ class GenericModel(GenericModel_):
             sys.modules[created_class.__module__], created_class.__name__, created_class
         )
         return created_class
+
+
+class _BedDocumentable:
+
+    @property
+    def documentation(self) -> BedSrcDoc:
+        return NotImplemented
+
+
+class _BedDocumentable1:
+
+    @property
+    def documentation(self) -> Single[BedSrcDoc]:
+        return NotImplemented
+
+
+class _BedDocumentable2:
+
+    @property
+    def documentation(self) -> Double[BedSrcDoc]:
+        return NotImplemented
+
+
+class _BedBaseDocumentable(BaseModel, _BedDocumentable):
+    pass
+
+
+class _BedBaseDocumentable1(BaseModel, _BedDocumentable1):
+    pass
+
+
+class _BedBaseDocumentable2(BaseModel, _BedDocumentable2):
+    pass
+
+
+class _BedGenericDocumentable1(GenericModel, _BedDocumentable1):
+    pass
+
+
+class _BedGenericDocumentable2(GenericModel, _BedDocumentable2):
+    pass
+
+
+S = TypeVar("S", bound=_BedBaseDocumentable)
 
 
 class Diploid(GenericModel, Generic[X]):
@@ -1685,14 +1755,18 @@ class _Dip2ChrSrc(Generic[X]):
         return self.chr_pattern.choose(h).filter_indices(cis)
 
 
-class HapChrFileSrc(GenericModel, Generic[X], _HapChrSrc[X]):
+class HapChrFileSrc(_BedGenericDocumentable1, Generic[S], _HapChrSrc[S]):
     """Specification for a haploid source file."""
 
     chr_pattern_: HapChrPattern = Field(HapChrPattern(), alias="chr_pattern")
-    hap: X
+    hap: S
 
     @property
-    def src(self) -> Single[X]:
+    def documentation(self) -> Single[BedSrcDoc]:
+        return Single(elem=self.hap.documentation)
+
+    @property
+    def src(self) -> Single[S]:
         return Single(elem=self.hap)
 
     @property
@@ -1700,7 +1774,7 @@ class HapChrFileSrc(GenericModel, Generic[X], _HapChrSrc[X]):
         return self.chr_pattern_
 
 
-class Dip1ChrFileSrc(GenericModel, Generic[X], _Dip1ChrSrc[X]):
+class Dip1ChrFileSrc(_BedGenericDocumentable1, Generic[S], _Dip1ChrSrc[S]):
     """Specification for a combined diploid source file.
 
     The 'src' is assumed to have all chromosomes for both haplotypes in one
@@ -1710,10 +1784,14 @@ class Dip1ChrFileSrc(GenericModel, Generic[X], _Dip1ChrSrc[X]):
     """
 
     chr_pattern_: DipChrPattern = Field(DipChrPattern(), alias="chr_pattern")
-    dip: X
+    dip: S
 
     @property
-    def src(self) -> Single[X]:
+    def documentation(self) -> Single[BedSrcDoc]:
+        return Single(elem=self.dip.documentation)
+
+    @property
+    def src(self) -> Single[S]:
         return Single(elem=self.dip)
 
     @property
@@ -1721,7 +1799,7 @@ class Dip1ChrFileSrc(GenericModel, Generic[X], _Dip1ChrSrc[X]):
         return self.chr_pattern_
 
 
-class Dip2ChrFileSrc(GenericModel, Generic[X], _Dip2ChrSrc[X]):
+class Dip2ChrFileSrc(_BedGenericDocumentable2, Generic[S], _Dip2ChrSrc[S]):
     """Specification for split diploid source files.
 
     Each source may or may not have each haplotype labeled; the identity of each
@@ -1744,11 +1822,18 @@ class Dip2ChrFileSrc(GenericModel, Generic[X], _Dip2ChrSrc[X]):
         ),
         alias="chr_pattern",
     )
-    hap1: X
-    hap2: X
+    hap1: S
+    hap2: S
 
     @property
-    def src(self) -> Double[X]:
+    def documentation(self) -> Double[BedSrcDoc]:
+        return Double(
+            elem1=self.hap1.documentation,
+            elem2=self.hap2.documentation,
+        )
+
+    @property
+    def src(self) -> Double[S]:
         return Double(elem1=self.hap1, elem2=self.hap2)
 
     @property
@@ -1802,7 +1887,7 @@ class DipBedTxtLine(BedTxtLine):
 BedTxtLineT = TypeVar("BedTxtLineT", HapBedTxtLine, DipBedTxtLine)
 
 
-class BedTxtSrc(GenericModel, Generic[BedTxtLineT]):
+class BedTxtSrc(GenericModel, Generic[BedTxtLineT], _BedDocumentable):
     """Bed file encoded directly in the configuration file.
 
     'lines' does not need to be sorted, but each 'more' attribute must have the
@@ -1810,6 +1895,11 @@ class BedTxtSrc(GenericModel, Generic[BedTxtLineT]):
     """
 
     lines: list[BedTxtLineT]
+    comment: str = "This bed file was specified manually in the yaml config"
+
+    @property
+    def documentation(self) -> BedSrcDoc:
+        return TxtSrcDoc(self.comment)
 
     @validator("lines")
     def same_length(cls, lines: list[HapBedTxtLine]) -> list[HapBedTxtLine]:
@@ -1822,8 +1912,12 @@ HapBedTxtSrc = BedTxtSrc[HapBedTxtLine]
 DipBedTxtSrc = BedTxtSrc[DipBedTxtLine]
 
 
-class HapChrTxtSrc(BaseModel, _HapChrSrc[bed.BedLines]):
+class HapChrTxtSrc(_BedBaseDocumentable1, _HapChrSrc[bed.BedLines]):
     hap: HapBedTxtSrc
+
+    @property
+    def documentation(self) -> Single[BedSrcDoc]:
+        return Single(elem=self.hap.documentation)
 
     @property
     def src(self) -> Single[bed.BedLines]:
@@ -1834,8 +1928,13 @@ class HapChrTxtSrc(BaseModel, _HapChrSrc[bed.BedLines]):
         return HapChrPattern()
 
 
-class Dip1ChrTxtSrc(BaseModel, _Dip1ChrSrc[bed.BedLines]):
+class Dip1ChrTxtSrc(_BedBaseDocumentable1, _Dip1ChrSrc[bed.BedLines]):
     dip: DipBedTxtSrc
+    comment: str = "This bed file was specified manually in the yaml config"
+
+    @property
+    def documentation(self) -> Single[BedSrcDoc]:
+        return Single(elem=self.dip.documentation)
 
     @property
     def src(self) -> Single[bed.BedLines]:
@@ -1846,9 +1945,16 @@ class Dip1ChrTxtSrc(BaseModel, _Dip1ChrSrc[bed.BedLines]):
         return DipChrPattern()
 
 
-class Dip2ChrTxtSrc(BaseModel, _Dip2ChrSrc[bed.BedLines]):
+class Dip2ChrTxtSrc(_BedBaseDocumentable2, _Dip2ChrSrc[bed.BedLines]):
     hap1: HapBedTxtSrc
     hap2: HapBedTxtSrc
+
+    @property
+    def documentation(self) -> Double[BedSrcDoc]:
+        return Double(
+            elem1=self.hap1.documentation,
+            elem2=self.hap1.documentation,
+        )
 
     @property
     def src(self) -> Double[bed.BedLines]:
@@ -1874,7 +1980,7 @@ class Dip2ChrTxtSrc(BaseModel, _Dip2ChrSrc[bed.BedLines]):
         )
 
 
-class HashedSrc_(BaseModel):
+class HashedSrc_(_BedBaseDocumentable):
     """A source that may be hashed to verify its integrity"""
 
     md5: str | None = None
@@ -1884,6 +1990,11 @@ class FileSrc_(HashedSrc_):
     """Base class for local src files."""
 
     filepath: FilePath
+    comment: str = "This file was local on the filesystem when the pipeline was run"
+
+    @property
+    def documentation(self) -> BedSrcDoc:
+        return LocalSrcDoc(md5=self.md5, comment=self.comment)
 
 
 class BedLocalSrc(FileSrc_):
@@ -1908,6 +2019,10 @@ class HttpSrc_(HashedSrc_):
     """Base class for downloaded src files."""
 
     url: HttpUrl
+
+    @property
+    def documentation(self) -> BedSrcDoc:
+        return UrlSrcDoc(url=self.url, comment=None, md5=self.md5)
 
 
 class BedHttpSrc(HttpSrc_):
@@ -1998,11 +2113,24 @@ class BedFileParams(BaseModel):
     one_indexed: bool = False
 
 
-class BedFile(GenericModel, Generic[X]):
+Q = TypeVar(
+    "Q",
+    bound=_BedBaseDocumentable1
+    | _BedBaseDocumentable2
+    | _BedGenericDocumentable1
+    | _BedGenericDocumentable2,
+)
+
+
+class BedFile(GenericModel, Generic[Q]):
     """Inport specs for a bed-like file."""
 
-    bed: X
+    bed: Q
     params: BedFileParams = BedFileParams()
+
+    @property
+    def documentation(self) -> BedDoc:
+        return BedDoc(params=self.params, bed=self.bed.documentation)
 
     def read(self, path: Path) -> pd.DataFrame:
         """Read bed file with params from Path."""
@@ -2071,17 +2199,19 @@ Dip2VcfSrc = Dip2ChrFileSrc[BedFileSrc]
 AnyVcfT = TypeVar("AnyVcfT", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
 
 
-class VCFFile(BedFile[X], Generic[X]):
+class VCFFile(BedFile[Q], Generic[Q]):
     """Inport specs for a vcf file."""
 
-    bed: X  # type narrowing won't work without this redfinition
+    bed: Q  # type narrowing won't work without this redfinition
 
 
-class RMSKFile(BedFile[X], Generic[X]):
+class RMSKFile(BedFile[Q], Generic[Q]):
     """Input file for repeat masker stratification."""
 
-    bed: X  # type narrowing won't work without this redfinition
+    bed: Q  # type narrowing won't work without this redfinition
     class_col: NonNegativeInt
+
+    # TODO make custom doc function here
 
     @validator("class_col")
     def end_different(
@@ -2100,22 +2230,24 @@ class RMSKFile(BedFile[X], Generic[X]):
         return super()._read(path, [self.class_col])
 
 
-class SatFile(BedFile[X], Generic[X]):
+class SatFile(BedFile[Q], Generic[Q]):
     """Configuration for a satellites file."""
 
-    bed: X
+    bed: Q
     sat_col: NonNegativeInt
+
+    # TODO make custom doc function here
 
     def read(self, path: Path) -> pd.DataFrame:
         return super()._read(path, [self.sat_col])
 
 
-class LowComplexity(GenericModel, Generic[X]):
+class LowComplexity(GenericModel, Generic[Q]):
     """Configuration for low complexity stratification."""
 
-    rmsk: RMSKFile[X] | None = None
-    simreps: BedFile[X] | None = None
-    satellites: SatFile[X] | None = None
+    rmsk: RMSKFile[Q] | None = None
+    simreps: BedFile[Q] | None = None
+    satellites: SatFile[Q] | None = None
 
 
 class XYFile(HapBedFile):
@@ -2209,10 +2341,10 @@ class Mappability(BaseModel):
     unplaced_chr_patterns: list[str]
 
 
-class SegDups(GenericModel, Generic[X]):
+class SegDups(GenericModel, Generic[Q]):
     """Configuration for Segdup stratifications."""
 
-    superdups: BedFile[X] | None = None
+    superdups: BedFile[Q] | None = None
 
 
 class LowMapParams(BaseModel):
@@ -2442,19 +2574,21 @@ class CDSParams(BaseModel):
     attr_col: int = 8
 
 
-class CDS(BedFile[X], Generic[X]):
+class CDS(BedFile[Q], Generic[Q]):
     """Configuration for CDS stratifications.
 
     Note that the "bed" parameter actually expects a gff-ish formatted
     file by default as its "bed" file.
     """
 
-    bed: X
+    bed: Q
     cds_params: CDSParams = CDSParams()
     params: BedFileParams = BedFileParams(
         bed_cols=BedColumns(chr=0, start=3, end=4),
         one_indexed=True,
     )
+
+    # TODO make custom doc function here
 
     def read(self, path: Path) -> pd.DataFrame:
         """Read a bed file at 'path' on disk and return dataframe"""
@@ -2468,7 +2602,7 @@ class CDS(BedFile[X], Generic[X]):
 
 # TODO move these to the Functional directory given that the non-cds stuff
 # describes "genes" anyways?
-class Functional(GenericModel, Generic[X]):
+class Functional(GenericModel, Generic[Q]):
     """Configuration for all Functional-ish bed files.
 
     If not given, and the build has vdj/mhc/kir regions, attempt to get these
@@ -2478,10 +2612,10 @@ class Functional(GenericModel, Generic[X]):
     doesn't work (these regions are strange after all).
     """
 
-    cds: CDS[X] | None = None
-    mhc: BedFile[X] | None = None
-    kir: BedFile[X] | None = None
-    vdj: BedFile[X] | None = None
+    cds: CDS[Q] | None = None
+    mhc: BedFile[Q] | None = None
+    kir: BedFile[Q] | None = None
+    vdj: BedFile[Q] | None = None
 
 
 class StratInputs(GenericModel, Generic[AnyBedT]):

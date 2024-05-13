@@ -116,3 +116,19 @@ rule all_cds:
         rules.merge_cds.output,
         rules.invert_cds.output,
     localrule: True
+
+
+# rule functional_readme:
+#     input:
+#         common="workflow/templates/common.j2",
+#         description="workflow/templates/functional_description.j2",
+#         methods="workflow/templates/functional_methods.j2",
+#         cds=rules.merge_cds.output,
+#         notcds=rules.invert_cds.output,
+#         bedtools_env="workflow/envs/bedtools.yml",
+#     output:
+#         func.readme,
+#     conda:
+#         "../envs/templates.yml"
+#     script:
+#         "../scripts/python/templates/format_readme/format_functional.py"

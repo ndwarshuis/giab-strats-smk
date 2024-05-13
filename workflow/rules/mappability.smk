@@ -243,7 +243,6 @@ def mappabilty_inputs(ref_final_key, build_key):
     )
 
 
-# TODO write what happens in the diploid case
 # TODO what is the >0.9 thing in awk above?
 rule mappability_readme:
     input:
