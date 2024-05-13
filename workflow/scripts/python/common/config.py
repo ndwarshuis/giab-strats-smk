@@ -4024,16 +4024,36 @@ class GiabStrats(BaseModel):
 
     # other nice functions
 
+    def refkey_haplotypes(self, rk: RefKeyFullS) -> list[Haplotype]:
+        """Test if refkey is dip1 or dip2.
+
+        Return True if dip1, false if dip2.
+
+        If split is True, require dip1 refkey to have a haplotype and error
+        otherwise. The reverse is True if split is False.
+
+        If nohap is True, throw error if refkey is hap. If False permit the hap
+        case and return False.
+
+        """
+        return self.with_ref_data_full(
+            rk,
+            lambda _: [],
+            lambda _: [h for h in Haplotype],
+            lambda hap, _: [hap],
+        )
+
     def refkey_is_dip1(self, rk: RefKeyFullS, split: bool, nohap: bool) -> bool:
         """Test if refkey is dip1 or dip2.
 
         Return True if dip1, false if dip2.
 
-        If split is True, requrie haplotype to dip1 case and error otherwise.
-        The reverse is True is split is False.
+        If split is True, require dip1 refkey to have a haplotype and error
+        otherwise. The reverse is True if split is False.
 
         If nohap is True, throw error if refkey is hap. If False permit the hap
         case and return False.
+
         """
         return self.with_ref_data_full_rconf(
             rk,

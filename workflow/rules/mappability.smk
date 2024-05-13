@@ -243,9 +243,6 @@ def mappabilty_inputs(ref_final_key, build_key):
     )
 
 
-# TODO control whether or not we show the stuff for nonunique if we actually
-# have non-unique
-# TODO add versions for bedtools and bedops
 # TODO write what happens in the diploid case
 # TODO what is the >0.9 thing in awk above?
 rule mappability_readme:

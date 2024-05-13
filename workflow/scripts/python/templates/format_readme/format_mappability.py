@@ -52,6 +52,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         render_methods,
         "regions that are difficult to map for short reads",
         cfg.CoreLevel.MAPPABILITY,
+        sconf.refkey_haplotypes(rk),
     )
 
     with open(out, "w") as f:

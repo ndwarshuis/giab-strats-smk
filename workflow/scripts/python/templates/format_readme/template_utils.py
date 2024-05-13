@@ -31,6 +31,7 @@ def render_readme(
     render_methods: Callable[[j2.Template], str],
     desc: str,
     level: cfg.CoreLevel,
+    hs: list[cfg.Haplotype],
 ) -> str:
     common_path = cfg.smk_to_input_name(smk, "common")
     description_path = cfg.smk_to_input_name(smk, "description")
@@ -44,4 +45,5 @@ def render_readme(
         methods_text=render_methods(methods_template),
         group=level.value,
         description=desc,
+        haplotypes=[h.value for h in hs],
     )
