@@ -12,7 +12,7 @@ We generated mappability files representing all unique regions using
 
 {% for p in params %}
 - `l` = {{ p.length }}, `m` = {{ p.mismatches }}, `e` = {{ p.indels }}
-{% endfor %}
+{%- endfor %}
 
 Each of these were then converted to wig files using `gem-2-wig` which were then
 parsed into bed files using `wig2bed` from BEDOPS and then filtered for
@@ -54,4 +54,9 @@ The GEM mappability program ([Derrien T, Estellé J, Marco Sola S, Knowles DG,
 Raineri E, Guigó R, et al. (2012) Fast Computation and Applications of Genome
 Mappability. PLoS ONE 7(1):
 e30377](https://doi.org/10.1371/journal.pone.0030377)) was downloaded from
-{{ gemurl }}.
+{{ gemurl }}
+
+Other dependencies:
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}

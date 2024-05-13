@@ -144,3 +144,10 @@ def unzip2(xs: list[tuple[X, Y]]) -> tuple[list[X], list[Y]]:
 
 def unzip3(xs: list[tuple[X, Y, Z]]) -> tuple[list[X], list[Y], list[Z]]:
     return ([x[0] for x in xs], [x[1] for x in xs], [x[2] for x in xs])
+
+
+def filter_dict_strict(ds: dict[str, X], xs: set[str]) -> dict[str, X]:
+    notindict = set(xs) - set(ds)
+    if len(notindict) > 0:
+        raise DesignError(f"Items not in input dictionary keys: {notindict}")
+    return {k: v for k, v in ds.items() if k in xs}
