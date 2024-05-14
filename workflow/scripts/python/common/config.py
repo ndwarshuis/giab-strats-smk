@@ -101,6 +101,7 @@ import sys
 import json
 import pandas as pd
 import re
+from textwrap import fill
 from pathlib import Path
 from pydantic import BaseModel as BaseModel_
 from pydantic.generics import GenericModel as GenericModel_
@@ -127,6 +128,7 @@ from typing_extensions import Self, assert_never
 from itertools import chain
 from more_itertools import duplicates_everseen
 from common.functional import (
+    from_maybe,
     fmap_maybe,
     fmap_maybe_def,
     both,
@@ -141,7 +143,7 @@ from common.functional import (
     noop,
     raise_inline,
 )
-from common.io import is_gzip, is_bgzip
+from common.io import is_gzip, is_bgzip, get_md5
 import common.bed as bed
 
 
@@ -979,6 +981,82 @@ def filter_sort_bed_main(
     )
 
 
+# doc formatters
+
+
+def format_bed_params(ps: BedFileParams) -> str:
+    cols = ps.bed_cols
+    chrom = cols.chr + 1
+    start = cols.start + 1
+    end = cols.end + 1
+
+    columns_txt = " ".join(
+        [
+            f"To construct the bed file, columns {chrom}, {start}, and {end}",
+            "were selected as the 'chrom', 'start', and 'end' columns",
+            "respectively.",
+        ]
+    )
+
+    skip_txt = (
+        None if ps.skip_lines == 0 else f"The first {ps.skip_lines} were skipped."
+    )
+
+    offset = (
+        "Each coordinate was reduced by 1 since the incoming file was 1-indexed."
+        if ps.one_indexed
+        else None
+    )
+
+    return " ".join([x for x in [columns_txt, skip_txt, offset] if x is not None])
+
+
+def format_md5(p: Path) -> str:
+    h = get_md5(p)
+    return f"The md5 hash of the uncompressed file was {h}."
+
+
+def format_this(this: str | None) -> str:
+    return from_maybe("This file", this)
+
+
+def format_url_src(src: UrlSrcDoc, p: Path, this: str | None) -> str:
+    url_txt = f"{format_this(this)} was downloaded from {src.url}."
+    md5_txt = format_md5(p)
+    return " ".join([x for x in [url_txt, md5_txt, src.comment] if x is not None])
+
+
+def format_local_src(src: LocalSrcDoc, p: Path, this: str | None) -> str:
+    local_txt = (
+        f"{format_this(this)} was saved locally on the machine running the pipeline."
+    )
+    md5_txt = format_md5(p)
+    return " ".join([x for x in [local_txt, md5_txt, src.comment] if x is not None])
+
+
+def format_txt_src(src: TxtSrcDoc, this: str | None) -> str:
+    txt = (
+        f"{format_this(this)} had coordinates which were specified manually"
+        "in the pipeline's configuration"
+    )
+    return " ".join([x for x in [txt, src.comment] if x is not None])
+
+
+def format_src(src: SrcDoc, p: Path, this: str | None) -> str:
+    if isinstance(src, UrlSrcDoc):
+        return format_url_src(src, p, this)
+    elif isinstance(src, LocalSrcDoc):
+        return format_local_src(src, p, this)
+    elif isinstance(src, TxtSrcDoc):
+        return format_txt_src(src, this)
+    else:
+        assert_never(src)
+
+
+def readme_fill(s: str) -> str:
+    return fill(s, width=80, break_long_words=False)
+
+
 ################################################################################
 # Helper classes
 
@@ -1338,7 +1416,6 @@ class RefDirs(NamedTuple):
 
 class LocalSrcDoc(NamedTuple):
     comment: str
-    md5: str | None
 
 
 class TxtSrcDoc(NamedTuple):
@@ -1347,16 +1424,35 @@ class TxtSrcDoc(NamedTuple):
 
 class UrlSrcDoc(NamedTuple):
     comment: str | None
-    md5: str | None
     url: str
 
 
-BedSrcDoc = LocalSrcDoc | TxtSrcDoc | UrlSrcDoc
+SrcDoc = LocalSrcDoc | TxtSrcDoc | UrlSrcDoc
 
 
 class BedDoc(NamedTuple):
     params: BedFileParams
-    bed: Single[BedSrcDoc] | Double[BedSrcDoc]
+    bed: Single[SrcDoc] | Double[SrcDoc]
+
+
+# class RMSKDoc(NamedTuple):
+#     bed: BedDoc
+#     class_col: int
+
+
+# class SatDoc(NamedTuple):
+#     bed: BedDoc
+#     sat_col: int
+
+
+# class XYDoc(NamedTuple):
+#     bed: BedDoc
+#     level_col: int
+
+
+# class CDSDoc(NamedTuple):
+#     bed: BedDoc
+#     cds_params: CDSParams
 
 
 ################################################################################
@@ -1405,48 +1501,59 @@ class GenericModel(GenericModel_):
         return created_class
 
 
-class _BedDocumentable:
+class _SrcDocumentable:
+    """Means to provide documentation for a file source"""
 
     @property
-    def documentation(self) -> BedSrcDoc:
+    def documentation(self) -> SrcDoc:
         return NotImplemented
 
 
-class _BedDocumentable1:
+class _SrcDocumentable1:
+    """Means to provide documentation for one source file"""
 
     @property
-    def documentation(self) -> Single[BedSrcDoc]:
+    def documentation(self) -> Single[SrcDoc]:
         return NotImplemented
 
 
-class _BedDocumentable2:
+class _SrcDocumentable2:
+    """Means to provide documentation for two source files"""
 
     @property
-    def documentation(self) -> Double[BedSrcDoc]:
+    def documentation(self) -> Double[SrcDoc]:
         return NotImplemented
 
 
-class _BedBaseDocumentable(BaseModel, _BedDocumentable):
+class _BaseSrcDocumentable(BaseModel, _SrcDocumentable):
     pass
 
 
-class _BedBaseDocumentable1(BaseModel, _BedDocumentable1):
+class _BaseSrcDocumentable1(BaseModel, _SrcDocumentable1):
     pass
 
 
-class _BedBaseDocumentable2(BaseModel, _BedDocumentable2):
+class _BaseSrcDocumentable2(BaseModel, _SrcDocumentable2):
     pass
 
 
-class _BedGenericDocumentable1(GenericModel, _BedDocumentable1):
+class _GenericSrcDocumentable1(GenericModel, _SrcDocumentable1):
     pass
 
 
-class _BedGenericDocumentable2(GenericModel, _BedDocumentable2):
+class _GenericSrcDocumentable2(GenericModel, _SrcDocumentable2):
     pass
 
 
-S = TypeVar("S", bound=_BedBaseDocumentable)
+S = TypeVar("S", bound=_BaseSrcDocumentable)
+
+Q = TypeVar(
+    "Q",
+    bound=_BaseSrcDocumentable1
+    | _BaseSrcDocumentable2
+    | _GenericSrcDocumentable1
+    | _GenericSrcDocumentable2,
+)
 
 
 class Diploid(GenericModel, Generic[X]):
@@ -1755,14 +1862,14 @@ class _Dip2ChrSrc(Generic[X]):
         return self.chr_pattern.choose(h).filter_indices(cis)
 
 
-class HapChrFileSrc(_BedGenericDocumentable1, Generic[S], _HapChrSrc[S]):
+class HapChrFileSrc(_GenericSrcDocumentable1, Generic[S], _HapChrSrc[S]):
     """Specification for a haploid source file."""
 
     chr_pattern_: HapChrPattern = Field(HapChrPattern(), alias="chr_pattern")
     hap: S
 
     @property
-    def documentation(self) -> Single[BedSrcDoc]:
+    def documentation(self) -> Single[SrcDoc]:
         return Single(elem=self.hap.documentation)
 
     @property
@@ -1774,7 +1881,7 @@ class HapChrFileSrc(_BedGenericDocumentable1, Generic[S], _HapChrSrc[S]):
         return self.chr_pattern_
 
 
-class Dip1ChrFileSrc(_BedGenericDocumentable1, Generic[S], _Dip1ChrSrc[S]):
+class Dip1ChrFileSrc(_GenericSrcDocumentable1, Generic[S], _Dip1ChrSrc[S]):
     """Specification for a combined diploid source file.
 
     The 'src' is assumed to have all chromosomes for both haplotypes in one
@@ -1787,7 +1894,7 @@ class Dip1ChrFileSrc(_BedGenericDocumentable1, Generic[S], _Dip1ChrSrc[S]):
     dip: S
 
     @property
-    def documentation(self) -> Single[BedSrcDoc]:
+    def documentation(self) -> Single[SrcDoc]:
         return Single(elem=self.dip.documentation)
 
     @property
@@ -1799,7 +1906,7 @@ class Dip1ChrFileSrc(_BedGenericDocumentable1, Generic[S], _Dip1ChrSrc[S]):
         return self.chr_pattern_
 
 
-class Dip2ChrFileSrc(_BedGenericDocumentable2, Generic[S], _Dip2ChrSrc[S]):
+class Dip2ChrFileSrc(_GenericSrcDocumentable2, Generic[S], _Dip2ChrSrc[S]):
     """Specification for split diploid source files.
 
     Each source may or may not have each haplotype labeled; the identity of each
@@ -1826,7 +1933,7 @@ class Dip2ChrFileSrc(_BedGenericDocumentable2, Generic[S], _Dip2ChrSrc[S]):
     hap2: S
 
     @property
-    def documentation(self) -> Double[BedSrcDoc]:
+    def documentation(self) -> Double[SrcDoc]:
         return Double(
             elem1=self.hap1.documentation,
             elem2=self.hap2.documentation,
@@ -1887,7 +1994,7 @@ class DipBedTxtLine(BedTxtLine):
 BedTxtLineT = TypeVar("BedTxtLineT", HapBedTxtLine, DipBedTxtLine)
 
 
-class BedTxtSrc(GenericModel, Generic[BedTxtLineT], _BedDocumentable):
+class BedTxtSrc(GenericModel, Generic[BedTxtLineT], _SrcDocumentable):
     """Bed file encoded directly in the configuration file.
 
     'lines' does not need to be sorted, but each 'more' attribute must have the
@@ -1898,7 +2005,7 @@ class BedTxtSrc(GenericModel, Generic[BedTxtLineT], _BedDocumentable):
     comment: str = "This bed file was specified manually in the yaml config"
 
     @property
-    def documentation(self) -> BedSrcDoc:
+    def documentation(self) -> SrcDoc:
         return TxtSrcDoc(self.comment)
 
     @validator("lines")
@@ -1912,11 +2019,11 @@ HapBedTxtSrc = BedTxtSrc[HapBedTxtLine]
 DipBedTxtSrc = BedTxtSrc[DipBedTxtLine]
 
 
-class HapChrTxtSrc(_BedBaseDocumentable1, _HapChrSrc[bed.BedLines]):
+class HapChrTxtSrc(_BaseSrcDocumentable1, _HapChrSrc[bed.BedLines]):
     hap: HapBedTxtSrc
 
     @property
-    def documentation(self) -> Single[BedSrcDoc]:
+    def documentation(self) -> Single[SrcDoc]:
         return Single(elem=self.hap.documentation)
 
     @property
@@ -1928,12 +2035,12 @@ class HapChrTxtSrc(_BedBaseDocumentable1, _HapChrSrc[bed.BedLines]):
         return HapChrPattern()
 
 
-class Dip1ChrTxtSrc(_BedBaseDocumentable1, _Dip1ChrSrc[bed.BedLines]):
+class Dip1ChrTxtSrc(_BaseSrcDocumentable1, _Dip1ChrSrc[bed.BedLines]):
     dip: DipBedTxtSrc
     comment: str = "This bed file was specified manually in the yaml config"
 
     @property
-    def documentation(self) -> Single[BedSrcDoc]:
+    def documentation(self) -> Single[SrcDoc]:
         return Single(elem=self.dip.documentation)
 
     @property
@@ -1945,12 +2052,12 @@ class Dip1ChrTxtSrc(_BedBaseDocumentable1, _Dip1ChrSrc[bed.BedLines]):
         return DipChrPattern()
 
 
-class Dip2ChrTxtSrc(_BedBaseDocumentable2, _Dip2ChrSrc[bed.BedLines]):
+class Dip2ChrTxtSrc(_BaseSrcDocumentable2, _Dip2ChrSrc[bed.BedLines]):
     hap1: HapBedTxtSrc
     hap2: HapBedTxtSrc
 
     @property
-    def documentation(self) -> Double[BedSrcDoc]:
+    def documentation(self) -> Double[SrcDoc]:
         return Double(
             elem1=self.hap1.documentation,
             elem2=self.hap1.documentation,
@@ -1980,7 +2087,7 @@ class Dip2ChrTxtSrc(_BedBaseDocumentable2, _Dip2ChrSrc[bed.BedLines]):
         )
 
 
-class HashedSrc_(_BedBaseDocumentable):
+class HashedSrc_(_BaseSrcDocumentable):
     """A source that may be hashed to verify its integrity"""
 
     md5: str | None = None
@@ -1993,8 +2100,8 @@ class FileSrc_(HashedSrc_):
     comment: str = "This file was local on the filesystem when the pipeline was run"
 
     @property
-    def documentation(self) -> BedSrcDoc:
-        return LocalSrcDoc(md5=self.md5, comment=self.comment)
+    def documentation(self) -> SrcDoc:
+        return LocalSrcDoc(comment=self.comment)
 
 
 class BedLocalSrc(FileSrc_):
@@ -2019,10 +2126,11 @@ class HttpSrc_(HashedSrc_):
     """Base class for downloaded src files."""
 
     url: HttpUrl
+    comment: str | None = None
 
     @property
-    def documentation(self) -> BedSrcDoc:
-        return UrlSrcDoc(url=self.url, comment=None, md5=self.md5)
+    def documentation(self) -> SrcDoc:
+        return UrlSrcDoc(url=self.url, comment=self.comment)
 
 
 class BedHttpSrc(HttpSrc_):
@@ -2113,24 +2221,19 @@ class BedFileParams(BaseModel):
     one_indexed: bool = False
 
 
-Q = TypeVar(
-    "Q",
-    bound=_BedBaseDocumentable1
-    | _BedBaseDocumentable2
-    | _BedGenericDocumentable1
-    | _BedGenericDocumentable2,
-)
-
-
 class BedFile(GenericModel, Generic[Q]):
     """Inport specs for a bed-like file."""
 
     bed: Q
     params: BedFileParams = BedFileParams()
 
-    @property
-    def documentation(self) -> BedDoc:
-        return BedDoc(params=self.params, bed=self.bed.documentation)
+    # @property
+    # def bed_documentation(self) -> BedDoc:
+    #     return self._documentation
+
+    # @property
+    # def _documentation(self) -> BedDoc:
+    #     return BedDoc(params=self.params, bed=self.bed.documentation)
 
     def read(self, path: Path) -> pd.DataFrame:
         """Read bed file with params from Path."""
@@ -2211,7 +2314,9 @@ class RMSKFile(BedFile[Q], Generic[Q]):
     bed: Q  # type narrowing won't work without this redfinition
     class_col: NonNegativeInt
 
-    # TODO make custom doc function here
+    # @property
+    # def rmsk_documentation(self) -> RMSKDoc:
+    #     return RMSKDoc(bed=self._documentation, class_col=self.class_col)
 
     @validator("class_col")
     def end_different(
@@ -2236,7 +2341,9 @@ class SatFile(BedFile[Q], Generic[Q]):
     bed: Q
     sat_col: NonNegativeInt
 
-    # TODO make custom doc function here
+    # @property
+    # def sat_documentation(self) -> SatDoc:
+    #     return SatDoc(bed=self._documentation, sat_col=self.sat_col)
 
     def read(self, path: Path) -> pd.DataFrame:
         return super()._read(path, [self.sat_col])
@@ -2254,6 +2361,10 @@ class XYFile(HapBedFile):
     """Bed file input for XY features."""
 
     level_col: NonNegativeInt
+
+    # @property
+    # def documentation(self) -> XYDoc:
+    #     return XYDoc(bed=self._documentation, level_col=self.level_col)
 
     @validator("level_col")
     def level_different(
@@ -2588,7 +2699,9 @@ class CDS(BedFile[Q], Generic[Q]):
         one_indexed=True,
     )
 
-    # TODO make custom doc function here
+    # @property
+    # def cds_documentation(self) -> CDSDoc:
+    #     return CDSDoc(bed=self._documentation, cds_params=self.cds_params)
 
     def read(self, path: Path) -> pd.DataFrame:
         """Read a bed file at 'path' on disk and return dataframe"""
@@ -4054,6 +4167,108 @@ class GiabStrats(BaseModel):
             lambda i, o, bd, bf: list(
                 chain(*wrap_dip_2to2_io_f(dip_2to2_f, i, o, bd, bf))
             ),
+        )
+
+    def with_build_data_and_bed_doc(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        inputs: list[Path],
+        get_bed_f: BuildDataToBed,
+        this: str | None,
+        extra: str | None,
+    ) -> str:
+        """Format readme documentation for a given source.
+
+        Input file(s) will be used to generate md5 hashes.
+
+        'extra' will be appended as an additional paragraph to the end.
+
+        Return a string of rmarkdown paragraphs formatted with 80-char wrap.
+        """
+
+        def hap(bf: HapBedFile) -> list[str]:
+            src_txt = match1_unsafe(
+                inputs, lambda p: format_src(bf.bed.documentation.elem, p, this)
+            )
+            params_txt = format_bed_params(bf.params)
+            return [src_txt, params_txt]
+
+        def dip1to1(bf: Dip1BedFile) -> list[str]:
+            dip_txt = "This source contained both haplotypes for this reference."
+            src_txt = match1_unsafe(
+                inputs, lambda p: format_src(bf.bed.documentation.elem, p, this)
+            )
+            params_txt = format_bed_params(bf.params)
+            return [dip_txt, src_txt, params_txt]
+
+        def dip1to2(bf: Dip1BedFile, hap: Haplotype) -> list[str]:
+            dip_txt = " ".join(
+                [
+                    "This source contained both haplotypes for this reference,",
+                    f"and only the {hap.value} haplotype was used to generate",
+                    "these bed files.",
+                ]
+            )
+            src_txt = match1_unsafe(
+                inputs, lambda p: format_src(bf.bed.documentation.elem, p, this)
+            )
+            params_txt = format_bed_params(bf.params)
+            return [dip_txt, src_txt, params_txt]
+
+        def dip2to1(bf: Dip2BedFile) -> list[str]:
+            def fmt_src(h: Haplotype) -> list[str]:
+                header = f"#### Haplotype {h.value}"
+                src_txt = match2_unsafe(
+                    inputs,
+                    lambda p1, p2: format_src(
+                        bf.bed.documentation.choose(h), h.choose(p1, p2), this
+                    ),
+                )
+                return [header, src_txt]
+
+            dip_txt = " ".join(
+                [
+                    "The two haplotypes for this reference were obtained from",
+                    "different source files",
+                ]
+            )
+            src_paras = [p for h in Haplotype for p in fmt_src(h)]
+            params_txt = format_bed_params(bf.params)
+            return [dip_txt, *src_paras, "#### Both haplotypes", params_txt]
+
+        def dip2to2(bf: Dip2BedFile, hap: Haplotype) -> list[str]:
+            dip_txt = " ".join(
+                [
+                    f"This source contained only the {hap.value} haplotype for",
+                    "this reference, which was used to generate these bed files.",
+                ]
+            )
+            src_txt = match2_unsafe(
+                inputs,
+                lambda p1, p2: format_src(
+                    bf.bed.documentation.choose(hap), hap.choose(p1, p2), this
+                ),
+            )
+            params_txt = format_bed_params(bf.params)
+            return [dip_txt, src_txt, params_txt]
+
+        paragraphs = self.with_build_data_and_bed_full(
+            rk,
+            bk,
+            get_bed_f,
+            lambda _, bf: hap(bf),
+            lambda _, bf: dip1to1(bf),
+            lambda hap, _, bf: dip1to2(bf, hap),
+            lambda _, bf: dip2to1(bf),
+            lambda hap, _, bf: dip2to2(bf, hap),
+        )
+
+        return "\n\n".join(
+            [
+                readme_fill(p)
+                for p in fmap_maybe_def(paragraphs, lambda e: [*paragraphs, e], extra)
+            ]
         )
 
     # final refkey/buildkey lists (for the "all" target and related)

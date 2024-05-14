@@ -1,18 +1,11 @@
 ## Description of methods used to generate the stratifications
 
-A GFF file containing the CDS regions (and likely other stuff) is filtered for
-lines with "(Best)RefSeq" and "CDS" (in columns 2 and 3 respectively). This is
-then parsed into a bed file by subsetting to columns 1, 4, and 5 (chrom, start,
-and end respectively) and shifting each coordinate by -1 (note that GFF files
-are 1-based and BED files are 0-based). Coordinates where start == end are
-removed. The remainining regions are merged using `mergeBed`.
+{{ src_txt }}
 
-## Dependencies
-
-{{ gff_file }}
+{{ processing_txt }}
 
 ## Software
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}
 
-{# TODO include bedtools and stuff here #}
-
-{% include "footer.md" %}

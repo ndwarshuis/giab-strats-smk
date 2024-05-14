@@ -1,4 +1,11 @@
-from common.config import CoreLevel, si_to_cds, si_to_mhc, si_to_kir, si_to_vdj
+from common.config import (
+    CoreLevel,
+    si_to_cds,
+    si_to_mhc,
+    si_to_kir,
+    si_to_vdj,
+    strip_full_refkey,
+)
 
 func = config.to_bed_dirs(CoreLevel.FUNCTIONAL)
 
@@ -118,17 +125,23 @@ rule all_cds:
     localrule: True
 
 
-# rule functional_readme:
-#     input:
-#         common="workflow/templates/common.j2",
-#         description="workflow/templates/functional_description.j2",
-#         methods="workflow/templates/functional_methods.j2",
-#         cds=rules.merge_cds.output,
-#         notcds=rules.invert_cds.output,
-#         bedtools_env="workflow/envs/bedtools.yml",
-#     output:
-#         func.readme,
-#     conda:
-#         "../envs/templates.yml"
-#     script:
-#         "../scripts/python/templates/format_readme/format_functional.py"
+rule functional_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/functional_description.j2",
+        methods="workflow/templates/functional_methods.j2",
+        cds_inputs=lambda w: expand(
+            rules.download_cds.output,
+            ref_src_key=config.refkey_to_bed_refsrckeys(
+                si_to_cds, strip_full_refkey(w["ref_final_key"])
+            ),
+        ),
+        cds=rules.merge_cds.output[0],
+        notcds=rules.invert_cds.output[0],
+        bedtools_env="workflow/envs/bedtools.yml",
+    output:
+        func.readme,
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_functional.py"

@@ -1,9 +1,25 @@
 import jinja2 as j2
-from typing import Any, assert_never
+from typing import Any
 import common.config as cfg
-from common.functional import DesignError
-from common.bed import BedLines
+from common.functional import DesignError, fmap_maybe
 import template_utils as tu
+
+
+def format_cds_params(p: cfg.CDSParams) -> str:
+    source_txt = fmap_maybe(
+        lambda x: f"column {x[1]+1} matched '{x[0]}'", p.source_match
+    )
+    type_txt = fmap_maybe(lambda x: f"column {x[1]+1} matched '{x[0]}'", p.type_match)
+
+    return cfg.readme_fill(
+        " ".join(
+            [
+                f"Lines where {source_txt} and {type_txt} were selected.",
+                "Coordinates where start == end were removed.",
+                "The remainining regions where merged using `mergeBed`.",
+            ]
+        )
+    )
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
@@ -19,43 +35,19 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     if cds_src is None:
         raise DesignError()
 
-    params = cds_src.params
-    cds_params = cds_src.params
-
-    # def format_src(src: cfg.BedFileSrc | BedLines) -> str:
-    #     if isinstance(src, cfg.HapChrFileSrc):
-    #         src.src
-    #     elif isinstance(src, cfg.HapChrTxtSrc):
-    #         pass
-    #     else:
-    #         assert_never(src)
-
-    bed = sconf.with_build_data_and_bed(
-        rk,
+    src_txt = sconf.with_build_data_and_bed_doc(
+        rfk,
         bk,
+        cfg.smk_to_inputs_name(smk, "cds_inputs"),
         cfg.bd_to_cds,
-        lambda _, bf: bf.bed.documentation.as_list,
-        lambda _, bf: bf.bed.documentation.as_list,
-        lambda _, bf: bf.bed.documentation.as_list,
-        lambda _, bf: bf.bed.documentation.as_list,
-        lambda _, bf: bf.bed.documentation.as_list,
+        "The GFF file",
+        None,
     )
-
-    # if isinstance(bed, cfg.Single):
-    #     pass
-    # elif isinstance(bed, cfg.Double):
-    #     pass
-    # else:
-    #     assert_never(bed)
-
-    cds_path = cfg.smk_to_input_name(smk, "cds")
-    notcds_path = cfg.smk_to_input_name(smk, "notcds")
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
-    out = cfg.smk_to_output(smk)
-
-    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools"})
+    cds_path = cfg.smk_to_input_name(smk, "cds")
+    notcds_path = cfg.smk_to_input_name(smk, "notcds")
 
     def render_description(t: j2.Template) -> str:
         return t.render(
@@ -63,9 +55,13 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             notcds_file=notcds_path.name,
         )
 
+    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
+
     def render_methods(t: j2.Template) -> str:
         return t.render(
             deps=bedtools_deps,
+            src_txt=src_txt,
+            processing_txt=format_cds_params(cds_src.cds_params),
         )
 
     txt = tu.render_readme(
@@ -76,6 +72,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         cfg.CoreLevel.FUNCTIONAL,
         sconf.refkey_haplotypes(rfk),
     )
+
+    out = cfg.smk_to_output(smk)
 
     with open(out, "w") as f:
         f.write(txt)
