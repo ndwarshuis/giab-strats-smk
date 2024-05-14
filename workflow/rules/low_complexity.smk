@@ -705,25 +705,6 @@ use rule invert_satellites as invert_HPs_and_TRs with:
         lc.final("notinAllTandemRepeatsandHomopolymers_slop5"),
 
 
-# rule all_low_complexity:
-#     input:
-#         # Uniform repeats
-#         rules.all_uniform_repeats.input,
-#         rules.merge_all_uniform_repeats.output,
-#         rules.invert_all_uniform_repeats.output,
-#         # Satellites
-#         rules.merge_satellites.output,
-#         rules.invert_satellites.output,
-#         # Tandem Repeats
-#         rules.all_TRs.input,
-#         rules.merge_filtered_TRs.output,
-#         rules.invert_TRs.output,
-#         # "Everything" (in theory)
-#         rules.merge_HPs_and_TRs.output,
-#         rules.invert_HPs_and_TRs.output,
-#     localrule: True
-
-
 def all_low_complexity(ref_final_key):
     rd = config.to_ref_data_full(ref_final_key)
     rmsk = rd.has_low_complexity_rmsk
@@ -752,4 +733,55 @@ def all_low_complexity(ref_final_key):
     merged = rules.merge_HPs_and_TRs.output + rules.invert_HPs_and_TRs.output
     all_trs_and_hps = trs + merged if has_sats and simreps else []
 
+    return {
+        "uniform_repeats": urs,
+        "satellites": sats,
+        "all_trs_and_hps": all_trs_and_hps,
+    }
+
+
+def all_low_complexity_flat(ref_final_key):
+    rd = config.to_ref_data_full(ref_final_key)
+    rmsk = rd.has_low_complexity_rmsk
+    simreps = rd.has_low_complexity_simreps
+    censat = rd.has_low_complexity_censat
+    has_sats = rmsk or censat
+
+    # include uniform repeats no matter what
+    urs = (
+        rules.all_uniform_repeats.input
+        + rules.merge_all_uniform_repeats.output
+        + rules.invert_all_uniform_repeats.output
+    )
+
+    # include satellites only if we have rmsk or censat
+    sats = (
+        rules.merge_satellites.output + rules.invert_satellites.output
+        if has_sats
+        else []
+    )
+
+    # include tandem repeats and merged output if we have rmsk/censat and simreps
+    trs = (
+        rules.all_TRs.input + rules.merge_filtered_TRs.output + rules.invert_TRs.output
+    )
+    merged = rules.merge_HPs_and_TRs.output + rules.invert_HPs_and_TRs.output
+    all_trs_and_hps = trs + merged if has_sats and simreps else []
+
     return all_trs_and_hps + sats + urs
+
+
+rule gc_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/gc_description.j2",
+        methods="workflow/templates/gc_methods.j2",
+        gc_inputs=rules.intersect_gc_ranges.output[0],
+        bedtools_env="workflow/envs/bedtools.yml",
+        seqtk_env="workflow/envs/seqtk.yml",
+    output:
+        lc.readme,
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_lowcomplexity.py"

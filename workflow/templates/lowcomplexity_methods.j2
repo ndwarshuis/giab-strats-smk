@@ -1,0 +1,46 @@
+# METHODOLOGICAL INFORMATION
+
+## Description of methods used to generate the stratifications
+
+### Simple Repeats (perfect and imperfect)
+
+Each of the `SimpleRepeat` files were generated directly from the reference
+using a simple C program (`repseq`, see below) that loops through a fasta file
+and creates a bed file whose regions represent all repeats that have subunits of
+length 1 (homopolymer), 2 (diTR), 3 (triTR), or 4 (quadTR) basepairs long. These
+bed files were subset to repeats less than given lengths (and in some cases to
+complimentary base pairs) for subsequent steps.
+
+*TODO add parameters here*
+
+These bed files were subtracted from one another to produce bed files
+representing repeats of a given range using `subtractBed` (ie subtracting
+repeats less than `X` from repeats less than `Y` produced a bed file
+representing repeats of length `X` to `Y` assuming `Y > X`). These bed files
+were extended by 5 bases in either direction with `slopBed` and then overlaps
+were merged using `mergeBed`.
+
+Imperfect repeats were made using the same `repseq` generated bed files for just
+homopolymers as described immediately above, but this time merging all repeats
+within 1 base pair (`mergeBed` with `-d 1`) of each other before adding slop and
+merging overlaps. The result of this is a set of regions that represent
+homopolymers that may be interrupted by one non-homopolymer base.
+
+### Satellites
+
+
+
+### All Tandem Repeats and Homopolymers
+
+## Dependencies
+
+* Repeat masker file: {{ rmsk_src }}
+* Tandem repeat finder: {{ trf_src }}
+* Censat: {{ censat_src }}
+
+Note that simple repeats and imperfect homopolymers were generated only using
+the reference fasta.
+
+## Software
+
+{# TODO include bedtools and stuff here #}
