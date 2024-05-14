@@ -93,3 +93,19 @@ def gc_inputs(ref_final_key, build_key):
 def gc_inputs_flat(ref_final_key, build_key):
     res = gc_inputs(ref_final_key, build_key)
     return [*res["gc_ranges"], res["widest_extreme"], *res["other_extremes"]]
+
+
+rule gc_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/gc_description.j2",
+        methods="workflow/templates/gc_methods.j2",
+        gc_inputs=rules.intersect_gc_ranges.output[0],
+        bedtools_env="workflow/envs/bedtools.yml",
+        seqtk_env="workflow/envs/seqtk.yml",
+    output:
+        gc.readme,
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_gc.py"

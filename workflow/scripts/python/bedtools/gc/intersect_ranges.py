@@ -130,6 +130,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         log_path,
     )
 
+    # ASSUME there is one extreme denoted in the config (otherwise we won't have
+    # something to put in "widest extreme"
     with open(out_path, "w") as f:
         # put the first low and last high input here since these are already
         # in the final directory

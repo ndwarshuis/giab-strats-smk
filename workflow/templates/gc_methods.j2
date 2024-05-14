@@ -1,0 +1,35 @@
+## Methods
+
+`seqtk` was used to find regions >=100bp long in the reference that were either
+less than or greater than a given GC% cutoff. The following cutoffs were used:
+
+- less than:
+{%- for b in lower_fractions %}
+  - {{ b }}%
+{%- endfor %}
+
+- greater than:
+{%- for b in upper_fractions %}
+  - {{ b }}%
+{%- endfor %}
+
+Regions were extended by 50bp in either direction using `slopBed`. Regions were
+then merged using `mergeBed`.
+
+To generate bed files with GC ranges from X to Y, we subtracted the larger (in
+total bases) of X and Y from the smaller using `subtractBed`. This was done for
+each consequtive pair of bases in the union of the "less than" and "greater
+than" lists above.
+
+To generate the dual extreme bed files, we combined two bed files representing
+GC content <X and >Y respectively and combined them using `multiIntersectBed`
+and `mergeBed`.
+
+## Dependencies
+
+These stratifications only depended on the reference.
+
+## Software
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}

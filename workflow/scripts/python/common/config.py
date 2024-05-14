@@ -2498,17 +2498,27 @@ class GCParams(BaseModel):
         (85, False),
     ]
 
+    @validator("low", "high")
+    def non_empty_range(cls, rng: list[GCBound]) -> list[GCBound]:
+        try:
+            assert len(rng) > 0, "GC low and high must be non-empty lists"
+        except KeyError:
+            pass
+        return rng
+
     @validator("high")
-    def has_balanced_ranges(
+    def has_balanced_nonempty_ranges(
         cls,
         high: list[GCBound],
         values: dict[str, Any],
-    ) -> list[tuple[Percent, bool]]:
+    ) -> list[GCBound]:
         try:
             low = cast(list[GCBound], values["low"])
-            assert len([x for x in low if x[1]]) == len(
-                [x for x in high if x[1]]
-            ), "GC low/high must have same number of range boundaries"
+            low_len = len([x for x in low if x[1]])
+            high_len = len([x for x in high if x[1]])
+            assert (
+                (low_len == high_len) and low_len > 0 and high_len > 0
+            ), "GC low/high must have at least one and the same number of range boundaries"
         except KeyError:
             pass
         return high
@@ -2529,6 +2539,7 @@ class GCParams(BaseModel):
     def high_fractions(self) -> list[int]:
         return [x[0] for x in self.high_sorted]
 
+    # NOTE these assume that the low/high lists are non-empty
     @property
     def low_bounds(self) -> tuple[int, list[int]]:
         bounds = self.low_fractions
