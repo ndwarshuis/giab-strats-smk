@@ -1440,6 +1440,7 @@ class BedDoc(NamedTuple):
 
 class UniformRepeatPaths(NamedTuple):
     perfect: list[Path]  # ASSUME this will always be non-empty
+    imperfect: list[Path]  # ASSUME this will always be non-empty
     homopolymers: Path
     not_homopolymers: Path
 
@@ -1501,6 +1502,7 @@ def all_low_complexity(
     rk: RefKeyFullS,
     # uniform
     perfect: list[Path],
+    imperfect: list[Path],
     homopolymers: Path,
     not_homopolymers: Path,
     # satellites
@@ -1522,6 +1524,7 @@ def all_low_complexity(
     # homopolymers and uniform repeats are included no matter what
     uniform = UniformRepeatPaths(
         perfect=perfect,
+        imperfect=imperfect,
         homopolymers=homopolymers,
         not_homopolymers=not_homopolymers,
     )

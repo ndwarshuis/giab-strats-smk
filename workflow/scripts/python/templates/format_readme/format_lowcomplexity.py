@@ -34,7 +34,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     inputs: cfg.LowComplexityPaths = smk.params["input_paths"]
 
-    urs = inputs.uniform_repeats
+    uniform = inputs.uniform_repeats
     sats = inputs.satellites
 
     if sats is None:
@@ -70,23 +70,28 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     def render_methods(t: j2.Template) -> str:
         return t.render(
             # uniform repeat section
-            perfect_files=[],
-            imperfect_files=[],
-            perfect_imperfect_file=[],
-            not_perfect_imperfect_file=[],
+            uniform_repeat_paths=uniform,
+            # perfect_files=[x.name for x in uniform.perfect],
+            # imperfect_files=[x.name for x in uniform.imperfect],
+            # homopolymers_file=uniform.homopolymers.name,
+            # not_homopolymers_file=uniform.not_homopolymers.name,
             # sat section
+            sat_paths=fmap_maybe(lambda i: i.satellites, inputs),
             sat_src=[],
-            sat_file=[],
-            not_sat_file=[],
+            # sat_file=[],
+            # not_sat_file=[],
             # tr section
             rmsk_src=[],
             sat_src=[],
             trf_src=[],
-            all_filtered_tr_files=[],
-            all_tr_file=[],
-            not_all_tr_file=[],
-            all_repeat_file=[],
-            not_all_repeat_file=[],
+            repeat_paths=fmap_maybe(
+                lambda i: fmap_maybe(lambda s: s.all_repeats, i.satellites), inputs
+            ),
+            # all_filtered_tr_files=[],
+            # all_tr_file=[],
+            # not_all_tr_file=[],
+            # all_repeat_file=[],
+            # not_all_repeat_file=[],
             # software section
             repseq_src="TODO",
             deps=bedtools_deps,

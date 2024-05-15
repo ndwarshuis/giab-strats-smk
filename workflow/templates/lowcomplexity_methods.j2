@@ -82,6 +82,7 @@ This was then complemented with `complementBed` to produce the following:
 
 {{ not_sat_file }}
 
+{% if not none(repeat_paths) %}
 ### All Tandem Repeats and Homopolymers
 
 #### Repeat Masker Source
@@ -129,6 +130,7 @@ following:
 
 {{ not_all_tr_file }}
 {{ not_all_repeat_file }}
+{% endif %}
 
 ## Software
 

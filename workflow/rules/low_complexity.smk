@@ -302,7 +302,7 @@ use rule merge_imperfect_uniform_repeats as merge_imperfect_uniform_repeats_comp
         bases=bases_constraint,
 
 
-rule all_uniform_repeats:
+rule all_perfect_uniform_repeats:
     input:
         # Perfect (greater than X)
         *[
@@ -355,6 +355,11 @@ rule all_uniform_repeats:
                 else []
             )
         ],
+    localrule: True
+
+
+rule all_imperfect_uniform_repeats:
+    input:
         # Imperfect (greater than X)
         expand(
             rules.merge_imperfect_uniform_repeats_complement.output,
@@ -370,6 +375,13 @@ rule all_uniform_repeats:
             )
             for x in IMPERFECT_LENS
         },
+    localrule: True
+
+
+rule all_uniform_repeats:
+    input:
+        rules.all_perfect_uniform_repeats.input
+        + rules.all_imperfect_uniform_repeats.input,
     localrule: True
 
 
@@ -760,7 +772,8 @@ def all_low_complexity_flat(ref_final_key):
     paths = all_low_complexity(
         config,
         ref_final_key,
-        [Path(p) for p in rules.all_uniform_repeats.input],
+        [Path(p) for p in rules.all_perfect_uniform_repeats.input],
+        [Path(p) for p in rules.all_imperfect_uniform_repeats.input],
         Path(rules.merge_all_uniform_repeats.output[0]),
         Path(rules.invert_all_uniform_repeats.output[0]),
         Path(rules.merge_satellites.output[0]),
