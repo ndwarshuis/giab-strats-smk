@@ -26,20 +26,89 @@ within 1 base pair (`mergeBed` with `-d 1`) of each other before adding slop and
 merging overlaps. The result of this is a set of regions that represent
 homopolymers that may be interrupted by one non-homopolymer base.
 
+#### Combined Simple Repeats
+
+We also created a special combination file with all imperfect homopolymers 11 or
+more bases long, and all perfect homopolymers 7 or more bases long.
+
+The steps to make this file were:
+1. extend regions in the perfect homopolymer bed (with >=7bp) by 5 bases using
+   `slopBed`
+2. merge overlaps using `mergeBed`
+3. combine with imperfect homopolymers (>= 11bp) using `multiIntersectBed`
+   followed by `mergeBed`
+   
+This resulted in the following file:
+
+{{ perfect_imperfect_file }}
+
+This was then flipped using `complementBed` to create the following file:
+
+{{ not_perfect_imperfect_file }}
+
 ### Satellites
 
+TODO change this depending on what we have as inputs.
 
+#### Censat Source
+
+{{ censat_src }}
+
+This bed file was filtered for for values in column {{ sat_col}} which
+started with "ct", then overlapping regions were merged with `mergeBed`.
+
+#### Repeat Masker Source
+
+{{ rmsk_src }}
+
+This bed file was then filtered for the "Satellite" class in {{ rmsk_col }}.
+Overlapping regions were then merged with `mergeBed`.
+
+#### Merging
+
+Regions were extended by 5 base pairs in either direction using `slopBed`.
+Overlaps were then merged using `mergeBed`.
 
 ### All Tandem Repeats and Homopolymers
 
-## Dependencies
+#### Repeat Masker Source
 
-* Repeat masker file: {{ rmsk_src }}
-* Tandem repeat finder: {{ trf_src }}
-* Censat: {{ censat_src }}
+{{ rmsk_src }}
 
-Note that simple repeats and imperfect homopolymers were generated only using
-the reference fasta.
+#### Tandem Repeat Finder Source
+
+{{ trf_src }}
+
+#### Processing
+
+The following repeat files were combined by sequentially applying
+`multiIntersectBed`, `slopBed` with `-b 5`, and `mergeBed`:
+
+- Repeat Masker regions from classes "Low_complexity" and "Simple_Repeat" from
+  above
+- Tandem Repeat Finder regions from above
+- Satellites from the previous section
+- Simple Repeats:
+  - dinucleotide repeats >= 10 base pairs
+  - trunucleotide repeats >= 14 base pairs
+  - quadnucleotide repeats >= 19 base pairs
+
+These were then filtered by various lengths followed by removal of imperfect and
+perfect repeats (see above section "Combined Simple Repeats") using
+`subtractBed`. This produced the following filtered tandem repeat files:
+
+{{ all_tr_filtered_files }}
+
+Each of these was combined using `multiIntersectBed` and `mergeBed` to produce
+the following unfiltered tandem repeat file:
+
+{{ all_tr_file }}
+
+This was then combined using `multiIntersectBed` and `mergeBed` with the
+perfect/imperfect homopolymer file to produce the following file with all
+repeats (including homopolymers):
+
+{{ all_repeat_file }}
 
 ## Software
 
