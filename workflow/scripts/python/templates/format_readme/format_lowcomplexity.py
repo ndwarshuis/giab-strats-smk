@@ -1,3 +1,5 @@
+from pathlib import Path
+import json
 import jinja2 as j2
 from typing import Any
 import common.config as cfg
@@ -22,6 +24,108 @@ def format_cds_params(p: cfg.CDSParams) -> str:
     )
 
 
+def read_paths(p: Path) -> list[Path]:
+    with open(p, "r") as f:
+        return [Path(p) for p in json.load(f)]
+
+
+def format_satellite_source(
+    sconf: cfg.GiabStrats,
+    ps: cfg.SatellitesPaths,
+    rfk: cfg.RefKeyFullS,
+    bk: cfg.BuildKey,
+) -> tuple[str, str | None, str | None]:
+    overlap_txt = "Overlapping regions were then merged with `mergeBed`."
+
+    src_paths = read_paths(ps.sat_src)
+
+    bd = sconf.to_build_data_full(rfk, bk)
+
+    if ps.used_censat:
+
+        src_txt = sconf.with_build_data_and_bed_doc(
+            rfk,
+            bk,
+            src_paths,
+            cfg.bd_to_satellites,
+            None,
+            None,
+        )
+
+        sat_conf = bd.refdata.strat_inputs.low_complexity.satellites
+        if sat_conf is None:
+            raise DesignError()
+
+        other_txt = (
+            "This bed file was filtered for for values in column "
+            f"{sat_conf.sat_col + 1} which started with `ct`."
+        )
+    else:
+
+        src_txt = sconf.with_build_data_and_bed_doc(
+            rfk,
+            bk,
+            src_paths,
+            cfg.bd_to_rmsk,
+            None,
+            None,
+        )
+
+        rmsk_conf = bd.refdata.strat_inputs.low_complexity.rmsk
+        if rmsk_conf is None:
+            raise DesignError()
+
+        other_txt = (
+            "This bed file was then filtered for the `Satellite` class in "
+            f"{rmsk_conf.class_col + 1}."
+        )
+
+    sat_txt = "\n\n".join(
+        [cfg.readme_fill(x) for x in [src_txt, " ".join([other_txt, overlap_txt])]]
+    )
+
+    if ps.all_repeats is None:
+        return (sat_txt, None, None)
+    else:
+        trf_txt = sconf.with_build_data_and_bed_doc(
+            rfk,
+            bk,
+            read_paths(ps.all_repeats.trf_src),
+            cfg.bd_to_simreps,
+            None,
+            None,
+        )
+        if ps.used_censat:
+            # TODO not DRY
+            rmsk_conf = bd.refdata.strat_inputs.low_complexity.rmsk
+            if rmsk_conf is None:
+                raise DesignError()
+            rmsk_txt = sconf.with_build_data_and_bed_doc(
+                rfk,
+                bk,
+                src_paths,
+                cfg.bd_to_rmsk,
+                None,
+                None,
+            )
+            other_txt = (
+                "This bed file was then filtered for `Low_complexity` and `Simple_Repeat` class in "
+                f"{rmsk_conf.class_col + 1}."
+            )
+            # boooooooo0000000000
+            return (sat_txt, rmsk_txt + " " + other_txt, trf_txt)
+        else:
+            rmsk_conf = bd.refdata.strat_inputs.low_complexity.rmsk
+            if rmsk_conf is None:
+                raise DesignError()
+            rmsk_txt = (
+                "The same repeat masker source from above was used here, "
+                "except that `Low_complexity` and `Simple_Repeat` classes were "
+                f"selected via {rmsk_conf.class_col + 1}."
+            )
+            return (sat_txt, rmsk_txt, trf_txt)
+
+
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
 
@@ -29,8 +133,6 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     rk = cfg.strip_full_refkey(rfk)
     bk = cfg.wc_to_buildkey(ws)
     bd = sconf.to_build_data(rk, bk)
-
-    cds_src = bd.refdata.strat_inputs.low_complexity
 
     inputs: cfg.LowComplexityPaths = smk.params["input_paths"]
 

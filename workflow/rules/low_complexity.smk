@@ -769,9 +769,17 @@ use rule invert_satellites as invert_HPs_and_TRs with:
 
 
 def all_low_complexity_flat(ref_final_key):
+    def go(pathlist):
+        rk = strip_full_refkey(rfk)
+        rsks = config.refkey_to_bed_refsrckeys(f, rk)
+        return expand(pathlist, ref_src_key=rsks)
+
     paths = all_low_complexity(
         config,
         ref_final_key,
+        go(rules.download_rmsk.output),
+        go(rules.download_censat.output),
+        go(rules.download_simreps.output),
         [Path(p) for p in rules.all_perfect_uniform_repeats.input],
         [Path(p) for p in rules.all_imperfect_uniform_repeats.input],
         Path(rules.merge_all_uniform_repeats.output[0]),
@@ -793,8 +801,11 @@ rule gc_readme:
         description="workflow/templates/lowcomplexity_description.j2",
         methods="workflow/templates/lowcomplexity_methods.j2",
         bedtools_env="workflow/envs/bedtools.yml",
+        # dynamic rule expander to pull in checkpoints, since the template logic
+        # needs to read them depending on which sources are available
+        _src_paths=lambda w: all_low_complexity(w.ref_final_key).all_inputs,
     params:
-        input_paths=lambda w: all_low_complexity(w.ref_final_key),
+        paths=lambda w: all_low_complexity(w.ref_final_key),
     output:
         lc.readme,
     conda:

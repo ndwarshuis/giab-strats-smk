@@ -1450,6 +1450,9 @@ class UniformRepeatPaths(NamedTuple):
 
 
 class RepeatsPaths(NamedTuple):
+    trf_src: Path
+    rmsk_src: Path
+
     filtered_trs: list[Path]  # ASSUME this is non-empty
     all_trs: Path
     not_all_trs: Path
@@ -1468,8 +1471,11 @@ class RepeatsPaths(NamedTuple):
 
 
 class SatellitesPaths(NamedTuple):
+    sat_src: Path
+
     sats: Path
     not_sats: Path
+
     used_censat: bool
     all_repeats: RepeatsPaths | None
 
@@ -1487,6 +1493,20 @@ class LowComplexityPaths(NamedTuple):
     satellites: SatellitesPaths | None
 
     @property
+    def all_inputs(self) -> list[Path]:
+        return fmap_maybe_def(
+            [],
+            lambda s: fmap_maybe_def(
+                [s.sat_src],
+                lambda r: (
+                    [r.trf_src, s.sat_src] + [r.rmsk_src] if s.used_censat else []
+                ),
+                s.all_repeats,
+            ),
+            self.satellites,
+        )
+
+    @property
     def all_outputs(self) -> list[str]:
         return [
             str(x)
@@ -1500,6 +1520,10 @@ class LowComplexityPaths(NamedTuple):
 def all_low_complexity(
     sconf: GiabStrats,
     rk: RefKeyFullS,
+    # sources
+    rmsk_src: Path,
+    censat_src: Path,
+    trf_src: Path,
     # uniform
     perfect: list[Path],
     imperfect: list[Path],
@@ -1532,6 +1556,8 @@ def all_low_complexity(
     # include tandem repeats and merged output if we have rmsk/censat and simreps
     repeats = (
         RepeatsPaths(
+            trf_src=trf_src,
+            rmsk_src=rmsk_src,
             filtered_trs=filtered_trs,
             all_trs=all_trs,
             not_all_trs=not_all_trs,
@@ -1545,6 +1571,7 @@ def all_low_complexity(
     # include satellites only if we have rmsk or censat
     satpaths = (
         SatellitesPaths(
+            sat_src=censat_src if censat else rmsk_src,
             sats=sats,
             not_sats=notsats,
             used_censat=censat,
