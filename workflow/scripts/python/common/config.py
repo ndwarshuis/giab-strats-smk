@@ -1435,24 +1435,123 @@ class BedDoc(NamedTuple):
     bed: Single[SrcDoc] | Double[SrcDoc]
 
 
-# class RMSKDoc(NamedTuple):
-#     bed: BedDoc
-#     class_col: int
+# Rule aggregation classes
 
 
-# class SatDoc(NamedTuple):
-#     bed: BedDoc
-#     sat_col: int
+class UniformRepeatPaths(NamedTuple):
+    perfect: list[Path]  # ASSUME this will always be non-empty
+    homopolymers: Path
+    not_homopolymers: Path
+
+    @property
+    def all_outputs(self) -> list[Path]:
+        return [*self.perfect, self.homopolymers, self.not_homopolymers]
 
 
-# class XYDoc(NamedTuple):
-#     bed: BedDoc
-#     level_col: int
+class RepeatsPaths(NamedTuple):
+    filtered_trs: list[Path]  # ASSUME this is non-empty
+    all_trs: Path
+    not_all_trs: Path
+    all_repeats: Path
+    not_all_repeats: Path
+
+    @property
+    def all_outputs(self) -> list[Path]:
+        return [
+            *self.filtered_trs,
+            self.all_trs,
+            self.not_all_trs,
+            self.all_repeats,
+            self.not_all_repeats,
+        ]
 
 
-# class CDSDoc(NamedTuple):
-#     bed: BedDoc
-#     cds_params: CDSParams
+class SatellitesPaths(NamedTuple):
+    sats: Path
+    not_sats: Path
+    used_censat: bool
+    all_repeats: RepeatsPaths | None
+
+    @property
+    def all_outputs(self) -> list[Path]:
+        return [
+            self.sats,
+            self.not_sats,
+            *(r.all_outputs if (r := self.all_repeats) is not None else []),
+        ]
+
+
+class LowComplexityPaths(NamedTuple):
+    uniform_repeats: UniformRepeatPaths
+    satellites: SatellitesPaths | None
+
+    @property
+    def all_outputs(self) -> list[str]:
+        return [
+            str(x)
+            for x in (
+                self.uniform_repeats.all_outputs
+                + (s.all_outputs if (s := self.satellites) is not None else [])
+            )
+        ]
+
+
+def all_low_complexity(
+    sconf: GiabStrats,
+    rk: RefKeyFullS,
+    # uniform
+    perfect: list[Path],
+    homopolymers: Path,
+    not_homopolymers: Path,
+    # satellites
+    sats: Path,
+    notsats: Path,
+    # all repeats
+    filtered_trs: list[Path],
+    all_trs: Path,
+    not_all_trs: Path,
+    all_repeats: Path,
+    not_all_repeats: Path,
+) -> LowComplexityPaths:
+    rd = sconf.to_ref_data_full(rk)
+    rmsk = rd.has_low_complexity_rmsk
+    simreps = rd.has_low_complexity_simreps
+    censat = rd.has_low_complexity_censat
+    has_sats = rmsk or censat
+
+    # homopolymers and uniform repeats are included no matter what
+    uniform = UniformRepeatPaths(
+        perfect=perfect,
+        homopolymers=homopolymers,
+        not_homopolymers=not_homopolymers,
+    )
+
+    # include tandem repeats and merged output if we have rmsk/censat and simreps
+    repeats = (
+        RepeatsPaths(
+            filtered_trs=filtered_trs,
+            all_trs=all_trs,
+            not_all_trs=not_all_trs,
+            all_repeats=all_repeats,
+            not_all_repeats=not_all_repeats,
+        )
+        if simreps and rmsk
+        else None
+    )
+
+    # include satellites only if we have rmsk or censat
+    satpaths = (
+        SatellitesPaths(
+            sats=sats,
+            not_sats=notsats,
+            used_censat=censat,
+            all_repeats=repeats,
+        )
+        if has_sats
+        else None
+    )
+
+    return LowComplexityPaths(uniform_repeats=uniform, satellites=satpaths)
 
 
 ################################################################################

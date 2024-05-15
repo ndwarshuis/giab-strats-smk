@@ -11,20 +11,27 @@ length 1 (homopolymer), 2 (diTR), 3 (triTR), or 4 (quadTR) basepairs long. These
 bed files were subset to repeats less than given lengths (and in some cases to
 complimentary base pairs) for subsequent steps.
 
-*TODO add parameters here*
+These bed files were subtracted from one another to produce files representing
+repeats of a given range using `subtractBed` (ie subtracting repeats less than
+`X` from repeats less than `Y` produced a bed file representing repeats of
+length `X` to `Y` assuming `Y > X`). These bed files were extended by 5 bases in
+either direction with `slopBed` and then overlaps were merged using `mergeBed`.
 
-These bed files were subtracted from one another to produce bed files
-representing repeats of a given range using `subtractBed` (ie subtracting
-repeats less than `X` from repeats less than `Y` produced a bed file
-representing repeats of length `X` to `Y` assuming `Y > X`). These bed files
-were extended by 5 bases in either direction with `slopBed` and then overlaps
-were merged using `mergeBed`.
+This produced the following files:
+{% for file in perfect_files %}
+- `{{ file }}`
+{-% endfor %}
 
 Imperfect repeats were made using the same `repseq` generated bed files for just
 homopolymers as described immediately above, but this time merging all repeats
 within 1 base pair (`mergeBed` with `-d 1`) of each other before adding slop and
 merging overlaps. The result of this is a set of regions that represent
 homopolymers that may be interrupted by one non-homopolymer base.
+
+These were subset to lengths at least 11 or 21 base pairs long:
+{% for file in imperfect_files %}
+- `{{ file }}`
+{-% endfor %}
 
 #### Combined Simple Repeats
 
@@ -67,7 +74,13 @@ Overlapping regions were then merged with `mergeBed`.
 #### Merging
 
 Regions were extended by 5 base pairs in either direction using `slopBed`.
-Overlaps were then merged using `mergeBed`.
+Overlaps were then merged using `mergeBed`. This resulted in the following:
+
+{{ sat_file }}
+
+This was then complemented with `complementBed` to produce the following:
+
+{{ not_sat_file }}
 
 ### All Tandem Repeats and Homopolymers
 
@@ -96,8 +109,9 @@ The following repeat files were combined by sequentially applying
 These were then filtered by various lengths followed by removal of imperfect and
 perfect repeats (see above section "Combined Simple Repeats") using
 `subtractBed`. This produced the following filtered tandem repeat files:
-
-{{ all_tr_filtered_files }}
+{% for file in all_tr_filtered_files %}
+- `{{ file }}`
+{-% endfor %}
 
 Each of these was combined using `multiIntersectBed` and `mergeBed` to produce
 the following unfiltered tandem repeat file:
@@ -110,6 +124,23 @@ repeats (including homopolymers):
 
 {{ all_repeat_file }}
 
+These files were then complemented using `complementBed` to produce the
+following:
+
+{{ not_all_tr_file }}
+{{ not_all_repeat_file }}
+
 ## Software
 
-{# TODO include bedtools and stuff here #}
+### repseq
+
+This is a small C program that was compiled on-the-fly during pipline runtime.
+
+Its source can be found here:
+
+{{ repseq_src }}
+
+### Other deps
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}

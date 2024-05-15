@@ -30,10 +30,20 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     bk = cfg.wc_to_buildkey(ws)
     bd = sconf.to_build_data(rk, bk)
 
-    cds_src = bd.refdata.strat_inputs.functional.cds
+    cds_src = bd.refdata.strat_inputs.low_complexity
 
-    if cds_src is None:
-        raise DesignError()
+    inputs: cfg.LowComplexityPaths = smk.params["input_paths"]
+
+    urs = inputs.uniform_repeats
+    sats = inputs.satellites
+
+    if sats is None:
+        pass
+    else:
+        if sats.all_repeats is None:
+            pass
+        else:
+            pass
 
     src_txt = sconf.with_build_data_and_bed_doc(
         rfk,
@@ -59,9 +69,27 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_methods(t: j2.Template) -> str:
         return t.render(
+            # uniform repeat section
+            perfect_files=[],
+            imperfect_files=[],
+            perfect_imperfect_file=[],
+            not_perfect_imperfect_file=[],
+            # sat section
+            sat_src=[],
+            sat_file=[],
+            not_sat_file=[],
+            # tr section
+            rmsk_src=[],
+            sat_src=[],
+            trf_src=[],
+            all_filtered_tr_files=[],
+            all_tr_file=[],
+            not_all_tr_file=[],
+            all_repeat_file=[],
+            not_all_repeat_file=[],
+            # software section
+            repseq_src="TODO",
             deps=bedtools_deps,
-            src_txt=src_txt,
-            processing_txt=format_cds_params(cds_src.cds_params),
         )
 
     txt = tu.render_readme(

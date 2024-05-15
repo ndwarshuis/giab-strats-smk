@@ -1,6 +1,13 @@
+from itertools import chain
 from more_itertools import unzip, flatten
 from collections import namedtuple
-from common.config import CoreLevel, si_to_rmsk, si_to_simreps, si_to_satellites
+from common.config import (
+    CoreLevel,
+    si_to_rmsk,
+    si_to_simreps,
+    si_to_satellites,
+    all_low_complexity,
+)
 from functools import partial
 
 lc = config.to_bed_dirs(CoreLevel.LOWCOMPLEXITY)
@@ -705,80 +712,76 @@ use rule invert_satellites as invert_HPs_and_TRs with:
         lc.final("notinAllTandemRepeatsandHomopolymers_slop5"),
 
 
-def all_low_complexity(ref_final_key):
-    rd = config.to_ref_data_full(ref_final_key)
-    rmsk = rd.has_low_complexity_rmsk
-    simreps = rd.has_low_complexity_simreps
-    censat = rd.has_low_complexity_censat
-    has_sats = rmsk or censat
+# def all_low_complexity(ref_final_key):
+#     rd = config.to_ref_data_full(ref_final_key)
+#     rmsk = rd.has_low_complexity_rmsk
+#     simreps = rd.has_low_complexity_simreps
+#     censat = rd.has_low_complexity_censat
+#     has_sats = rmsk or censat
 
-    # include uniform repeats no matter what
-    urs = (
-        rules.all_uniform_repeats.input
-        + rules.merge_all_uniform_repeats.output
-        + rules.invert_all_uniform_repeats.output
-    )
+#     # homopolymers and uniform repeats are included no matter what
+#     uniform = UniformRepeats(
+#         perfect=rules.all_uniform_repeats.input,
+#         homopolymers=rules.merge_all_uniform_repeats.output[0],
+#         not_homopolymers=rules.invert_all_uniform_repeats.output[0],
+#     )
 
-    # include satellites only if we have rmsk or censat
-    sats = (
-        rules.merge_satellites.output + rules.invert_satellites.output
-        if has_sats
-        else []
-    )
+#     # include satellites only if we have rmsk or censat
+#     sats = (
+#         SatellitesPaths(
+#             sats=rules.merge_satellites.output[0],
+#             notsats=rules.invert_satellites.output[0],
+#         )
+#         if has_sats
+#         else None
+#     )
 
-    # include tandem repeats and merged output if we have rmsk/censat and simreps
-    trs = (
-        rules.all_TRs.input + rules.merge_filtered_TRs.output + rules.invert_TRs.output
-    )
-    merged = rules.merge_HPs_and_TRs.output + rules.invert_HPs_and_TRs.output
-    all_trs_and_hps = trs + merged if has_sats and simreps else []
+#     # include tandem repeats and merged output if we have rmsk/censat and simreps
+#     repeats = (
+#         RepeatsPaths(
+#             filtered_trs=rules.all_TRs.input,
+#             all_trs=rules.merge_filtered_TRs.output[0],
+#             not_all_trs=rules.invert_TRs.output[0],
+#             all_repeats=rules.merge_HPs_and_TRs.output[0],
+#             not_all_repeats=rules.invert_HPs_and_TRs.output[0],
+#         )
+#         if has_sats and simreps and rmsk
+#         else None
+#     )
 
-    return {
-        "uniform_repeats": urs,
-        "satellites": sats,
-        "all_trs_and_hps": all_trs_and_hps,
-    }
+#     return LowComplexityPaths(
+#         uniform_repeat=uniform,
+#         satellites=sats,
+#         repeats=repeats,
+#     )
 
 
 def all_low_complexity_flat(ref_final_key):
-    rd = config.to_ref_data_full(ref_final_key)
-    rmsk = rd.has_low_complexity_rmsk
-    simreps = rd.has_low_complexity_simreps
-    censat = rd.has_low_complexity_censat
-    has_sats = rmsk or censat
-
-    # include uniform repeats no matter what
-    urs = (
-        rules.all_uniform_repeats.input
-        + rules.merge_all_uniform_repeats.output
-        + rules.invert_all_uniform_repeats.output
+    paths = all_low_complexity(
+        config,
+        ref_final_key,
+        [Path(p) for p in rules.all_uniform_repeats.input],
+        Path(rules.merge_all_uniform_repeats.output[0]),
+        Path(rules.invert_all_uniform_repeats.output[0]),
+        Path(rules.merge_satellites.output[0]),
+        Path(rules.invert_satellites.output[0]),
+        [Path(p) for p in rules.all_TRs.input],
+        Path(rules.merge_filtered_TRs.output[0]),
+        Path(rules.invert_TRs.output[0]),
+        Path(rules.merge_HPs_and_TRs.output[0]),
+        Path(rules.invert_HPs_and_TRs.output[0]),
     )
-
-    # include satellites only if we have rmsk or censat
-    sats = (
-        rules.merge_satellites.output + rules.invert_satellites.output
-        if has_sats
-        else []
-    )
-
-    # include tandem repeats and merged output if we have rmsk/censat and simreps
-    trs = (
-        rules.all_TRs.input + rules.merge_filtered_TRs.output + rules.invert_TRs.output
-    )
-    merged = rules.merge_HPs_and_TRs.output + rules.invert_HPs_and_TRs.output
-    all_trs_and_hps = trs + merged if has_sats and simreps else []
-
-    return all_trs_and_hps + sats + urs
+    return paths.all_outputs
 
 
 rule gc_readme:
     input:
         common="workflow/templates/common.j2",
-        description="workflow/templates/gc_description.j2",
-        methods="workflow/templates/gc_methods.j2",
-        gc_inputs=rules.intersect_gc_ranges.output[0],
+        description="workflow/templates/lowcomplexity_description.j2",
+        methods="workflow/templates/lowcomplexity_methods.j2",
         bedtools_env="workflow/envs/bedtools.yml",
-        seqtk_env="workflow/envs/seqtk.yml",
+    params:
+        input_paths=lambda w: all_low_complexity(w.ref_final_key),
     output:
         lc.readme,
     conda:
