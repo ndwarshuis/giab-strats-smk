@@ -302,7 +302,7 @@ use rule merge_imperfect_uniform_repeats as merge_imperfect_uniform_repeats_comp
         bases=bases_constraint,
 
 
-rule all_perfect_uniform_repeats:
+rule _all_perfect_uniform_repeats:
     input:
         # Perfect (greater than X)
         *[
@@ -358,7 +358,7 @@ rule all_perfect_uniform_repeats:
     localrule: True
 
 
-rule all_imperfect_uniform_repeats:
+rule _all_imperfect_uniform_repeats:
     input:
         # Imperfect (greater than X)
         expand(
@@ -380,8 +380,8 @@ rule all_imperfect_uniform_repeats:
 
 rule all_uniform_repeats:
     input:
-        rules.all_perfect_uniform_repeats.input
-        + rules.all_imperfect_uniform_repeats.input,
+        **rules._all_perfect_uniform_repeats.input,
+        **rules._all_imperfect_uniform_repeats.input,
     localrule: True
 
 
@@ -768,20 +768,20 @@ use rule invert_satellites as invert_HPs_and_TRs with:
 #     )
 
 
-def all_low_complexity_flat(ref_final_key):
-    def go(pathlist):
-        rk = strip_full_refkey(rfk)
-        rsks = config.refkey_to_bed_refsrckeys(f, rk)
-        return expand(pathlist, ref_src_key=rsks)
+def all_low_complexity_smk(ref_final_key):
+    # def go(pathlist, f):
+    #     rk = strip_full_refkey(ref_final_key)
+    #     rsks = config.refkey_to_bed_refsrckeys(f, rk)
+    #     return expand(pathlist, ref_src_key=rsks)
 
-    paths = all_low_complexity(
+    return all_low_complexity(
         config,
         ref_final_key,
-        go(rules.download_rmsk.output),
-        go(rules.download_censat.output),
-        go(rules.download_simreps.output),
-        [Path(p) for p in rules.all_perfect_uniform_repeats.input],
-        [Path(p) for p in rules.all_imperfect_uniform_repeats.input],
+        rules.download_rmsk.output,
+        rules.download_censat.output,
+        rules.download_simreps.output,
+        [Path(p) for p in rules._all_perfect_uniform_repeats.input],
+        [Path(p) for p in rules._all_imperfect_uniform_repeats.input],
         Path(rules.merge_all_uniform_repeats.output[0]),
         Path(rules.invert_all_uniform_repeats.output[0]),
         Path(rules.merge_satellites.output[0]),
@@ -795,7 +795,11 @@ def all_low_complexity_flat(ref_final_key):
     return paths.all_outputs
 
 
-rule gc_readme:
+def all_low_complexity_flat(ref_final_key):
+    return all_low_complexity_smk(ref_final_key).all_outputs
+
+
+rule low_complexity_readme:
     input:
         common="workflow/templates/common.j2",
         description="workflow/templates/lowcomplexity_description.j2",
@@ -803,9 +807,9 @@ rule gc_readme:
         bedtools_env="workflow/envs/bedtools.yml",
         # dynamic rule expander to pull in checkpoints, since the template logic
         # needs to read them depending on which sources are available
-        _src_paths=lambda w: all_low_complexity(w.ref_final_key).all_inputs,
+        _src_paths=lambda w: all_low_complexity_smk(w.ref_final_key).all_inputs,
     params:
-        paths=lambda w: all_low_complexity(w.ref_final_key),
+        paths=lambda w: all_low_complexity_smk(w.ref_final_key),
     output:
         lc.readme,
     conda:

@@ -32,6 +32,11 @@ def both(f: Callable[[X], Y], x: tuple[X, X]) -> tuple[Y, Y]:
     return (f(x[0]), f(x[1]))
 
 
+def thrice(f: Callable[[X], Y], x: tuple[X, X, X]) -> tuple[Y, Y, Y]:
+    """3-tuple functor thingy"""
+    return (f(x[0]), f(x[1]), f(x[2]))
+
+
 def const(x: X) -> Callable[[Y], X]:
     def go(y: Y) -> X:
         return x

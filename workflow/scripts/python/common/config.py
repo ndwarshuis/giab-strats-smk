@@ -195,6 +195,14 @@ Z = TypeVar("Z")
 # Helper functions
 
 
+def sub_wildcard(s: str, wc: str, rep: str) -> str:
+    return s.replace("{" + wc + "}", rep)
+
+
+def sub_wildcard_path(s: Path, wc: str, rep: str) -> Path:
+    return Path(sub_wildcard(str(s), wc, rep))
+
+
 def flip_hap(h: Haplotype) -> Haplotype:
     return h.choose(Haplotype.HAP2, Haplotype.HAP1)
 
@@ -1450,8 +1458,8 @@ class UniformRepeatPaths(NamedTuple):
 
 
 class RepeatsPaths(NamedTuple):
-    trf_src: Path
-    rmsk_src: Path
+    trf_src: list[Path]
+    rmsk_src: list[Path]
 
     filtered_trs: list[Path]  # ASSUME this is non-empty
     all_trs: Path
@@ -1471,7 +1479,7 @@ class RepeatsPaths(NamedTuple):
 
 
 class SatellitesPaths(NamedTuple):
-    sat_src: Path
+    sat_src: list[Path]
 
     sats: Path
     not_sats: Path
@@ -1497,24 +1505,30 @@ class LowComplexityPaths(NamedTuple):
         return fmap_maybe_def(
             [],
             lambda s: fmap_maybe_def(
-                [s.sat_src],
-                lambda r: (
-                    [r.trf_src, s.sat_src] + [r.rmsk_src] if s.used_censat else []
-                ),
+                s.sat_src,
+                lambda r: r.trf_src + s.sat_src + (r.rmsk_src if s.used_censat else []),
                 s.all_repeats,
             ),
             self.satellites,
         )
 
     @property
-    def all_outputs(self) -> list[str]:
+    def all_output_paths(self) -> list[Path]:
         return [
-            str(x)
+            x
             for x in (
                 self.uniform_repeats.all_outputs
-                + (s.all_outputs if (s := self.satellites) is not None else [])
+                + (self.satellites.all_outputs if self.satellites is not None else [])
             )
         ]
+
+    @property
+    def all_outputs(self) -> list[str]:
+        return [str(x) for x in self.all_output_paths]
+
+    @property
+    def all_output_files(self) -> list[str]:
+        return [x.name for x in self.all_output_paths]
 
 
 def all_low_complexity(
@@ -1539,6 +1553,14 @@ def all_low_complexity(
     all_repeats: Path,
     not_all_repeats: Path,
 ) -> LowComplexityPaths:
+    def go(p: Path, f: StratInputToBed) -> list[Path]:
+        _rk = strip_full_refkey(rk)
+        rsks = sconf.refkey_to_bed_refsrckeys(f, _rk)
+        return [sub_wildcard_path(p, "ref_src_key", r) for r in rsks]
+
+    def sub_rk(p: Path) -> Path:
+        return sub_wildcard_path(p, "ref_final_key", rk)
+
     rd = sconf.to_ref_data_full(rk)
     rmsk = rd.has_low_complexity_rmsk
     simreps = rd.has_low_complexity_simreps
@@ -1547,22 +1569,22 @@ def all_low_complexity(
 
     # homopolymers and uniform repeats are included no matter what
     uniform = UniformRepeatPaths(
-        perfect=perfect,
-        imperfect=imperfect,
-        homopolymers=homopolymers,
-        not_homopolymers=not_homopolymers,
+        perfect=[sub_rk(p) for p in perfect],
+        imperfect=[sub_rk(p) for p in imperfect],
+        homopolymers=sub_rk(homopolymers),
+        not_homopolymers=sub_rk(not_homopolymers),
     )
 
     # include tandem repeats and merged output if we have rmsk/censat and simreps
     repeats = (
         RepeatsPaths(
-            trf_src=trf_src,
-            rmsk_src=rmsk_src,
-            filtered_trs=filtered_trs,
-            all_trs=all_trs,
-            not_all_trs=not_all_trs,
-            all_repeats=all_repeats,
-            not_all_repeats=not_all_repeats,
+            trf_src=go(trf_src, si_to_simreps),
+            rmsk_src=go(rmsk_src, si_to_rmsk),
+            filtered_trs=[sub_rk(p) for p in filtered_trs],
+            all_trs=sub_rk(all_trs),
+            not_all_trs=sub_rk(not_all_trs),
+            all_repeats=sub_rk(all_repeats),
+            not_all_repeats=sub_rk(not_all_repeats),
         )
         if simreps and rmsk
         else None
@@ -1571,9 +1593,11 @@ def all_low_complexity(
     # include satellites only if we have rmsk or censat
     satpaths = (
         SatellitesPaths(
-            sat_src=censat_src if censat else rmsk_src,
-            sats=sats,
-            not_sats=notsats,
+            sat_src=(
+                go(censat_src, si_to_satellites) if censat else go(rmsk_src, si_to_rmsk)
+            ),
+            sats=sub_rk(sats),
+            not_sats=sub_rk(notsats),
             used_censat=censat,
             all_repeats=repeats,
         )

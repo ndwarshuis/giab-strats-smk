@@ -1,201 +1,146 @@
 from pathlib import Path
-import json
 import jinja2 as j2
 from typing import Any
+from urllib.parse import unquote
 import common.config as cfg
 from common.functional import DesignError, fmap_maybe
 import template_utils as tu
 
 
-def format_cds_params(p: cfg.CDSParams) -> str:
-    source_txt = fmap_maybe(
-        lambda x: f"column {x[1]+1} matched '{x[0]}'", p.source_match
-    )
-    type_txt = fmap_maybe(lambda x: f"column {x[1]+1} matched '{x[0]}'", p.type_match)
-
-    return cfg.readme_fill(
-        " ".join(
-            [
-                f"Lines where {source_txt} and {type_txt} were selected.",
-                "Coordinates where start == end were removed.",
-                "The remainining regions where merged using `mergeBed`.",
-            ]
-        )
-    )
-
-
-def read_paths(p: Path) -> list[Path]:
-    with open(p, "r") as f:
-        return [Path(p) for p in json.load(f)]
-
-
-def format_satellite_source(
+def format_sources(
     sconf: cfg.GiabStrats,
-    ps: cfg.SatellitesPaths,
+    ps: cfg.SatellitesPaths | None,
     rfk: cfg.RefKeyFullS,
     bk: cfg.BuildKey,
-) -> tuple[str, str | None, str | None]:
-    overlap_txt = "Overlapping regions were then merged with `mergeBed`."
+) -> tuple[str | None, str | None, str | None]:
+    def go(f: cfg.BuildDataToBed, paths: list[Path]) -> str:
+        return sconf.with_build_data_and_bed_doc(rfk, bk, paths, f, None, None)
 
-    src_paths = read_paths(ps.sat_src)
+    if ps is None:
+        return (None, None, None)
 
     bd = sconf.to_build_data_full(rfk, bk)
+    lc = bd.refdata.strat_inputs.low_complexity
 
-    if ps.used_censat:
-
-        src_txt = sconf.with_build_data_and_bed_doc(
-            rfk,
-            bk,
-            src_paths,
-            cfg.bd_to_satellites,
-            None,
-            None,
-        )
-
-        sat_conf = bd.refdata.strat_inputs.low_complexity.satellites
-        if sat_conf is None:
-            raise DesignError()
-
-        other_txt = (
-            "This bed file was filtered for for values in column "
-            f"{sat_conf.sat_col + 1} which started with `ct`."
-        )
+    # fmap_maybe doesn't work here for some reason... :(
+    if lc.rmsk is None:
+        rmsk_col = None
     else:
+        rmsk_col = lc.rmsk.class_col + 1
 
-        src_txt = sconf.with_build_data_and_bed_doc(
-            rfk,
-            bk,
-            src_paths,
-            cfg.bd_to_rmsk,
-            None,
-            None,
-        )
-
-        rmsk_conf = bd.refdata.strat_inputs.low_complexity.rmsk
-        if rmsk_conf is None:
+    overlap_txt = "Overlapping regions were then merged with `mergeBed`."
+    if ps.used_censat:
+        if lc.satellites is None:
             raise DesignError()
 
-        other_txt = (
-            "This bed file was then filtered for the `Satellite` class in "
-            f"{rmsk_conf.class_col + 1}."
+        sat_src_txt = go(cfg.bd_to_satellites, ps.sat_src)
+        sat_other_txt = " ".join(
+            [
+                "This bed file was filtered for for values in column",
+                f"{lc.satellites.sat_col + 1} which started with `ct`.",
+                overlap_txt,
+            ]
         )
 
-    sat_txt = "\n\n".join(
-        [cfg.readme_fill(x) for x in [src_txt, " ".join([other_txt, overlap_txt])]]
-    )
+    else:
+        if rmsk_col is None:
+            raise DesignError()
+
+        sat_src_txt = go(cfg.bd_to_rmsk, ps.sat_src)
+        sat_other_txt = " ".join(
+            [
+                "This bed file was then filtered for the `Satellite` class in",
+                f"{rmsk_col}.",
+                overlap_txt,
+            ]
+        )
+
+    sat_txt = "\n\n".join([sat_src_txt, cfg.readme_fill(sat_other_txt)])
 
     if ps.all_repeats is None:
         return (sat_txt, None, None)
     else:
-        trf_txt = sconf.with_build_data_and_bed_doc(
-            rfk,
-            bk,
-            read_paths(ps.all_repeats.trf_src),
-            cfg.bd_to_simreps,
-            None,
-            None,
-        )
+        trf_txt = go(cfg.bd_to_simreps, ps.all_repeats.trf_src)
+        if rmsk_col is None:
+            raise DesignError()
         if ps.used_censat:
-            # TODO not DRY
-            rmsk_conf = bd.refdata.strat_inputs.low_complexity.rmsk
-            if rmsk_conf is None:
-                raise DesignError()
-            rmsk_txt = sconf.with_build_data_and_bed_doc(
-                rfk,
-                bk,
-                src_paths,
-                cfg.bd_to_rmsk,
-                None,
-                None,
+            rmsk_src_txt = go(cfg.bd_to_rmsk, ps.all_repeats.rmsk_src)
+            rmsk_other_txt = cfg.readme_fill(
+                "This bed file was then filtered for `Low_complexity` "
+                f"and `Simple_Repeat` class in {rmsk_col}."
             )
-            other_txt = (
-                "This bed file was then filtered for `Low_complexity` and `Simple_Repeat` class in "
-                f"{rmsk_conf.class_col + 1}."
+            return (
+                sat_txt,
+                "\n\n".join([rmsk_src_txt, rmsk_other_txt]),
+                trf_txt,
             )
-            # boooooooo0000000000
-            return (sat_txt, rmsk_txt + " " + other_txt, trf_txt)
         else:
-            rmsk_conf = bd.refdata.strat_inputs.low_complexity.rmsk
-            if rmsk_conf is None:
-                raise DesignError()
-            rmsk_txt = (
+            rmsk_txt = cfg.readme_fill(
                 "The same repeat masker source from above was used here, "
                 "except that `Low_complexity` and `Simple_Repeat` classes were "
-                f"selected via {rmsk_conf.class_col + 1}."
+                f"selected via {rmsk_col}."
             )
             return (sat_txt, rmsk_txt, trf_txt)
+
+
+def basenames(ps: list[Path]) -> list[str]:
+    return [x.name for x in ps]
+
+
+def maybe_filename(p: Path | None) -> str | None:
+    return fmap_maybe(lambda x: x.name, p)
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
 
     rfk = cfg.wc_to_reffinalkey(ws)
-    rk = cfg.strip_full_refkey(rfk)
     bk = cfg.wc_to_buildkey(ws)
-    bd = sconf.to_build_data(rk, bk)
 
-    inputs: cfg.LowComplexityPaths = smk.params["input_paths"]
+    bed_paths: cfg.LowComplexityPaths = smk.params["paths"]
+    sat_paths = bed_paths.satellites
+    all_reps = fmap_maybe(lambda s: s.all_repeats, sat_paths)
 
-    uniform = inputs.uniform_repeats
-    sats = inputs.satellites
+    sat_src, rmsk_src, trf_src = format_sources(sconf, sat_paths, rfk, bk)
 
-    if sats is None:
-        pass
-    else:
-        if sats.all_repeats is None:
-            pass
-        else:
-            pass
-
-    src_txt = sconf.with_build_data_and_bed_doc(
-        rfk,
-        bk,
-        cfg.smk_to_inputs_name(smk, "cds_inputs"),
-        cfg.bd_to_cds,
-        "The GFF file",
-        None,
-    )
+    uniform = bed_paths.uniform_repeats
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
-    cds_path = cfg.smk_to_input_name(smk, "cds")
-    notcds_path = cfg.smk_to_input_name(smk, "notcds")
+    _all_paths: list[tuple[str, Path | list[Path] | None]] = [
+        # uniform repeat section
+        ("perfect_files", uniform.perfect),
+        ("imperfect_files", uniform.imperfect),
+        ("homopolymers_file", uniform.homopolymers),
+        ("not_homopolymers_file", uniform.not_homopolymers),
+        # sat section
+        ("sat_file", fmap_maybe(lambda x: x.sats, sat_paths)),
+        ("not_sat_file", fmap_maybe(lambda x: x.not_sats, sat_paths)),
+        # tr section
+        ("all_filtered_tr_files", fmap_maybe(lambda x: x.filtered_trs, all_reps)),
+        ("all_tr_file", fmap_maybe(lambda x: x.all_trs, all_reps)),
+        ("not_all_tr_file", fmap_maybe(lambda x: x.not_all_trs, all_reps)),
+        ("all_repeats_file", fmap_maybe(lambda x: x.all_repeats, all_reps)),
+        ("not_all_repeats_file", fmap_maybe(lambda x: x.not_all_repeats, all_reps)),
+    ]
+
+    all_paths = {
+        k: None if v is None else (basenames(v) if isinstance(v, list) else v.name)
+        for k, v in _all_paths
+    }
 
     def render_description(t: j2.Template) -> str:
-        return t.render(
-            cds_file=cds_path.name,
-            notcds_file=notcds_path.name,
-        )
+        return t.render(**all_paths)
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
 
     def render_methods(t: j2.Template) -> str:
         return t.render(
-            # uniform repeat section
-            uniform_repeat_paths=uniform,
-            # perfect_files=[x.name for x in uniform.perfect],
-            # imperfect_files=[x.name for x in uniform.imperfect],
-            # homopolymers_file=uniform.homopolymers.name,
-            # not_homopolymers_file=uniform.not_homopolymers.name,
-            # sat section
-            sat_paths=fmap_maybe(lambda i: i.satellites, inputs),
-            sat_src=[],
-            # sat_file=[],
-            # not_sat_file=[],
-            # tr section
-            rmsk_src=[],
-            sat_src=[],
-            trf_src=[],
-            repeat_paths=fmap_maybe(
-                lambda i: fmap_maybe(lambda s: s.all_repeats, i.satellites), inputs
-            ),
-            # all_filtered_tr_files=[],
-            # all_tr_file=[],
-            # not_all_tr_file=[],
-            # all_repeat_file=[],
-            # not_all_repeat_file=[],
-            # software section
-            repseq_src="TODO",
+            **all_paths,
+            sat_src=sat_src,
+            rmsk_src=rmsk_src,
+            trf_src=trf_src,
+            repseq_src=unquote(sconf.tools.repseq),
             deps=bedtools_deps,
         )
 
@@ -203,8 +148,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         smk,
         render_description,
         render_methods,
-        "coding regions",
-        cfg.CoreLevel.FUNCTIONAL,
+        "homopolymers and tandem repeats",
+        cfg.CoreLevel.LOWCOMPLEXITY,
         sconf.refkey_haplotypes(rfk),
     )
 

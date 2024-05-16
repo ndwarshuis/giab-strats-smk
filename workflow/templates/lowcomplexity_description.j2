@@ -1,37 +1,90 @@
+The following is a short summary of the files contained in this directory. For
+more depth on how each file was created, so Methods below.
+
 Note that in all cases, 5bp slop is added to each repeat region. Slop does not
-count toward the length of a given region in the cases where a given bed subsets
-to a given range of region lengths.
+count toward the length of a given region in the cases where a given bed
+indicates repeats of a given length.
 
 ### Simple Repeats
+
+#### Perfect Repeats
 
 These represent continuous runs of perfectly repeating patterns with 1-4
 subunits:
 
-* SimpleRepeat_homopolymer = 1bp repeats
-* SimpleRepeat_diTR = 2bp repeats
-* SimpleRepeat_triTR = 3bp repeats
-* SimpleRepeat_quadTR = 4bp repeats
+- SimpleRepeat_homopolymer = 1bp repeats
+- SimpleRepeat_diTR = 2bp repeats
+- SimpleRepeat_triTR = 3bp repeats
+- SimpleRepeat_quadTR = 4bp repeats
 
 In the case of subunits >1bp long, either end of the repeat may contain only
 part of the subunit.
 
 Each file represents a range of lengths either written as `XtoY` which means `X
-<= length <= Y` or `geX` which means `length >= X`.
+<= length <= Y` or `geX` which means `length >= X`. These are further subdivided
+into AT- and GC- specific regions:
+{% for file in perfect_files %}
+- `{{ file }}`
+{%- endfor %}
 
-These are further subdivided into AT- and GC- specific regions.
+#### Imperfect Homopolymers
 
-### Imperfect homopolymers
+These represent homopolymers that may be interrupted by one non-homopolymer
+base:
+{% for file in imperfect_files %}
+- `{{ file }}`
+{%- endfor %}
 
-These are a special case of homopolymers that are interrupted by 1 bp that is
-not the same base as the rest of the homopolymer (for example `AAAATAAAA`). The
-minimum length for any given perfect (uninterrupted) homopolymer is 4 bp.
+#### All Homopolymers
 
-Here these are subset to different lower-length cutoffs.
-`SimpleRepeat_imperfecthomopolgeX` includes all imperfect homopolymers greater
-than or equal to X bp long.
+These contain all homopolymers >=7 base pairs and all imperfect homopolymers
+>=11 base pairs long:
 
+{{ homopolymers_file }}
+
+This is the complement of the above:
+
+{{ not_homopolymers_file }}
+
+{% if sat_file is not none -%}
 ### Satellites
 
-TODO
+The following contains all satellite repeat regions:
 
-### etc etc etc
+{{ sat_file }}
+
+And this is the complement of the above:
+
+{{ not_sat_file }}
+{%- endif %}
+
+{% if all_tr_file is not none -%}
+### Union repeat files
+
+#### All Tandem Repeats
+
+These contain all tandem repeats of various lengths. Note that this does NOT
+contain perfect or imperfect homopolymers:
+{% for file in all_filtered_tr_files %}
+- `{{ file }}`
+{%- endfor %}
+
+This is a union of the above files:
+
+{{ all_tr_file }}
+
+This is the complement of the above:
+
+{{ not_all_tr_file }}
+
+#### All Repeats
+
+This has all tandem repeats from the above section with perfect/imperfect
+homopolymers:
+
+{{ all_repeats_file }}
+
+This is the complement of the above:
+
+{{ not_all_repeats_file }}
+{%- endif %}
