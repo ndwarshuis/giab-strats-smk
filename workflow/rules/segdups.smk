@@ -85,3 +85,28 @@ rule all_segdups:
         rules.notin_superdups.output,
         rules.notin_long_superdups.output,
     localrule: True
+
+
+rule segdups_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/segdups_description.j2",
+        methods="workflow/templates/segdups_methods.j2",
+        segdups_inputs=lambda w: expand(
+            rules.download_superdups.output,
+            ref_src_key=config.refkey_to_bed_refsrckeys(
+                si_to_superdups, strip_full_refkey(w["ref_final_key"])
+            ),
+        ),
+        bedtools_env="workflow/envs/bedtools.yml",
+    params:
+        segdups_path=rules.merge_superdups.output[0],
+        long_segdups_path=rules.filter_long_superdups.output[0],
+        not_segdups_path=rules.notin_superdups.output[0],
+        not_long_segdups_path=rules.notin_long_superdups.output[0],
+    output:
+        segdup.readme,
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_segdups.py"

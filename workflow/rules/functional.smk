@@ -136,6 +136,8 @@ rule functional_readme:
                 si_to_cds, strip_full_refkey(w["ref_final_key"])
             ),
         ),
+        # TODO put these in params so it doesn't wait to generate this until
+        # these files are actually build
         cds=rules.merge_cds.output[0],
         notcds=rules.invert_cds.output[0],
         bedtools_env="workflow/envs/bedtools.yml",

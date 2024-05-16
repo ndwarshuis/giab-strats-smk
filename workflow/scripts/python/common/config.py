@@ -671,6 +671,10 @@ def smk_to_param_str(smk: Any, name: str) -> str:
         raise DesignError(f"Params does not have {name}")
 
 
+def smk_to_param_path(smk: Any, name: str) -> Path:
+    return Path(smk_to_param_str(smk, name))
+
+
 def smk_to_output(smk: Any, n: int = 0) -> Path:
     try:
         return Path(smk.output[n])
