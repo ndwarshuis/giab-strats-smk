@@ -22,3 +22,19 @@ rule find_telomeres:
         bgzip -c \
         > {output}
         """
+
+
+rule telomere_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/telomeres_description.j2",
+        methods="workflow/templates/telomeres_methods.j2",
+        seqtk_env="workflow/envs/seqtk.yml",
+    params:
+        path=rules.find_telomeres.output[0],
+    output:
+        telo.readme,
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_telomeres.py"

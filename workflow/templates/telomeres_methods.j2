@@ -1,0 +1,11 @@
+## Description of methods used to generate the stratifications
+
+`seqtk telo` was used to generate telomere sequences based on the reference
+fasta. The first three columns of this output were parsed into a bed file and
+used as-is.
+
+## Software
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}
+
