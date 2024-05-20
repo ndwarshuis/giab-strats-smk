@@ -81,6 +81,9 @@ checkpoint intersect_gc_ranges:
         "../scripts/python/bedtools/gc/intersect_ranges.py"
 
 
+# TODO check the ref/build key to see if these are wanted, and if not return
+# empty list; this will permit us to use this function in a safe way to build
+# input lists without triggering the checkpoint system
 def gc_inputs(ref_final_key, build_key):
     c = checkpoints.intersect_gc_ranges.get(
         ref_final_key=ref_final_key,

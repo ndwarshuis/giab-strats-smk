@@ -1,0 +1,45 @@
+## All Autosomes
+
+`{{ all_auto_file }}`
+
+## Sex Chromosome Files
+
+X and Y chromosomes are broken out into seperate files denoted with "chrX" or
+"chrY".
+
+{% if par_files|length > 0 %}
+### Pseudo-autosomal Regions (PAR)
+
+These are regions at both ends that are homologous between X and Y.
+
+{% for file in par_files -%}
+`{{ file }}`
+{%- endfor %}
+
+The complements of these (nonPAR) are given in:
+
+{% for file in non_par_files -%}
+`{{ file }}`
+{%- endfor %}
+{% endif %}
+
+{% if ampliconic_files|length > 0 %}
+### Ampliconic
+
+These are regions on both X and Y that tend to have many copies.
+
+{% for file in ampliconic_files -%}
+`{{ file }}`
+{%- endfor %}
+{% endif %}
+
+{% if xtr_files|length > 0 %}
+### X-transposed
+
+These are regions that were transposed from X to Y and thus are highly
+homologous between the two (but also outside the PAR).
+
+{% for file in xtr_files -%}
+`{{ file }}`
+{%- endfor %}
+{% endif %}

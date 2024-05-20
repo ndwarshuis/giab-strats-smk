@@ -1,0 +1,27 @@
+## PAR
+
+Each of these was used as-is and also complemented with `complementBed` to
+produce the non-PAR beds.
+
+### X
+
+{{ x_par_src }}
+
+### Y
+
+{{ y_par_src }}
+
+## Features
+
+### X
+
+{{ x_features_src }}
+
+### Y
+
+{{ y_features_src }}
+
+## Software
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}

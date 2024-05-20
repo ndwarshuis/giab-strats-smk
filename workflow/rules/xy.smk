@@ -161,3 +161,23 @@ def all_xy_sex(ref_final_key, build_key):
         + all_xy_nonPAR(ref_final_key, build_key)
         + all_xy_features(ref_final_key, build_key)
     )
+
+
+rule xy_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/xy_description.j2",
+        methods="workflow/templates/xy_methods.j2",
+        bedtools_env="workflow/envs/bedtools.yml",
+    params:
+        "",
+        # segdup_map_path=rules.intersect_segdup_and_map.output[0],
+        # not_segdup_map_path=rules.invert_segdup_and_map.output[0],
+        # alldifficult_path=rules.intersect_alldifficult.output[0],
+        # not_alldifficult_path=rules.invert_alldifficult.output[0],
+    output:
+        xy.readme,
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_xy.py"
