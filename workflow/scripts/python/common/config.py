@@ -125,6 +125,7 @@ from typing import (
     Protocol,
 )
 from typing_extensions import Self, assert_never
+from functools import reduce
 from itertools import chain
 from more_itertools import duplicates_everseen
 from common.functional import (
@@ -199,8 +200,16 @@ def sub_wildcard(s: str, wc: str, rep: str) -> str:
     return s.replace("{" + wc + "}", rep)
 
 
+def sub_wildcards(s: str, wc: dict[str, str]) -> str:
+    return reduce(lambda acc, nxt: sub_wildcard(acc, *nxt), wc.items(), s)
+
+
 def sub_wildcard_path(s: Path, wc: str, rep: str) -> Path:
     return Path(sub_wildcard(str(s), wc, rep))
+
+
+def sub_wildcards_path(s: Path, wc: dict[str, str]) -> Path:
+    return Path(sub_wildcards(str(s), wc))
 
 
 def flip_hap(h: Haplotype) -> Haplotype:
@@ -671,8 +680,24 @@ def smk_to_param_str(smk: Any, name: str) -> str:
         raise DesignError(f"Params does not have {name}")
 
 
+def smk_to_param_strs(smk: Any, name: str) -> list[str]:
+    ps = smk.params
+    if hasattr(ps, name):
+        x = ps[name]
+        if isinstance(x, list) and all([isinstance(y, str) for y in x]):
+            return x
+        else:
+            raise DesignError(f"Params for {name} are not a list")
+    else:
+        raise DesignError(f"Params does not have {name}")
+
+
 def smk_to_param_path(smk: Any, name: str) -> Path:
     return Path(smk_to_param_str(smk, name))
+
+
+def smk_to_param_paths(smk: Any, name: str) -> list[Path]:
+    return [Path(p) for p in smk_to_param_strs(smk, name)]
 
 
 def smk_to_output(smk: Any, n: int = 0) -> Path:
@@ -1535,6 +1560,217 @@ class LowComplexityPaths(NamedTuple):
         return [x.name for x in self.all_output_paths]
 
 
+class SubSexPaths(NamedTuple):
+    features_src: Path
+
+    par: Path | None
+    nonpar: Path | None
+    xtr: Path | None
+    ampliconic: Path | None
+
+    @property
+    def all_inputs(self) -> list[Path]:
+        return [self.features_src]
+
+    @property
+    def all_output_paths(self) -> list[Path]:
+        return [
+            x
+            for x in [self.par, self.nonpar, self.xtr, self.ampliconic]
+            if x is not None
+        ]
+
+
+class MaleHapSexPaths(NamedTuple):
+    x: SubSexPaths | None
+    y: SubSexPaths | None
+
+    @property
+    def all_inputs(self) -> list[Path]:
+        empty: list[Path] = []
+        return fmap_maybe_def(empty, lambda z: z.all_inputs, self.x) + fmap_maybe_def(
+            empty, lambda z: z.all_inputs, self.y
+        )
+
+    @property
+    def all_output_paths(self) -> list[Path]:
+        empty: list[Path] = []
+        return fmap_maybe_def(
+            empty, lambda z: z.all_output_paths, self.x
+        ) + fmap_maybe_def(empty, lambda z: z.all_output_paths, self.y)
+
+
+# TODO when we need it...
+# class FemaleHapSexPaths(NamedTuple):
+#     x: SubSexPaths
+
+
+class Dip1SexPaths(NamedTuple):
+    sex1: SubSexPaths | None  # X
+    sex2: SubSexPaths | None  # Y if male
+
+    @property
+    def all_inputs(self) -> list[Path]:
+        empty: list[Path] = []
+        return fmap_maybe_def(
+            empty, lambda z: z.all_inputs, self.sex1
+        ) + fmap_maybe_def(empty, lambda z: z.all_inputs, self.sex2)
+
+    @property
+    def all_output_paths(self) -> list[Path]:
+        empty: list[Path] = []
+        return fmap_maybe_def(
+            empty, lambda z: z.all_output_paths, self.sex1
+        ) + fmap_maybe_def(empty, lambda z: z.all_output_paths, self.sex2)
+
+
+class Dip2SexPaths(NamedTuple):
+    paths: SubSexPaths | None
+    hap: Haplotype
+
+    @property
+    def all_inputs(self) -> list[Path]:
+        return fmap_maybe_def([], lambda z: z.all_inputs, self.paths)
+
+    @property
+    def all_output_paths(self) -> list[Path]:
+        return fmap_maybe_def([], lambda z: z.all_output_paths, self.paths)
+
+
+AnySexPaths = MaleHapSexPaths | Dip1SexPaths | Dip2SexPaths
+
+
+class SexPaths(NamedTuple):
+    sex: AnySexPaths
+    auto: Path
+
+    @property
+    def all_inputs(self) -> list[Path]:
+        return self.sex.all_inputs
+
+    @property
+    def all_output_paths(self) -> list[Path]:
+        return [self.auto, *self.sex.all_output_paths]
+
+    @property
+    def all_outputs(self) -> list[str]:
+        return [str(x) for x in self.all_output_paths]
+
+    @property
+    def all_output_files(self) -> list[str]:
+        return [x.name for x in self.all_output_paths]
+
+
+def all_xy_paths(
+    sconf: GiabStrats,
+    rk: RefKeyFullS,
+    bk: BuildKey,
+    # sources
+    features_src: Path,
+    # outputs
+    xtr: Path,
+    ampliconic: Path,
+    par: Path,
+    nonpar: Path,
+    auto: Path,
+) -> SexPaths:
+    def sub_rsk(p: Path) -> Path:
+        return sub_wildcard_path(p, "ref_src_key", rk)
+
+    def sub_rk(p: Path) -> Path:
+        return sub_wildcard_path(p, "ref_final_key", rk)
+
+    def sub_sex1(p: Path, sub_x: bool) -> Path:
+        c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).name
+        return sub_wildcard_path(p, "sex_chr", c)
+
+    def sub_sex(p: Path, sub_x: bool) -> Path:
+        c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).name
+        return sub_wildcards_path(
+            p,
+            {"sex_chr": c, "ref_final_key": rk, "build_key": bk},
+        )
+
+    def to_paths(
+        use_x: bool,
+        has_xtr: bool,
+        has_ampliconic: bool,
+        has_par: bool,
+    ) -> SubSexPaths:
+        return SubSexPaths(
+            features_src=sub_sex1(sub_rsk(features_src), use_x),
+            xtr=sub_sex(xtr, use_x) if has_xtr else None,
+            ampliconic=sub_sex(xtr, use_x) if has_ampliconic else None,
+            par=sub_sex(par, use_x) if has_par else None,
+            nonpar=sub_sex(nonpar, use_x) if has_par else None,
+        )
+
+    def hap(bd: HapBuildData) -> AnySexPaths:
+        cis = bd.refdata.ref.hap_chrs(bd.build_chrs)
+        return MaleHapSexPaths(
+            x=(
+                to_paths(True, bd.have_xy_XTR, bd.have_xy_ampliconic, bd.have_x_PAR)
+                if ChrIndex.CHRX in cis
+                else None
+            ),
+            y=(
+                to_paths(False, bd.have_xy_XTR, bd.have_xy_ampliconic, bd.have_x_PAR)
+                if ChrIndex.CHRY in cis
+                else None
+            ),
+        )
+
+    def dip1(bd: Dip1BuildData) -> AnySexPaths:
+        cis = bd.refdata.ref.all_chrs(bd.build_chrs)
+        return Dip1SexPaths(
+            sex1=(
+                to_paths(True, bd.have_xy_XTR, bd.have_xy_ampliconic, bd.have_x_PAR)
+                if ChrIndex.CHRX in cis
+                else None
+            ),
+            sex2=(
+                to_paths(False, bd.have_xy_XTR, bd.have_xy_ampliconic, bd.have_x_PAR)
+                if ChrIndex.CHRY in cis
+                else None
+            ),
+        )
+
+    def dip2(hap: Haplotype, bd: Dip2BuildData) -> AnySexPaths:
+        cis = bd.refdata.ref.hap_chrs(bd.build_chrs, hap)
+        use_x = not (bd.refdata.ref.hap1_is_pat and hap is Haplotype.HAP1)
+        return Dip2SexPaths(
+            paths=(
+                SubSexPaths(
+                    features_src=sub_sex(sub_rsk(features_src), use_x),
+                    xtr=sub_sex(xtr, use_x) if bd.have_xy_XTR else None,
+                    ampliconic=sub_sex(xtr, use_x) if bd.have_xy_ampliconic else None,
+                    par=sub_sex(par, use_x) if bd.have_x_PAR else None,
+                    nonpar=sub_sex(nonpar, use_x) if bd.have_x_PAR else None,
+                )
+                if (use_x and ChrIndex.CHRX in cis) or ChrIndex.CHRY in cis
+                else None
+            ),
+            hap=hap,
+        )
+
+    sex = sconf.with_build_data_full(
+        rk,
+        bk,
+        hap,
+        dip1,
+        dip2,
+    )
+    return SexPaths(
+        sex=sex,
+        auto=sub_wildcards_path(auto, {"ref_final_key": rk, "build_key": bk}),
+    )
+
+    # bd = sconf.to_build_data_full(rk, bk)
+    # cis = sconf.buildkey_to_wanted_xy(rk, bk)
+
+    # return DipSexPaths()
+
+
 def all_low_complexity(
     sconf: GiabStrats,
     rk: RefKeyFullS,
@@ -1796,10 +2032,9 @@ class DipChrPattern(BaseModel, ChrPattern):
 
     template: str = "chr%i_%h"
     special: dict[ChrIndex, bed.ChrName] = {}
-    hapnames: Diploid[HaplotypeName] = Diploid(
-        hap1=HaplotypeName("PATERNAL"),
-        hap2=HaplotypeName("MATERNAL"),
-    )
+    paternal_name: HaplotypeName = HaplotypeName("PATERNAL")
+    maternal_name: HaplotypeName = HaplotypeName("MATERNAL")
+    hap1_is_pat: bool = True
     # By default, paternal doesn't have X and maternal doesn't have Y
     exclusions: Diploid[set[ChrIndex]] = Diploid(
         hap1={ChrIndex.CHRX},
@@ -1821,6 +2056,15 @@ class DipChrPattern(BaseModel, ChrPattern):
 
         v.double.both(is_valid)
         return v
+
+    @property
+    def hapnames(self) -> Diploid[HaplotypeName]:
+        hap1, hap2 = (
+            (self.paternal_name, self.maternal_name)
+            if self.hap1_is_pat
+            else (self.maternal_name, self.paternal_name)
+        )
+        return Diploid(hap1=hap1, hap2=hap2)
 
     def _is_excluded(self, i: ChrIndex, h: Haplotype) -> bool:
         return i in self.exclusions.double.choose(h)
@@ -2086,6 +2330,7 @@ class Dip2ChrFileSrc(_GenericSrcDocumentable2, Generic[S], _Dip2ChrSrc[S]):
         ),
         alias="chr_pattern",
     )
+    hap1_is_pat: bool = True
     hap1: S
     hap2: S
 
@@ -2554,6 +2799,9 @@ class XYPar(BaseModel):
 
     start: tuple[NonNegativeInt, NonNegativeInt]
     end: tuple[NonNegativeInt, NonNegativeInt]
+    comment: str = (
+        "The PAR coordinates were specified manually in the pipeline configuration."
+    )
 
     @validator("start", "end")
     def positive_region(cls, v: tuple[int, int]) -> tuple[int, int]:

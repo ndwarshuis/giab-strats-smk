@@ -769,11 +769,6 @@ use rule invert_satellites as invert_HPs_and_TRs with:
 
 
 def all_low_complexity_smk(ref_final_key):
-    # def go(pathlist, f):
-    #     rk = strip_full_refkey(ref_final_key)
-    #     rsks = config.refkey_to_bed_refsrckeys(f, rk)
-    #     return expand(pathlist, ref_src_key=rsks)
-
     return all_low_complexity(
         config,
         ref_final_key,
@@ -792,7 +787,6 @@ def all_low_complexity_smk(ref_final_key):
         Path(rules.merge_HPs_and_TRs.output[0]),
         Path(rules.invert_HPs_and_TRs.output[0]),
     )
-    return paths.all_outputs
 
 
 def all_low_complexity_flat(ref_final_key):
