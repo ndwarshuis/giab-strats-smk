@@ -1,25 +1,36 @@
+{% if x_par_src is not none and y_par_src is not none -%}
 ## PAR
 
 Each of these was used as-is and also complemented with `complementBed` to
 produce the non-PAR beds.
 
+{% if x_par_src is not none -%}
 ### X
 
 {{ x_par_src }}
+{%- endif %}
 
+{% if y_par_src is not none -%}
 ### Y
 
 {{ y_par_src }}
+{%- endif %}
+{%- endif %}
 
+{% if x_features_src is not none and y_features_src is not none -%}
 ## Features
 
+{% if x_features_src is not none -%}
 ### X
 
 {{ x_features_src }}
 
+{% if y_features_src is not none -%}
 ### Y
 
 {{ y_features_src }}
+{%- endif %}
+{%- endif %}
 
 ## Software
 {% for dep, version in deps.items() %}
