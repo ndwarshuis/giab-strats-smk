@@ -149,10 +149,11 @@ haploid_stratifications:
                 url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/GRCh38/chrY_genomic_features_GRCh38.bed
                 md5: 770682734c41f5f7c1655adf1f986cb6
             level_col: 3
-          # Set to true if XTR regions are desired
-          xtr: true
+          # Set to the value by which to filter XTR regions if desired
+          # xtr: XTR
+          # Set to the value by which to filter ampliconic regions if desired
           # Set to true if Ampliconic regions are desired
-          ampliconic: true
+          # ampliconic: Ampliconic
         # Data for X or Y pseudoautosomal (PAR) regions. Since these are so short
         # it's easier to simply specify them manually here with two intervals ;)
         x_par:
@@ -425,8 +426,6 @@ haploid_stratifications:
             level_col: 3
             params:
               sep: "\\s+"
-          xtr: true
-          ampliconic: true
         x_par:
           start: [60001, 2699520]
           end: [154931044, 155260560]
@@ -543,8 +542,7 @@ haploid_stratifications:
                 url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/T2T/chrY_genomic_features_HG002.bed
                 md5: c2cb0d831db1f71dfb4632a6ce79b0d6
             level_col: 3
-          xtr: true
-          ampliconic: false # not present in these files
+          ampliconic: null # not present in these files
         x_par:
           start: [0, 2394410]
           end: [153925834, 154259566]
@@ -660,11 +658,11 @@ diploid1_stratifications:
                     - {chr: 21, hap: 1, start: 15, end: 55}
             test_dip:
               bed:
-                hap1:
+                pat:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
-                hap2:
+                mat:
                   lines:
                     - {chr: 2, start: 12, end: 60}
                     - {chr: 21, start: 15, end: 55}
@@ -682,18 +680,18 @@ diploid1_stratifications:
 diploid2_stratifications:
   HG002:
     ref:
-      hap1:
+      pat:
         url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.pat.fasta.gz
-      hap2:
+      mat:
         url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.mat.fasta.gz
     strat_inputs:
       low_complexity:
         rmsk:
           bed:
-            hap1:
+            pat:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/repeatmasker/hg002v1.0.1.paternal.final.bb
               md5: 5947df8866bd9f190615ca072fd9e6d9
-            hap2:
+            mat:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/repeatmasker/hg002v1.0.1.maternal.final.bb
               md5: ec8b96518a8b8d9c09794192b629d328
           class_col: 3
@@ -724,10 +722,10 @@ diploid2_stratifications:
       functional:
         cds:
           bed:
-            hap1:
+            pat:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.PAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
               md5: f436fe09bfd73aeb44f946a69b3a9a83
-            hap2:
+            mat:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.MAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
               md5: 78358c171a3c4141aaa2552fc413b5eb
           cds_params:
@@ -737,7 +735,7 @@ diploid2_stratifications:
           bed:
             # NOTE: both IGK loci are rearranged and inactivated so this
             # regions actually starts at IGKDEL
-            hap1:
+            pat:
               lines:
                 - { chr: 2,  start: 88868025,  end: 90383961  } # IGK
                 - { chr: 7,  start: 38373030,  end: 38494618  } # TRB
@@ -745,7 +743,7 @@ diploid2_stratifications:
                 - { chr: 14, start: 21320867,  end: 22186894  } # TRA/D
                 - { chr: 14, start: 105296422, end: 105793950 } # IGH
                 - { chr: 22, start: 20560550,  end: 21469622  } # IGL
-            hap2:
+            mat:
               lines:
                 - { chr: 2,  start: 88855564,  end: 90457523  } # IGK
                 - { chr: 7,  start: 38345242,  end: 38476019  } # TRB
@@ -795,11 +793,11 @@ diploid2_stratifications:
                     - {chr: 21, hap: 1, start: 15, end: 55}
             test_dip:
               bed:
-                hap1:
+                pat:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
-                hap2:
+                mat:
                   lines:
                     - {chr: 2, start: 12, end: 60}
                     - {chr: 21, start: 15, end: 55}

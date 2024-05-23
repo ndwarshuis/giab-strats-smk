@@ -27,7 +27,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
         src_para = cfg.format_src(
             p.bed.bed.documentation.elem,
-            cfg.smk_to_input_name(smk, f"{name}_features_inputs"),
+            p.src,
             f"The {name} chromosome feature bed",
         )
         params_para = cfg.format_bed_params(p.bed.params)
@@ -54,8 +54,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         return {
             "x_par_src": get_par_src(x),
             "y_par_src": get_par_src(y),
-            "x_feature_src": get_feature_src(x, True),
-            "y_feature_src": get_feature_src(y, False),
+            "x_features_src": get_feature_src(x, True),
+            "y_features_src": get_feature_src(y, False),
         }
 
     if isinstance(sex, cfg.MaleHapSexPaths):
@@ -77,7 +77,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         return t.render(
             all_auto_file=auto_path.name,
             par_files=[p.name for p in sex.par_paths],
-            nonpar_files=[p.name for p in sex.nonpar_paths],
+            non_par_files=[p.name for p in sex.nonpar_paths],
             ampliconic_files=[p.name for p in sex.ampliconic_paths],
             xtr_files=[p.name for p in sex.xtr_paths],
         )

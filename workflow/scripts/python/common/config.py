@@ -1564,6 +1564,8 @@ class LowComplexityPaths(NamedTuple):
 
 
 class XYFeaturePaths(NamedTuple):
+    src: Path
+
     bed: XYFile
     xtr_path: Path | None
     ampliconic_path: Path | None
@@ -1578,14 +1580,13 @@ class PARPaths(NamedTuple):
 
 
 class SubSexPaths(NamedTuple):
-    features_src: Path
 
     par: PARPaths | None
     features: XYFeaturePaths | None
 
     @property
     def all_inputs(self) -> list[Path]:
-        return [self.features_src]
+        return fmap_maybe_def([], lambda z: [z.src], self.features)
 
     @property
     def par_path(self) -> Path | None:
@@ -1729,18 +1730,19 @@ def all_xy_paths(
         return sub_wildcard_path(p, "ref_final_key", rk)
 
     def sub_sex1(p: Path, sub_x: bool) -> Path:
-        c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).name
+        c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).chr_name
         return sub_wildcard_path(p, "sex_chr", c)
 
     def sub_sex(p: Path, sub_x: bool) -> Path:
-        c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).name
+        c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).chr_name
         return sub_wildcards_path(
             p,
             {"sex_chr": c, "ref_final_key": rk, "build_key": bk},
         )
 
-    def to_features(use_x: bool, features: XYFeatures) -> XYFeaturePaths:
+    def to_features(use_x: bool, features: XYFeatures, src: Path) -> XYFeaturePaths:
         return XYFeaturePaths(
+            src=sub_sex1(sub_rsk(src), use_x),
             bed=features.x_bed if use_x else features.y_bed,
             xtr_path=sub_sex(xtr, use_x) if features.xtr is not None else None,
             ampliconic_path=(
@@ -1762,8 +1764,9 @@ def all_xy_paths(
 
     def to_paths(use_x: bool, xy: XY) -> SubSexPaths:
         return SubSexPaths(
-            features_src=sub_sex1(sub_rsk(features_src), use_x),
-            features=fmap_maybe(lambda z: to_features(use_x, z), xy.features),
+            features=fmap_maybe(
+                lambda z: to_features(use_x, z, features_src), xy.features
+            ),
             par=to_par(use_x, xy),
         )
 
@@ -1790,8 +1793,10 @@ def all_xy_paths(
         return Dip2SexPaths(
             paths=(
                 SubSexPaths(
-                    features_src=sub_sex(sub_rsk(features_src), use_x),
-                    features=fmap_maybe(lambda z: to_features(use_x, z), xy.features),
+                    features=fmap_maybe(
+                        lambda z: to_features(use_x, z, features_src),
+                        xy.features,
+                    ),
                     par=to_par(use_x, xy),
                 )
                 if (use_x and ChrIndex.CHRX in cis) or ChrIndex.CHRY in cis
@@ -2488,14 +2493,14 @@ class Dip1ChrTxtSrc(_BaseSrcDocumentable1, _Dip1ChrSrc[bed.BedLines]):
 
 
 class Dip2ChrTxtSrc(_BaseSrcDocumentable2, _Dip2ChrSrc[bed.BedLines]):
-    hap1: HapBedTxtSrc
-    hap2: HapBedTxtSrc
+    pat: HapBedTxtSrc
+    mat: HapBedTxtSrc
 
     @property
     def documentation(self) -> Double[SrcDoc]:
         return Double(
-            pat=self.hap1.documentation,
-            mat=self.hap1.documentation,
+            pat=self.pat.documentation,
+            mat=self.mat.documentation,
         )
 
     @property
@@ -2504,8 +2509,8 @@ class Dip2ChrTxtSrc(_BaseSrcDocumentable2, _Dip2ChrSrc[bed.BedLines]):
 
             return [x.to_line(self.chr_pattern.choose(h)) for x in s.lines]
 
-        b1 = go(Haplotype.PAT, self.hap1)
-        b2 = go(Haplotype.MAT, self.hap2)
+        b1 = go(Haplotype.PAT, self.pat)
+        b2 = go(Haplotype.MAT, self.mat)
         return Double(pat=b1, mat=b2)
 
     @property
