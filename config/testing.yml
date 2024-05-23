@@ -159,9 +159,11 @@ haploid_stratifications:
         x_par:
           start: [0, 2781479]
           end: [155701383, 156030895]
+          comment: "I cribbed this from Wikipedia."
         y_par:
           start: [10001, 2781479]
           end: [56887902, 57217415]
+          comment: "I also cribbed this from Wikipedia."
   
       # Source files for segmental duplications. For now only superdups is used
       # and supported.
