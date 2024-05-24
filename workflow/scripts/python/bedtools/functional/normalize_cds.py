@@ -21,6 +21,7 @@ class GFFOut(NamedTuple):
     rk: cfg.RefKeyFull
 
 
+# TODO don't hardcode this
 VDJ_PAT = "^ID=gene-(IGH|IGK|IGL|TRA|TRB|TRG);"
 
 

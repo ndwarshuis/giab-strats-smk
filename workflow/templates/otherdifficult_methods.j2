@@ -1,0 +1,54 @@
+## Description of methods used to generate the stratifications
+
+{% if gaps_src is not none -%}
+### Gaps
+
+{{ gaps_src }}
+
+Regions were extended in either direction by 15000 base pairs using `slopBed`
+followed by `mergeBed`.
+{%- endif %}
+
+{% if refseq_src is not none -%}
+### Refseq
+
+{{ refseq_src }}
+
+{{ refseq_src }}
+{%- endif %}
+
+{% if vdj_src is not none -%}
+### VDJ
+
+{{ vdj_src }}
+{%- endif %}
+
+{% if mhc_src is not none -%}
+### MHC
+
+{{ mhc_src }}
+{%- endif %}
+
+{% if kir_src is not none -%}
+### KIR
+
+{{ kir_src }}
+{%- endif %}
+
+{% if other_srcs|length > 0 -%}
+### Other
+
+These bed files were taken as is from their denoted sources.
+
+{% for other_name, other_src in other_srcs %}
+#### {{ other_name }}
+
+{{ other_src }}
+{% endfor %}
+{%- endif %}
+
+## Software
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}
+

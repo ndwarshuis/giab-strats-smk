@@ -129,6 +129,7 @@ from functools import reduce
 from itertools import chain
 from more_itertools import duplicates_everseen
 from common.functional import (
+    maybe2,
     from_maybe,
     fmap_maybe,
     fmap_maybe_def,
@@ -342,10 +343,36 @@ def with_dip_bedfile(
         # assert_never(bf)
 
 
+def match_single_unsafe(f: Callable[[X], Y], x: SingleOrDouble[X]) -> Y:
+    if isinstance(x, Single):
+        return f(x.elem)
+    else:
+        raise DesignError()
+
+
+def match_double_unsafe(f: Callable[[X, X], Y], x: SingleOrDouble[X]) -> Y:
+    if isinstance(x, Double):
+        return f(x.pat, x.mat)
+    else:
+        raise DesignError()
+
+
+def map_single_or_double(
+    f: Callable[[X], Y],
+    x: SingleOrDouble[X],
+) -> SingleOrDouble[Y]:
+    if isinstance(x, Single):
+        return Single(f(x.elem))
+    if isinstance(x, Double):
+        return x.both(lambda y, _: f(y))
+    else:
+        assert_never(x)
+
+
 def with_single_or_double(
-    x: Single[X] | Double[X],
     single_f: Callable[[Single[X]], Y],
     double_f: Callable[[Double[X]], Y],
+    x: SingleOrDouble[X],
 ) -> Y:
     if isinstance(x, Single):
         return single_f(x)
@@ -355,11 +382,20 @@ def with_single_or_double(
         assert_never(x)
 
 
+def single_or_double_to_list(x: SingleOrDouble[X]) -> list[X]:
+    if isinstance(x, Single):
+        return [x.elem]
+    if isinstance(x, Double):
+        return [x.pat, x.mat]
+    else:
+        assert_never(x)
+
+
 def from_single_or_double(x: Single[X] | Double[X], hap: Haplotype | None) -> X:
     return with_single_or_double(
-        x,
         lambda x: none_unsafe(hap, x.elem),
         lambda x: not_none_unsafe(hap, lambda h: x.choose(h)),
+        x,
     )
 
 
@@ -448,7 +484,11 @@ def all_ref_refsrckeys(
         Stratification[RefSrcT, AnyBedT, AnyVcfT],
     ],
 ) -> list[RefKeyFullS]:
-    return [s for k, v in xs.items() for s in v.ref.src.to_str_refkeys(k)]
+    return [
+        s
+        for k, v in xs.items()
+        for s in single_or_double_to_list(v.ref.src.to_str_refkeys(k))
+    ]
 
 
 def all_build_data(
@@ -471,7 +511,7 @@ def all_bed_build_and_refsrckeys(
         (rk, b.buildkey)
         for b in all_build_data(xs)
         if (src := f(b)) is not None
-        for rk in src.to_str_refkeys(b.refdata.refkey)
+        for rk in single_or_double_to_list(src.to_str_refkeys(b.refdata.refkey))
     ]
 
 
@@ -503,7 +543,9 @@ def all_ref_build_keys(
     return [
         (rk, r.buildkey)
         for r in all_build_data(xs)
-        for rk in r.refdata.ref.src.to_str_refkeys(r.refdata.refkey)
+        for rk in single_or_double_to_list(
+            r.refdata.ref.src.to_str_refkeys(r.refdata.refkey)
+        )
     ]
 
 
@@ -834,6 +876,7 @@ def read_write_filter_sort_dip1to1_bed(
     bed.write_bed(opath, g(df))
 
 
+# TDOO consider not using a tuple here for ipath
 def read_filter_sort_dip2to1_bed(
     bd: Dip1BuildData,
     bf: Dip2BedFile,
@@ -848,15 +891,15 @@ def read_filter_sort_dip2to1_bed(
         return bed.filter_sort_bed(imap, fmap, df)
 
     conv = bd.refdata.ref.hap_chr_conversion(bf.bed.chr_pattern, bd.build_chrs)
-    imap1, imap2 = conv.init_mapper
+    imap = conv.init_mapper
     fmap = conv.final_mapper
 
     return pd.concat(
         [
             go(bf, *x)
             for x in [
-                (ipath[0], imap1),
-                (ipath[1], imap2),
+                (ipath[0], imap.pat),
+                (ipath[1], imap.mat),
             ]
         ]
     )
@@ -881,7 +924,7 @@ def read_filter_sort_dip1to2_bed(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     conv = bd.refdata.ref.dip_chr_conversion(bf.bed.chr_pattern, bd.build_chrs)
     imap, splitter = conv.init_mapper
-    fmap0, fmap1 = conv.final_mapper
+    fmap = conv.final_mapper
 
     # TODO small micro-optimization for when I feel like it; splitting the bed
     # will also filter it, so we need only sort it after vs filtering and
@@ -891,7 +934,7 @@ def read_filter_sort_dip1to2_bed(
 
     df = bf.read(ipath)
     df0, df1 = bed.split_bed(splitter, df)
-    return (go(df0, fmap0), go(df1, fmap1))
+    return (go(df0, fmap.pat), go(df1, fmap.mat))
 
 
 def read_write_filter_sort_dip1to2_bed(
@@ -1104,11 +1147,11 @@ class _HasRefKeys:
 
     """
 
-    def to_refkeys(self, rk: RefKey) -> list[RefKeyFull]:
+    def to_refkeys(self, rk: RefKey) -> RefKeyFull1or2:
         return NotImplemented
 
-    def to_str_refkeys(self, rk: RefKey) -> list[RefKeyFullS]:
-        return [k.name for k in self.to_refkeys(rk)]
+    def to_str_refkeys(self, rk: RefKey) -> RefKeyFullS1or2:
+        return map_single_or_double(lambda k: k.name, self.to_refkeys(rk))
 
 
 @dataclass(frozen=True)
@@ -1126,8 +1169,8 @@ class Single(Generic[X], _HasRefKeys):
 
     elem: X
 
-    def to_refkeys(self, rk: RefKey) -> list[RefKeyFull]:
-        return [self.key(rk)]
+    def to_refkeys(self, rk: RefKey) -> RefKeyFull1or2:
+        return Single(elem=self.key(rk))
 
     def key(self, rk: RefKey) -> RefKeyFull:
         return RefKeyFull(rk, None)
@@ -1144,11 +1187,15 @@ class Double(Generic[X], _HasRefKeys):
     pat: X
     mat: X
 
+    @property
+    def as_tuple(self) -> tuple[X, X]:
+        return (self.pat, self.mat)
+
     def choose(self, hap: Haplotype) -> X:
         return hap.choose(self.pat, self.mat)
 
-    def both(self, f: Callable[[X, Haplotype], Y]) -> tuple[Y, Y]:
-        return (f(self.pat, Haplotype.PAT), f(self.mat, Haplotype.MAT))
+    def both(self, f: Callable[[X, Haplotype], Y]) -> Double[Y]:
+        return Double(f(self.pat, Haplotype.PAT), f(self.mat, Haplotype.MAT))
 
     def key1(self, rk: RefKey) -> RefKeyFull:
         return RefKeyFull(rk, Haplotype.PAT)
@@ -1156,11 +1203,14 @@ class Double(Generic[X], _HasRefKeys):
     def key2(self, rk: RefKey) -> RefKeyFull:
         return RefKeyFull(rk, Haplotype.MAT)
 
-    def keys(self, rk: RefKey) -> tuple[RefKeyFull, RefKeyFull]:
-        return (self.key1(rk), self.key2(rk))
+    def keys(self, rk: RefKey) -> Double[RefKeyFull]:
+        return Double(self.key1(rk), self.key2(rk))
 
-    def to_refkeys(self, rk: RefKey) -> list[RefKeyFull]:
-        return list(self.keys(rk))
+    def to_refkeys(self, rk: RefKey) -> RefKeyFull1or2:
+        return self.keys(rk)
+
+
+SingleOrDouble = Single[X] | Double[X]
 
 
 @dataclass(frozen=True)
@@ -1188,6 +1238,7 @@ class RefKeyFull:
         return RefKeyFullS(f"{k}.{h.name}" if h is not None else k)
 
 
+# TODO change this to 'pat' and 'mat'
 class Haplotype(Enum):
     "One of the human diploid haplotypes. 0 = Paternal, 1 = Maternal"
     PAT: int = 0
@@ -1370,7 +1421,7 @@ class HapToDipChrConversion:
     indices: BuildChrs
 
     @property
-    def init_mapper(self) -> tuple[bed.InitMapper, bed.InitMapper]:
+    def init_mapper(self) -> Double[bed.InitMapper]:
         return self.fromPattern.both(lambda p, h: p.init_mapper(self.indices, h))
 
     @property
@@ -1391,7 +1442,7 @@ class DipToHapChrConversion:
         return (im, bed.make_split_mapper(im, fm0))
 
     @property
-    def final_mapper(self) -> tuple[bed.FinalMapper, bed.FinalMapper]:
+    def final_mapper(self) -> Double[bed.FinalMapper]:
         return self.toPattern.both(lambda p, h: p.final_mapper(self.indices, h))
 
 
@@ -1490,8 +1541,8 @@ class UniformRepeatPaths(NamedTuple):
 
 
 class RepeatsPaths(NamedTuple):
-    trf_src: list[Path]
-    rmsk_src: list[Path]
+    trf_src: Path1or2
+    rmsk_src: Path1or2
 
     filtered_trs: list[Path]  # ASSUME this is non-empty
     all_trs: Path
@@ -1511,7 +1562,7 @@ class RepeatsPaths(NamedTuple):
 
 
 class SatellitesPaths(NamedTuple):
-    sat_src: list[Path]
+    sat_src: Path1or2
 
     sats: Path
     not_sats: Path
@@ -1537,8 +1588,10 @@ class LowComplexityPaths(NamedTuple):
         return fmap_maybe_def(
             [],
             lambda s: fmap_maybe_def(
-                s.sat_src,
-                lambda r: r.trf_src + s.sat_src + (r.rmsk_src if s.used_censat else []),
+                single_or_double_to_list(s.sat_src),
+                lambda r: single_or_double_to_list(r.trf_src)
+                + single_or_double_to_list(s.sat_src)
+                + (single_or_double_to_list(r.rmsk_src) if s.used_censat else []),
                 s.all_repeats,
             ),
             self.satellites,
@@ -1821,6 +1874,7 @@ def all_xy_paths(
 def all_low_complexity(
     sconf: GiabStrats,
     rk: RefKeyFullS,
+    bk: BuildKey,
     # sources
     rmsk_src: Path,
     censat_src: Path,
@@ -1840,19 +1894,25 @@ def all_low_complexity(
     all_repeats: Path,
     not_all_repeats: Path,
 ) -> LowComplexityPaths:
-    def go(p: Path, f: StratInputToBed) -> list[Path]:
+    def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
         _rk = strip_full_refkey(rk)
         rsks = sconf.refkey_to_bed_refsrckeys(f, _rk)
-        return [sub_wildcard_path(p, "ref_src_key", r) for r in rsks]
+        if rsks is None:
+            return None
+        else:
+            return map_single_or_double(
+                lambda s: sub_wildcards_path(p, {"ref_src_key": s, "build_key": bk}),
+                rsks,
+            )
 
     def sub_rk(p: Path) -> Path:
         return sub_wildcard_path(p, "ref_final_key", rk)
 
-    rd = sconf.to_ref_data_full(rk)
-    rmsk = rd.has_low_complexity_rmsk
-    simreps = rd.has_low_complexity_simreps
-    censat = rd.has_low_complexity_censat
-    has_sats = rmsk or censat
+    # rd = sconf.to_ref_data_full(rk)
+    # rmsk = rd.has_low_complexity_rmsk
+    # simreps = rd.has_low_complexity_simreps
+    # censat = rd.has_low_complexity_censat
+    # has_sats = rmsk or censat
 
     # homopolymers and uniform repeats are included no matter what
     uniform = UniformRepeatPaths(
@@ -1862,37 +1922,148 @@ def all_low_complexity(
         not_homopolymers=sub_rk(not_homopolymers),
     )
 
+    trf = sub_rsk(trf_src, si_to_simreps)
+    rmsk = sub_rsk(rmsk_src, si_to_rmsk)
+    censat = sub_rsk(censat_src, si_to_satellites)
+
     # include tandem repeats and merged output if we have rmsk/censat and simreps
-    repeats = (
-        RepeatsPaths(
-            trf_src=go(trf_src, si_to_simreps),
-            rmsk_src=go(rmsk_src, si_to_rmsk),
+    tm: tuple[Path1or2, Path1or2] | None = maybe2((trf, rmsk))
+    if tm is None:
+        repeats = None
+    else:
+        repeats = RepeatsPaths(
+            trf_src=tm[0],
+            rmsk_src=tm[1],
             filtered_trs=[sub_rk(p) for p in filtered_trs],
             all_trs=sub_rk(all_trs),
             not_all_trs=sub_rk(not_all_trs),
             all_repeats=sub_rk(all_repeats),
             not_all_repeats=sub_rk(not_all_repeats),
         )
-        if simreps and rmsk
-        else None
-    )
 
     # include satellites only if we have rmsk or censat
-    satpaths = (
-        SatellitesPaths(
-            sat_src=(
-                go(censat_src, si_to_satellites) if censat else go(rmsk_src, si_to_rmsk)
-            ),
+    s: Path1or2 | None = from_maybe(rmsk, censat)
+    if s is None:
+        satpaths = None
+    else:
+        satpaths = SatellitesPaths(
+            sat_src=s,
             sats=sub_rk(sats),
             not_sats=sub_rk(notsats),
-            used_censat=censat,
+            used_censat=censat is not None,
             all_repeats=repeats,
         )
-        if has_sats
-        else None
-    )
 
     return LowComplexityPaths(uniform_repeats=uniform, satellites=satpaths)
+
+
+# @dataclass(frozen=True)
+# class OtherDifficultOtherPath:
+#     doc: str | None
+#     params: BedFileParams
+#     path: Path
+
+
+Path1or2 = SingleOrDouble[Path]
+
+RefKeyFull1or2 = SingleOrDouble[RefKeyFull]
+RefKeyFullS1or2 = SingleOrDouble[RefKeyFullS]
+
+
+@dataclass(frozen=True)
+class OtherDifficultPaths:
+    gaps_src: Path1or2 | None
+    refseq_src: Path1or2 | None
+    vdj_src: Path1or2 | None
+    kir_src: Path1or2 | None
+    mhc_src: Path1or2 | None
+    other_src: dict[OtherStratKey, Path1or2]
+
+    gaps_output: Path | None
+    vdj_output: Path | None
+    mhc_output: Path | None
+    kir_output: Path | None
+
+    other_outputs: dict[OtherStratKey, Path]
+
+
+def all_otherdifficult_paths(
+    sconf: GiabStrats,
+    rk: RefKeyFullS,
+    bk: BuildKey,
+    # sources
+    gaps_src: Path,
+    refseq_src: Path,
+    vdj_src: Path,
+    mhc_src: Path,
+    kir_src: Path,
+    other_srcs: dict[OtherStratKey, Path],
+    # outputs
+    gaps: Path,
+    vdj: Path,
+    kir: Path,
+    mhc: Path,
+    other: dict[OtherStratKey, Path],
+) -> OtherDifficultPaths:
+    def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
+        _rk = strip_full_refkey(rk)
+        rsks = sconf.refkey_to_bed_refsrckeys(f, _rk)
+        if rsks is None:
+            return None
+        else:
+            return map_single_or_double(
+                lambda r: sub_wildcards_path(p, {"ref_src_key": r, "build_key": bk}),
+                rsks,
+            )
+
+    def sub_rsk_other(p: Path, k: OtherStratKey) -> Path1or2 | None:
+        _rk = strip_full_refkey(rk)
+        # TODO don't hardcode
+        rsks = sconf.buildkey_to_bed_refsrckeys(
+            lambda bd: bd_to_other(OtherLevelKey("OtherDifficult"), k, bd), _rk, bk
+        )
+        if rsks is None:
+            return None
+        else:
+            return map_single_or_double(
+                lambda r: sub_wildcards_path(p, {"ref_src_key": r, "build_key": bk}),
+                rsks,
+            )
+
+    def sub_rk(p: Path) -> Path:
+        return sub_wildcards_path(p, {"ref_final_key": rk, "build_key": bk})
+
+    _gap_src = sub_rsk(gaps_src, si_to_gaps)
+    _refseq_src = sub_rsk(refseq_src, si_to_cds)
+    _vdj_src = sub_rsk(vdj_src, si_to_vdj)
+    _mhc_src = sub_rsk(mhc_src, si_to_mhc)
+    _kir_src = sub_rsk(kir_src, si_to_kir)
+
+    _other_src = {
+        k: o for k, p in other_srcs.items() if (o := sub_rsk_other(p, k)) is not None
+    }
+    _other_output = {k: sub_rk(p) for k, p in other.items() if k in _other_src}
+
+    # TODO add switches to bring in vdj/kir/mhc only if we want them from the build
+    return OtherDifficultPaths(
+        gaps_src=_gap_src,
+        refseq_src=_refseq_src,
+        vdj_src=sub_rsk(vdj_src, si_to_vdj),
+        mhc_src=sub_rsk(mhc_src, si_to_mhc),
+        kir_src=sub_rsk(kir_src, si_to_kir),
+        gaps_output=sub_rk(gaps) if _gap_src is not None else None,
+        vdj_output=(
+            sub_rk(vdj) if _refseq_src is not None or _vdj_src is not None else None
+        ),
+        mhc_output=(
+            sub_rk(mhc) if _refseq_src is not None or _mhc_src is not None else None
+        ),
+        kir_output=(
+            sub_rk(kir) if _refseq_src is not None or _kir_src is not None else None
+        ),
+        other_src=_other_src,
+        other_outputs=_other_output,
+    )
 
 
 ################################################################################
@@ -3230,12 +3401,12 @@ class RefData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
     builds: dict[BuildKey, Build[AnyBedT, AnyVcfT]]
 
     @property
-    def ref_refkeys(self) -> list[RefKeyFull]:
+    def ref_refkeys(self) -> RefKeyFull1or2:
         "The list of full refkeys for the reference (either one or two)"
         return self.ref.src.to_refkeys(self.refkey)
 
     @property
-    def ref_str_refkeys(self) -> list[RefKeyFullS]:
+    def ref_str_refkeys(self) -> RefKeyFullS1or2:
         "Like 'ref_refkeys' but returns strings."
         return self.ref.src.to_str_refkeys(self.refkey)
 
@@ -3270,25 +3441,44 @@ class RefData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
         except KeyError:
             return None
 
-    def get_refkeys_unsafe_(self, f: RefDataToSrc) -> list[RefKeyFullS]:
+    def get_refkeys(self, f: RefDataToSrc) -> RefKeyFullS1or2 | None:
         """
         Get the list of refkeys (either one or two) given a function
         that retrieves an input file
         """
-        return not_none_unsafe(
+        return fmap_maybe(
+            lambda s: s.to_str_refkeys(self.refkey),
             f(self),
-            lambda s: s.to_str_refkeys(self.refkey),
         )
 
-    def get_refkeys_unsafe(self, f: StratInputToSrc) -> list[RefKeyFullS]:
-        """Like 'get_refkeys_unsafe_' but the input function is restricted to
-        the 'strat_inputs' member of this object.
-
+    def get_si_refkeys(self, f: StratInputToSrc) -> RefKeyFullS1or2 | None:
         """
-        return not_none_unsafe(
-            f(self.strat_inputs),
+        Like 'get_refkeys' but 'f' takes strat_inputs and not a ref object.
+        """
+        return fmap_maybe(
             lambda s: s.to_str_refkeys(self.refkey),
+            f(self.strat_inputs),
         )
+
+    # def get_refkeys_unsafe_(self, f: RefDataToSrc) -> RefKeyFullS1or2:
+    #     """
+    #     Get the list of refkeys (either one or two) given a function
+    #     that retrieves an input file
+    #     """
+    #     return not_none_unsafe(
+    #         f(self),
+    #         lambda s: s.to_str_refkeys(self.refkey),
+    #     )
+
+    # def get_refkeys_unsafe(self, f: StratInputToSrc) -> RefKeyFullS1or2:
+    #     """Like 'get_refkeys_unsafe_' but the input function is restricted to
+    #     the 'strat_inputs' member of this object.
+
+    #     """
+    #     return not_none_unsafe(
+    #         f(self.strat_inputs),
+    #         lambda s: s.to_str_refkeys(self.refkey),
+    #     )
 
     @property
     def has_low_complexity_rmsk(self) -> bool:
@@ -3968,7 +4158,7 @@ class GiabStrats(BaseModel):
 
     def refkey_to_bed_refsrckeys(
         self, f: StratInputToBed, rk: RefKey
-    ) -> list[RefKeyFullS]:
+    ) -> RefKeyFullS1or2 | None:
         """Lookup a given reference and return the full refkeys for the
         bed file obtained with the given function.
 
@@ -3979,7 +4169,7 @@ class GiabStrats(BaseModel):
         this function provides the full refkeys for obtaining said inputs.
         """
         # TODO this seems like a useful glue function (the labmda that is)
-        return self.to_ref_data(rk).get_refkeys_unsafe(
+        return self.to_ref_data(rk).get_refkeys(
             lambda si: fmap_maybe(lambda x: x.bed.src, f(si))
         )
 
@@ -4027,14 +4217,14 @@ class GiabStrats(BaseModel):
 
     def buildkey_to_bed_refsrckeys(
         self, f: BuildDataToBed, rk: RefKey, bk: BuildKey
-    ) -> list[RefKeyFullS]:
+    ) -> RefKeyFullS1or2 | None:
         """Like 'refkey_to_bed_refsrckeys' but build-specific.
 
         Used for looking up benchmark files for each build.
         """
         # TODO this "update" function is not DRY
         # return self.refkey_to_bed_refsrckeys(lambda rd: f(rd.to_build_data(bk)), rk)
-        return self.to_ref_data(rk).get_refkeys_unsafe_(
+        return self.to_ref_data(rk).get_si_refkeys(
             lambda rd: fmap_maybe(lambda x: x.bed.src, f(rd.to_build_data(bk)))
         )
 
@@ -4525,6 +4715,7 @@ class GiabStrats(BaseModel):
             ),
         )
 
+    # TODO replace tuples here with single/double? and the input list
     def with_build_data_and_bed_io2(
         self,
         rk: RefKey,
@@ -4552,7 +4743,7 @@ class GiabStrats(BaseModel):
 
         def out2(src: Double[RefSrc]) -> tuple[Y, Y]:
             return with_first(
-                both(output_f, src.keys(rk)), lambda o: write_outputs([*o])
+                both(output_f, src.keys(rk).as_tuple), lambda o: write_outputs([*o])
             )
 
         return self.with_build_data_and_bed_i(
@@ -4625,11 +4816,12 @@ class GiabStrats(BaseModel):
             ),
         )
 
+    # TODO add levels to this for heading control
     def with_build_data_and_bed_doc(
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
-        inputs: list[Path],
+        inputs: Path1or2,
         get_bed_f: BuildDataToBed,
         this: str | None,
         extra: str | None,
@@ -4644,16 +4836,16 @@ class GiabStrats(BaseModel):
         """
 
         def hap(bf: HapBedFile) -> list[str]:
-            src_txt = match1_unsafe(
-                inputs, lambda p: format_src(bf.bed.documentation.elem, p, this)
+            src_txt = match_single_unsafe(
+                lambda p: format_src(bf.bed.documentation.elem, p, this), inputs
             )
             params_txt = format_bed_params(bf.params)
             return [src_txt, params_txt]
 
         def dip1to1(bf: Dip1BedFile) -> list[str]:
             dip_txt = "This source contained both haplotypes for this reference."
-            src_txt = match1_unsafe(
-                inputs, lambda p: format_src(bf.bed.documentation.elem, p, this)
+            src_txt = match_single_unsafe(
+                lambda p: format_src(bf.bed.documentation.elem, p, this), inputs
             )
             params_txt = format_bed_params(bf.params)
             return [dip_txt, src_txt, params_txt]
@@ -4666,8 +4858,8 @@ class GiabStrats(BaseModel):
                     "these bed files.",
                 ]
             )
-            src_txt = match1_unsafe(
-                inputs, lambda p: format_src(bf.bed.documentation.elem, p, this)
+            src_txt = match_single_unsafe(
+                lambda p: format_src(bf.bed.documentation.elem, p, this), inputs
             )
             params_txt = format_bed_params(bf.params)
             return [dip_txt, src_txt, params_txt]
@@ -4675,11 +4867,11 @@ class GiabStrats(BaseModel):
         def dip2to1(bf: Dip2BedFile) -> list[str]:
             def fmt_src(h: Haplotype) -> list[str]:
                 header = f"#### Haplotype {h.value}"
-                src_txt = match2_unsafe(
-                    inputs,
+                src_txt = match_double_unsafe(
                     lambda p1, p2: format_src(
                         bf.bed.documentation.choose(h), h.choose(p1, p2), this
                     ),
+                    inputs,
                 )
                 return [header, src_txt]
 
@@ -4700,11 +4892,11 @@ class GiabStrats(BaseModel):
                     "this reference, which was used to generate these bed files.",
                 ]
             )
-            src_txt = match2_unsafe(
-                inputs,
+            src_txt = match_double_unsafe(
                 lambda p1, p2: format_src(
                     bf.bed.documentation.choose(hap), hap.choose(p1, p2), this
                 ),
+                inputs,
             )
             params_txt = format_bed_params(bf.params)
             return [dip_txt, src_txt, params_txt]

@@ -54,3 +54,20 @@ use rule remove_vdj_gaps as remove_kir_gaps with:
         gapless=rules.get_gapless.output.auto,
     output:
         odiff.final("KIR"),
+
+
+rule otherdifficult_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/otherdifficult_description.j2",
+        methods="workflow/templates/otherdifficult_methods.j2",
+        bedtools_env="workflow/envs/bedtools.yml",
+        # _sources=lambda w: all_xy(w["ref_final_key"], w["build_key"]).all_inputs,
+    # params:
+    #     paths=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
+    output:
+        odiff.readme,
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_otherdifficult.py"
