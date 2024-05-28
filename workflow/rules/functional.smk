@@ -5,11 +5,26 @@ from common.config import (
     si_to_kir,
     si_to_vdj,
     strip_full_refkey,
+    all_otherdifficult_sources,
 )
 
 func = config.to_bed_dirs(CoreLevel.FUNCTIONAL)
 
 all_region_types = ["cds", "vdj", "kir", "mhc"]
+
+
+def all_otherdifficult_sources_smk(wildcards):
+    return all_otherdifficult_sources(
+        config,
+        wildcards["ref_key"],
+        wildcards["build_key"],
+        Path(rules.download_gaps.output[0]),
+        Path(rules.download_cds.output[0]),
+        Path(rules.download_kir.output[0]),
+        Path(rules.download_mhc.output[0]),
+        Path(rules.download_vdj.output[0]),
+        {},
+    )
 
 
 use rule download_gaps as download_cds with:
@@ -52,29 +67,43 @@ use rule download_gaps as download_kir with:
         func.src.log / "kir.log",
 
 
+# def functional_inputs(wildcards):
+#     rk = wildcards.ref_key
+#     bk = wildcards.build_key
+#     bd = config.to_build_data(rk, bk)
+
+#     def go(test, name, f):
+#         if test:
+#             rs = getattr(rules, name).output
+#             return expand(rs, ref_src_key=config.refkey_to_bed_refsrckeys(f, rk))
+#         else:
+#             return []
+
+#     return {
+#         "cds": go(bd.want_cds_src, "download_cds", si_to_cds),
+#         "mhc": go(bd.want_mhc_src, "download_mhc", si_to_mhc),
+#         "kir": go(bd.want_kir_src, "download_kir", si_to_kir),
+#         "vdj": go(bd.want_vdj_src, "download_vdj", si_to_vdj),
+#     }
+
+
 def functional_inputs(wildcards):
-    rk = wildcards.ref_key
-    bk = wildcards.build_key
-    bd = config.to_build_data(rk, bk)
-
-    def go(test, name, f):
-        if test:
-            rs = getattr(rules, name).output
-            return expand(rs, ref_src_key=config.refkey_to_bed_refsrckeys(f, rk))
-        else:
-            return []
-
+    src = all_otherdifficult_sources_smk(wildcards)
     return {
-        "cds": go(bd.want_cds_src, "download_cds", si_to_cds),
-        "mhc": go(bd.want_mhc_src, "download_mhc", si_to_mhc),
-        "kir": go(bd.want_kir_src, "download_kir", si_to_kir),
-        "vdj": go(bd.want_vdj_src, "download_vdj", si_to_vdj),
+        "cds": src.refseq_paths,
+        "mhc": src.mhc_paths,
+        "kir": src.kir_paths,
+        "vdj": src.vdj_paths,
     }
 
 
 checkpoint normalize_cds:
     input:
         unpack(functional_inputs),
+        # cds=lambda w: all_otherdifficult_sources_smk(w).refseq_paths,
+        # mhc=lambda w: all_otherdifficult_sources_smk(w).mhc_paths,
+        # kir=lambda w: all_otherdifficult_sources_smk(w).kir_paths,
+        # vdj=lambda w: all_otherdifficult_sources_smk(w).vdj_paths,
     output:
         **{k: func.inter.filtersort.data / f"{k}.json" for k in all_region_types},
     params:

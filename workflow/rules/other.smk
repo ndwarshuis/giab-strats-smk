@@ -41,7 +41,7 @@ checkpoint normalize_other:
         lambda w: expand(
             rules.download_other.output,
             allow_missing=True,
-            ref_src_key=config.buildkey_to_bed_refsrckeys(
+            ref_src_key=config.buildkey_to_bed_refsrckeys_smk(
                 lambda bd: bd_to_other(w.other_level_key, w.other_strat_key, bd),
                 w.ref_key,
                 w.build_key,

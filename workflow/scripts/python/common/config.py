@@ -2022,13 +2022,49 @@ RefKeyFullS1or2 = SingleOrDouble[RefKeyFullS]
 
 
 @dataclass(frozen=True)
+class OtherDifficultSources:
+    gaps: Path1or2 | None
+    refseq: Path1or2 | None
+    vdj: Path1or2 | None
+    kir: Path1or2 | None
+    mhc: Path1or2 | None
+    other: dict[OtherStratKey, Path1or2]
+
+    @property
+    def all_inputs(self) -> list[Path]:
+        return [
+            i
+            for p in [self.gaps, self.refseq, self.vdj, self.kir, self.mhc]
+            + [*self.other.values()]
+            if p is not None
+            for i in single_or_double_to_list(p)
+        ]
+
+    # NOTE return empty lists here to avoid failure when calling in rules
+    @property
+    def gaps_paths(self) -> list[Path]:
+        return [] if self.gaps is None else single_or_double_to_list(self.gaps)
+
+    @property
+    def refseq_paths(self) -> list[Path]:
+        return [] if self.refseq is None else single_or_double_to_list(self.refseq)
+
+    @property
+    def vdj_paths(self) -> list[Path]:
+        return [] if self.vdj is None else single_or_double_to_list(self.vdj)
+
+    @property
+    def kir_paths(self) -> list[Path]:
+        return [] if self.kir is None else single_or_double_to_list(self.kir)
+
+    @property
+    def mhc_paths(self) -> list[Path]:
+        return [] if self.mhc is None else single_or_double_to_list(self.mhc)
+
+
+@dataclass(frozen=True)
 class OtherDifficultPaths:
-    gaps_src: Path1or2 | None
-    refseq_src: Path1or2 | None
-    vdj_src: Path1or2 | None
-    kir_src: Path1or2 | None
-    mhc_src: Path1or2 | None
-    other_src: dict[OtherStratKey, Path1or2]
+    sources: OtherDifficultSources
 
     gaps_output: Path | None
     vdj_output: Path | None
@@ -2039,44 +2075,22 @@ class OtherDifficultPaths:
 
     @property
     def all_inputs(self) -> list[Path]:
-        return [
-            i
-            for p in [
-                self.gaps_src,
-                self.refseq_src,
-                self.vdj_src,
-                self.kir_src,
-                self.mhc_src,
-            ]
-            + [*self.other_src.values()]
-            if p is not None
-            for i in single_or_double_to_list(p)
-        ]
+        return self.sources.all_inputs
 
 
-def all_otherdifficult_paths(
+def all_otherdifficult_sources(
     sconf: GiabStrats,
-    rk: RefKeyFullS,
+    rk: RefKey,
     bk: BuildKey,
-    # sources
-    gaps_src: Path,
-    refseq_src: Path,
-    vdj_src: Path,
-    kir_src: Path,
-    mhc_src: Path,
-    other_srcs: dict[OtherStratKey, Path],
-    # outputs
     gaps: Path,
-    vdj: Path,
+    refseq: Path,
     kir: Path,
     mhc: Path,
+    vdj: Path,
     other: dict[OtherStratKey, Path],
-) -> OtherDifficultPaths:
-    print(1)
-
+) -> OtherDifficultSources:
     def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
-        _rk = strip_full_refkey(rk)
-        rsks = sconf.refkey_to_bed_refsrckeys(f, _rk)
+        rsks = sconf.refkey_to_bed_refsrckeys(f, rk)
         if rsks is None:
             return None
         else:
@@ -2086,10 +2100,9 @@ def all_otherdifficult_paths(
             )
 
     def sub_rsk_other(p: Path, k: OtherStratKey) -> Path1or2 | None:
-        _rk = strip_full_refkey(rk)
         # TODO don't hardcode
         rsks = sconf.buildkey_to_bed_refsrckeys(
-            lambda bd: bd_to_other(OtherLevelKey("OtherDifficult"), k, bd), _rk, bk
+            lambda bd: bd_to_other(OtherLevelKey("OtherDifficult"), k, bd), rk, bk
         )
         if rsks is None:
             return None
@@ -2099,52 +2112,93 @@ def all_otherdifficult_paths(
                 rsks,
             )
 
+    gap_src = sub_rsk(gaps, si_to_gaps)
+    refseq_src = sub_rsk(refseq, si_to_cds)
+    mhc_src = sub_rsk(mhc, si_to_mhc)
+    kir_src = sub_rsk(kir, si_to_kir)
+    vdj_src = sub_rsk(vdj, si_to_vdj)
+
+    other_src = {
+        k: o for k, p in other.items() if (o := sub_rsk_other(p, k)) is not None
+    }
+
+    bd = sconf.to_build_data(rk, bk)
+
+    return OtherDifficultSources(
+        gaps=gap_src,
+        refseq=(
+            refseq_src
+            if (bd.want_vdj and vdj_src is None)
+            or (bd.want_kir and kir_src is not None)
+            or (bd.want_mhc and mhc_src is not None)
+            or bd.want_cds
+            else None
+        ),
+        vdj=vdj_src if bd.want_vdj else None,
+        mhc=mhc_src if bd.want_mhc else None,
+        kir=kir_src if bd.want_kir else None,
+        other=other_src,
+    )
+
+
+def all_otherdifficult_paths(
+    sconf: GiabStrats,
+    rk: RefKeyFullS,
+    bk: BuildKey,
+    # sources
+    gaps_src: Path,
+    refseq_src: Path,
+    kir_src: Path,
+    mhc_src: Path,
+    vdj_src: Path,
+    other_srcs: dict[OtherStratKey, Path],
+    # outputs
+    gaps: Path,
+    cds: Path,
+    not_cds: Path,
+    kir: Path,
+    mhc: Path,
+    vdj: Path,
+    other: dict[OtherStratKey, Path],
+) -> OtherDifficultPaths:
+    sources = all_otherdifficult_sources(
+        sconf,
+        strip_full_refkey(rk),
+        bk,
+        gaps_src,
+        refseq_src,
+        kir_src,
+        mhc_src,
+        vdj_src,
+        other_srcs,
+    )
+
     def sub_rk(p: Path) -> Path:
         return sub_wildcards_path(p, {"ref_final_key": rk, "build_key": bk})
 
-    _gap_src = sub_rsk(gaps_src, si_to_gaps)
-    _refseq_src = sub_rsk(refseq_src, si_to_cds)
-    _vdj_src = sub_rsk(vdj_src, si_to_vdj)
-    _mhc_src = sub_rsk(mhc_src, si_to_mhc)
-    _kir_src = sub_rsk(kir_src, si_to_kir)
-
-    _other_src = {
-        k: o for k, p in other_srcs.items() if (o := sub_rsk_other(p, k)) is not None
-    }
-    _other_output = {k: sub_rk(p) for k, p in other.items() if k in _other_src}
+    other_output = {k: sub_rk(p) for k, p in other.items() if k in sources.other}
 
     bd = sconf.to_build_data_full(rk, bk)
 
     return OtherDifficultPaths(
-        gaps_src=_gap_src,
-        refseq_src=(
-            _refseq_src
-            if (bd.want_vdj and _vdj_src is None)
-            or (bd.want_kir and _kir_src is not None)
-            or (bd.want_mhc and _mhc_src is not None)
-            else None
-        ),
-        vdj_src=_vdj_src if bd.want_vdj else None,
-        mhc_src=_mhc_src if bd.want_mhc else None,
-        kir_src=_kir_src if bd.want_kir else None,
-        gaps_output=sub_rk(gaps) if _gap_src is not None else None,
+        sources=sources,
+        gaps_output=sub_rk(gaps) if sources.gaps is not None else None,
         vdj_output=(
             sub_rk(vdj)
-            if bd.want_vdj and (_refseq_src is not None or _vdj_src is not None)
+            if bd.want_vdj and (sources.refseq is not None or sources.vdj is not None)
             else None
         ),
         mhc_output=(
             sub_rk(mhc)
-            if bd.want_mhc and (_refseq_src is not None or _mhc_src is not None)
+            if bd.want_mhc and (sources.refseq is not None or sources.mhc is not None)
             else None
         ),
         kir_output=(
             sub_rk(kir)
-            if bd.want_kir and (_refseq_src is not None or _kir_src is not None)
+            if bd.want_kir and (sources.refseq is not None or sources.kir is not None)
             else None
         ),
-        other_src=_other_src,
-        other_outputs=_other_output,
+        other_outputs=other_output,
     )
 
 

@@ -64,14 +64,16 @@ def all_otherdifficult(ref_final_key, build_key):
         build_key,
         Path(rules.download_gaps.output[0]),
         Path(rules.download_cds.output[0]),
-        Path(rules.download_vdj.output[0]),
         Path(rules.download_kir.output[0]),
         Path(rules.download_mhc.output[0]),
+        Path(rules.download_vdj.output[0]),
         {},
         Path(rules.get_gaps.output[0]),
-        Path(rules.remove_vdj_gaps.output[0]),
+        Path(rules.merge_cds.output[0]),
+        Path(rules.invert_cds.output[0]),
         Path(rules.remove_kir_gaps.output[0]),
         Path(rules.remove_mhc_gaps.output[0]),
+        Path(rules.remove_vdj_gaps.output[0]),
         {},
     )
 
