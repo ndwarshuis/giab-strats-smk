@@ -1882,6 +1882,58 @@ def all_xy_paths(
     )
 
 
+class LowComplexitySources(NamedTuple):
+    trf: Path1or2 | None
+    sat: Path1or2 | None
+    rmsk: Path1or2 | None
+
+    @property
+    def trf_paths(self) -> list[Path]:
+        if self.trf is None:
+            raise DesignError()
+        else:
+            return single_or_double_to_list(self.trf)
+
+    @property
+    def sat_paths(self) -> list[Path]:
+        if self.sat is None:
+            raise DesignError()
+        else:
+            return single_or_double_to_list(self.sat)
+
+    @property
+    def rmsk_paths(self) -> list[Path]:
+        if self.rmsk is None:
+            raise DesignError()
+        else:
+            return single_or_double_to_list(self.rmsk)
+
+
+def all_low_complexity_sources(
+    sconf: GiabStrats,
+    rk: RefKey,
+    bk: BuildKey,
+    rmsk: Path,
+    censat: Path,
+    trf: Path,
+) -> LowComplexitySources:
+    def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
+        rsks = sconf.refkey_to_bed_refsrckeys(f, rk)
+        if rsks is None:
+            return None
+        else:
+            return map_single_or_double(
+                lambda s: sub_wildcards_path(p, {"ref_src_key": s, "build_key": bk}),
+                rsks,
+            )
+
+    return LowComplexitySources(
+        rmsk=sub_rsk(rmsk, si_to_rmsk),
+        sat=sub_rsk(censat, si_to_satellites),
+        trf=sub_rsk(trf, si_to_simreps),
+    )
+
+
 def all_low_complexity(
     sconf: GiabStrats,
     rk: RefKeyFullS,
@@ -1904,26 +1956,18 @@ def all_low_complexity(
     not_all_trs: Path,
     all_repeats: Path,
     not_all_repeats: Path,
-) -> LowComplexityPaths:
-    def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
-        _rk = strip_full_refkey(rk)
-        rsks = sconf.refkey_to_bed_refsrckeys(f, _rk)
-        if rsks is None:
-            return None
-        else:
-            return map_single_or_double(
-                lambda s: sub_wildcards_path(p, {"ref_src_key": s, "build_key": bk}),
-                rsks,
-            )
-
+) -> LowComplexityPaths | None:
     def sub_rk(p: Path) -> Path:
         return sub_wildcard_path(p, "ref_final_key", rk)
 
-    # rd = sconf.to_ref_data_full(rk)
-    # rmsk = rd.has_low_complexity_rmsk
-    # simreps = rd.has_low_complexity_simreps
-    # censat = rd.has_low_complexity_censat
-    # has_sats = rmsk or censat
+    bd = sconf.to_build_data_full(rk, bk)
+
+    if not bd.want_low_complexity:
+        return None
+
+    sources = all_low_complexity_sources(
+        sconf, strip_full_refkey(rk), bk, rmsk_src, censat_src, trf_src
+    )
 
     # homopolymers and uniform repeats are included no matter what
     uniform = UniformRepeatPaths(
@@ -1933,12 +1977,8 @@ def all_low_complexity(
         not_homopolymers=sub_rk(not_homopolymers),
     )
 
-    trf = sub_rsk(trf_src, si_to_simreps)
-    rmsk = sub_rsk(rmsk_src, si_to_rmsk)
-    censat = sub_rsk(censat_src, si_to_satellites)
-
     # include tandem repeats and merged output if we have rmsk/censat and simreps
-    tm: tuple[Path1or2, Path1or2] | None = maybe2((trf, rmsk))
+    tm: tuple[Path1or2, Path1or2] | None = maybe2((sources.trf, sources.rmsk))
     if tm is None:
         repeats = None
     else:
@@ -1953,7 +1993,7 @@ def all_low_complexity(
         )
 
     # include satellites only if we have rmsk or censat
-    s: Path1or2 | None = from_maybe(rmsk, censat)
+    s: Path1or2 | None = from_maybe(sources.rmsk, sources.sat)
     if s is None:
         satpaths = None
     else:
@@ -1961,7 +2001,7 @@ def all_low_complexity(
             sat_src=s,
             sats=sub_rk(sats),
             not_sats=sub_rk(notsats),
-            used_censat=censat is not None,
+            used_censat=sources.sat is not None,
             all_repeats=repeats,
         )
 

@@ -7,6 +7,7 @@ from common.config import (
     si_to_simreps,
     si_to_satellites,
     all_low_complexity,
+    all_low_complexity_sources,
 )
 from functools import partial
 
@@ -389,6 +390,17 @@ rule all_uniform_repeats:
 ## simple repeats
 
 
+def all_low_complexity_sources_smk(wildcards):
+    return all_low_complexity_sources(
+        config,
+        wildcards["ref_key"],
+        wildcards["build_key"],
+        Path(rules.download_rmsk.output[0]),
+        Path(rules.download_censat.output[0]),
+        Path(rules.download_simreps.output[0]),
+    )
+
+
 use rule download_gaps as download_simreps with:
     output:
         lc.src.data / "simreps.txt.gz",
@@ -401,7 +413,8 @@ use rule download_gaps as download_simreps with:
 
 checkpoint normalize_simreps:
     input:
-        lambda w: bed_src_inputs(rules.download_simreps.output, si_to_simreps, w),
+        lambda w: all_low_complexity_sources_smk(w).trf_paths,
+        # lambda w: bed_src_inputs(rules.download_simreps.output, si_to_simreps, w),
     output:
         lc.inter.filtersort.data / "simreps.json",
     params:
@@ -449,7 +462,8 @@ use rule download_gaps as download_rmsk with:
 
 checkpoint normalize_rmsk:
     input:
-        lambda w: bed_src_inputs(rules.download_rmsk.output, si_to_rmsk, w),
+        lambda w: all_low_complexity_sources_smk(w).rmsk_paths,
+        # lambda w: bed_src_inputs(rules.download_rmsk.output, si_to_rmsk, w),
     output:
         lc.inter.filtersort.data / "rmsk.txt.gz",
     params:
@@ -513,7 +527,8 @@ use rule download_gaps as download_censat with:
 # actually in them. 2-4k is probably a safe default
 checkpoint normalize_censat:
     input:
-        lambda w: bed_src_inputs(rules.download_censat.output, si_to_satellites, w),
+        lambda w: all_low_complexity_sources_smk(w).sat_paths,
+        # lambda w: bed_src_inputs(rules.download_censat.output, si_to_satellites, w),
     output:
         lc.inter.filtersort.data / "censat.json",
     params:
