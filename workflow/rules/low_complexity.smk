@@ -768,10 +768,11 @@ use rule invert_satellites as invert_HPs_and_TRs with:
 #     )
 
 
-def all_low_complexity_smk(ref_final_key):
+def all_low_complexity_smk(ref_final_key, build_key):
     return all_low_complexity(
         config,
         ref_final_key,
+        build_key,
         rules.download_rmsk.output,
         rules.download_censat.output,
         rules.download_simreps.output,
@@ -789,8 +790,8 @@ def all_low_complexity_smk(ref_final_key):
     )
 
 
-def all_low_complexity_flat(ref_final_key):
-    return all_low_complexity_smk(ref_final_key).all_outputs
+def all_low_complexity_flat(ref_final_key, build_key):
+    return all_low_complexity_smk(ref_final_key, build_key).all_outputs
 
 
 rule low_complexity_readme:
@@ -801,9 +802,11 @@ rule low_complexity_readme:
         bedtools_env="workflow/envs/bedtools.yml",
         # dynamic rule expander to pull in checkpoints, since the template logic
         # needs to read them depending on which sources are available
-        _src_paths=lambda w: all_low_complexity_smk(w.ref_final_key).all_inputs,
+        _src_paths=lambda w: all_low_complexity_smk(
+            w.ref_final_key, w["build_key"]
+        ).all_inputs,
     params:
-        paths=lambda w: all_low_complexity_smk(w.ref_final_key),
+        paths=lambda w: all_low_complexity_smk(w.ref_final_key, w["build_key"]),
     output:
         lc.readme,
     conda:

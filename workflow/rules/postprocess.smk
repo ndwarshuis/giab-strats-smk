@@ -16,11 +16,11 @@ def expand_strat_targets_inner(ref_final_key, build_key):
     # one or two haps, the configuration applies to both haps simultaneously
     bd = config.to_build_data_full(ref_final_key, build_key)
     function_targets = [
-        (lambda rk, _: all_low_complexity_flat(rk), bd.want_low_complexity),
+        (all_low_complexity_flat, bd.want_low_complexity),
         (gc_inputs_flat, bd.want_gc),
         (mappabilty_inputs, bd.have_and_want_mappability),
         (het_hom_inputs, bd.want_hets),
-        (all_xy_sex, True),
+        (all_xy_flat, True),
         (all_other, True),
     ]
     rule_targets = [

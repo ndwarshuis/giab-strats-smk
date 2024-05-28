@@ -94,7 +94,7 @@ rule segdups_readme:
         methods="workflow/templates/segdups_methods.j2",
         segdups_inputs=lambda w: expand(
             rules.download_superdups.output,
-            ref_src_key=config.refkey_to_bed_refsrckeys(
+            ref_src_key=config.refkey_to_bed_refsrckeys_smk(
                 si_to_superdups, strip_full_refkey(w["ref_final_key"])
             ),
         ),

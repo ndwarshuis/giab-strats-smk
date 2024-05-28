@@ -133,7 +133,7 @@ def gapless_input(wildcards):
     gaps_target = (
         expand(
             rules.download_gaps.output,
-            ref_src_key=config.refkey_to_bed_refsrckeys(si_to_gaps, rk),
+            ref_src_key=config.refkey_to_bed_refsrckeys_smk(si_to_gaps, rk),
         )
         if bd.have_gaps
         else None

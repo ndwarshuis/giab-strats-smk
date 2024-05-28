@@ -1603,6 +1603,12 @@ class LowComplexityPaths(NamedTuple):
         )
 
     @property
+    def sat_inputs(self) -> list[Path] | None:
+        return fmap_maybe(
+            lambda r: single_or_double_to_list(r.sat_src), self.satellites
+        )
+
+    @property
     def all_output_paths(self) -> list[Path]:
         return [
             x
@@ -2026,6 +2032,8 @@ def all_otherdifficult_paths(
     mhc: Path,
     other: dict[OtherStratKey, Path],
 ) -> OtherDifficultPaths:
+    print(1)
+
     def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
         _rk = strip_full_refkey(rk)
         rsks = sconf.refkey_to_bed_refsrckeys(f, _rk)
@@ -4200,6 +4208,15 @@ class GiabStrats(BaseModel):
             lambda rd: fmap_maybe(lambda x: x.bed.src, f(rd.strat_inputs))
         )
 
+    def refkey_to_bed_refsrckeys_smk(
+        self, f: StratInputToBed, rk: RefKey
+    ) -> list[RefKeyFullS]:
+        x = self.refkey_to_bed_refsrckeys(f, rk)
+        if x is None:
+            raise DesignError()
+        else:
+            return single_or_double_to_list(x)
+
     def _refkey_to_src(self, f: RefDataToSrc, rk: RefKeyFullS) -> AnyBedSrc:
         rk_, hap = parse_full_refkey(rk)
         src = with_ref_data(
@@ -4251,9 +4268,18 @@ class GiabStrats(BaseModel):
         """
         # TODO this "update" function is not DRY
         # return self.refkey_to_bed_refsrckeys(lambda rd: f(rd.to_build_data(bk)), rk)
-        return self.to_ref_data(rk).get_si_refkeys(
+        return self.to_ref_data(rk).get_refkeys(
             lambda rd: fmap_maybe(lambda x: x.bed.src, f(rd.to_build_data(bk)))
         )
+
+    def buildkey_to_bed_refsrckeys_smk(
+        self, f: BuildDataToBed, rk: RefKey, bk: BuildKey
+    ) -> list[RefKeyFullS]:
+        x = self.buildkey_to_bed_refsrckeys(f, rk, bk)
+        if x is None:
+            raise DesignError()
+        else:
+            return single_or_double_to_list(x)
 
     def buildkey_to_bed_src(
         self, f: BuildDataToBed, rk: RefKeyFullS, bk: BuildKey
