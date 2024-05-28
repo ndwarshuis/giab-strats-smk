@@ -82,7 +82,9 @@ rule otherdifficult_readme:
         description="workflow/templates/otherdifficult_description.j2",
         methods="workflow/templates/otherdifficult_methods.j2",
         bedtools_env="workflow/envs/bedtools.yml",
-        # _sources=lambda w: all_xy(w["ref_final_key"], w["build_key"]).all_inputs,
+        _sources=lambda w: all_otherdifficult(
+            w["ref_final_key"], w["build_key"]
+        ).all_inputs,
     params:
         paths=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
     output:

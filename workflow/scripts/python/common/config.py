@@ -1991,6 +1991,22 @@ class OtherDifficultPaths:
 
     other_outputs: dict[OtherStratKey, Path]
 
+    @property
+    def all_inputs(self) -> list[Path]:
+        return [
+            i
+            for p in [
+                self.gaps_src,
+                self.refseq_src,
+                self.vdj_src,
+                self.kir_src,
+                self.mhc_src,
+            ]
+            + [*self.other_src.values()]
+            if p is not None
+            for i in single_or_double_to_list(p)
+        ]
+
 
 def all_otherdifficult_paths(
     sconf: GiabStrats,
@@ -2053,10 +2069,16 @@ def all_otherdifficult_paths(
 
     return OtherDifficultPaths(
         gaps_src=_gap_src,
-        refseq_src=_refseq_src if bd.want_vdj or bd.want_kir or bd.want_mhc else None,
-        vdj_src=sub_rsk(vdj_src, si_to_vdj) if bd.want_vdj else None,
-        mhc_src=sub_rsk(mhc_src, si_to_mhc) if bd.want_mhc else None,
-        kir_src=sub_rsk(kir_src, si_to_kir) if bd.want_kir else None,
+        refseq_src=(
+            _refseq_src
+            if (bd.want_vdj and _vdj_src is None)
+            or (bd.want_kir and _kir_src is not None)
+            or (bd.want_mhc and _mhc_src is not None)
+            else None
+        ),
+        vdj_src=_vdj_src if bd.want_vdj else None,
+        mhc_src=_mhc_src if bd.want_mhc else None,
+        kir_src=_kir_src if bd.want_kir else None,
         gaps_output=sub_rk(gaps) if _gap_src is not None else None,
         vdj_output=(
             sub_rk(vdj)
