@@ -1774,114 +1774,6 @@ class SexPaths(NamedTuple):
         return [x.name for x in self.all_output_paths]
 
 
-def all_xy_paths(
-    sconf: GiabStrats,
-    rk: RefKeyFullS,
-    bk: BuildKey,
-    # sources
-    features_src: Path,
-    # outputs
-    xtr: Path,
-    ampliconic: Path,
-    par: Path,
-    nonpar: Path,
-    auto: Path,
-) -> SexPaths:
-    def sub_rsk(p: Path) -> Path:
-        return sub_wildcard_path(p, "ref_src_key", rk)
-
-    def sub_rk(p: Path) -> Path:
-        return sub_wildcard_path(p, "ref_final_key", rk)
-
-    def sub_sex1(p: Path, sub_x: bool) -> Path:
-        c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).chr_name
-        return sub_wildcard_path(p, "sex_chr", c)
-
-    def sub_sex(p: Path, sub_x: bool) -> Path:
-        c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).chr_name
-        return sub_wildcards_path(
-            p,
-            {"sex_chr": c, "ref_final_key": rk, "build_key": bk},
-        )
-
-    def to_features(use_x: bool, features: XYFeatures, src: Path) -> XYFeaturePaths:
-        return XYFeaturePaths(
-            src=sub_sex1(sub_rsk(src), use_x),
-            bed=features.x_bed if use_x else features.y_bed,
-            xtr_path=sub_sex(xtr, use_x) if features.xtr is not None else None,
-            ampliconic_path=(
-                sub_sex(xtr, use_x) if features.ampliconic is not None else None
-            ),
-            xtr=features.xtr,
-            ampliconic=features.ampliconic,
-        )
-
-    def to_par(use_x: bool, xy: XY) -> PARPaths | None:
-        return fmap_maybe(
-            lambda z: PARPaths(
-                path=sub_sex(par, use_x),
-                non_path=sub_sex(nonpar, use_x),
-                doc=z.comment,
-            ),
-            xy.x_par if use_x else xy.y_par,
-        )
-
-    def to_paths(use_x: bool, xy: XY) -> SubSexPaths:
-        return SubSexPaths(
-            features=fmap_maybe(
-                lambda z: to_features(use_x, z, features_src), xy.features
-            ),
-            par=to_par(use_x, xy),
-        )
-
-    def hap(bd: HapBuildData) -> AnySexPaths:
-        cis = bd.refdata.ref.hap_chrs(bd.build_chrs)
-        xy = bd.refdata.strat_inputs.xy
-        return MaleHapSexPaths(
-            x=to_paths(True, xy) if ChrIndex.CHRX in cis else None,
-            y=to_paths(False, xy) if ChrIndex.CHRY in cis else None,
-        )
-
-    def dip1(bd: Dip1BuildData) -> AnySexPaths:
-        cis = bd.refdata.ref.all_chrs(bd.build_chrs)
-        xy = bd.refdata.strat_inputs.xy
-        return Dip1SexPaths(
-            sex1=to_paths(True, xy) if ChrIndex.CHRX in cis else None,
-            sex2=to_paths(False, xy) if ChrIndex.CHRY in cis else None,
-        )
-
-    def dip2(hap: Haplotype, bd: Dip2BuildData) -> AnySexPaths:
-        cis = bd.refdata.ref.hap_chrs(bd.build_chrs, hap)
-        use_x = not (hap is Haplotype.PAT)
-        xy = bd.refdata.strat_inputs.xy
-        return Dip2SexPaths(
-            paths=(
-                SubSexPaths(
-                    features=fmap_maybe(
-                        lambda z: to_features(use_x, z, features_src),
-                        xy.features,
-                    ),
-                    par=to_par(use_x, xy),
-                )
-                if (use_x and ChrIndex.CHRX in cis) or ChrIndex.CHRY in cis
-                else None
-            ),
-            hap=hap,
-        )
-
-    sex = sconf.with_build_data_full(
-        rk,
-        bk,
-        hap,
-        dip1,
-        dip2,
-    )
-    return SexPaths(
-        sex=sex,
-        auto=sub_wildcards_path(auto, {"ref_final_key": rk, "build_key": bk}),
-    )
-
-
 class LowComplexitySources(NamedTuple):
     trf: Path1or2 | None
     sat: Path1or2 | None
@@ -1907,112 +1799,6 @@ class LowComplexitySources(NamedTuple):
             raise DesignError()
         else:
             return single_or_double_to_list(self.rmsk)
-
-
-def all_low_complexity_sources(
-    sconf: GiabStrats,
-    rk: RefKey,
-    bk: BuildKey,
-    rmsk: Path,
-    censat: Path,
-    trf: Path,
-) -> LowComplexitySources:
-    def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
-        rsks = sconf.refkey_to_bed_refsrckeys(f, rk)
-        if rsks is None:
-            return None
-        else:
-            return map_single_or_double(
-                lambda s: sub_wildcards_path(p, {"ref_src_key": s, "build_key": bk}),
-                rsks,
-            )
-
-    return LowComplexitySources(
-        rmsk=sub_rsk(rmsk, si_to_rmsk),
-        sat=sub_rsk(censat, si_to_satellites),
-        trf=sub_rsk(trf, si_to_simreps),
-    )
-
-
-def all_low_complexity(
-    sconf: GiabStrats,
-    rk: RefKeyFullS,
-    bk: BuildKey,
-    # sources
-    rmsk_src: Path,
-    censat_src: Path,
-    trf_src: Path,
-    # uniform
-    perfect: list[Path],
-    imperfect: list[Path],
-    homopolymers: Path,
-    not_homopolymers: Path,
-    # satellites
-    sats: Path,
-    notsats: Path,
-    # all repeats
-    filtered_trs: list[Path],
-    all_trs: Path,
-    not_all_trs: Path,
-    all_repeats: Path,
-    not_all_repeats: Path,
-) -> LowComplexityPaths | None:
-    def sub_rk(p: Path) -> Path:
-        return sub_wildcard_path(p, "ref_final_key", rk)
-
-    bd = sconf.to_build_data_full(rk, bk)
-
-    if not bd.want_low_complexity:
-        return None
-
-    sources = all_low_complexity_sources(
-        sconf, strip_full_refkey(rk), bk, rmsk_src, censat_src, trf_src
-    )
-
-    # homopolymers and uniform repeats are included no matter what
-    uniform = UniformRepeatPaths(
-        perfect=[sub_rk(p) for p in perfect],
-        imperfect=[sub_rk(p) for p in imperfect],
-        homopolymers=sub_rk(homopolymers),
-        not_homopolymers=sub_rk(not_homopolymers),
-    )
-
-    # include tandem repeats and merged output if we have rmsk/censat and simreps
-    tm: tuple[Path1or2, Path1or2] | None = maybe2((sources.trf, sources.rmsk))
-    if tm is None:
-        repeats = None
-    else:
-        repeats = RepeatsPaths(
-            trf_src=tm[0],
-            rmsk_src=tm[1],
-            filtered_trs=[sub_rk(p) for p in filtered_trs],
-            all_trs=sub_rk(all_trs),
-            not_all_trs=sub_rk(not_all_trs),
-            all_repeats=sub_rk(all_repeats),
-            not_all_repeats=sub_rk(not_all_repeats),
-        )
-
-    # include satellites only if we have rmsk or censat
-    s: Path1or2 | None = from_maybe(sources.rmsk, sources.sat)
-    if s is None:
-        satpaths = None
-    else:
-        satpaths = SatellitesPaths(
-            sat_src=s,
-            sats=sub_rk(sats),
-            not_sats=sub_rk(notsats),
-            used_censat=sources.sat is not None,
-            all_repeats=repeats,
-        )
-
-    return LowComplexityPaths(uniform_repeats=uniform, satellites=satpaths)
-
-
-# @dataclass(frozen=True)
-# class OtherDifficultOtherPath:
-#     doc: str | None
-#     params: BedFileParams
-#     path: Path
 
 
 Path1or2 = SingleOrDouble[Path]
@@ -2078,132 +1864,6 @@ class OtherDifficultPaths:
     kir_output: Path | None
 
     other_outputs: dict[OtherStratKey, Path]
-
-
-def all_otherdifficult_sources(
-    sconf: GiabStrats,
-    rk: RefKey,
-    bk: BuildKey,
-    gaps: Path,
-    refseq: Path,
-    kir: Path,
-    mhc: Path,
-    vdj: Path,
-    other: dict[OtherStratKey, Path],
-) -> OtherDifficultSources:
-    def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
-        rsks = sconf.refkey_to_bed_refsrckeys(f, rk)
-        if rsks is None:
-            return None
-        else:
-            return map_single_or_double(
-                lambda r: sub_wildcards_path(p, {"ref_src_key": r, "build_key": bk}),
-                rsks,
-            )
-
-    def sub_rsk_other(p: Path, k: OtherStratKey) -> Path1or2 | None:
-        # TODO don't hardcode
-        rsks = sconf.buildkey_to_bed_refsrckeys(
-            lambda bd: bd_to_other(OtherLevelKey("OtherDifficult"), k, bd), rk, bk
-        )
-        if rsks is None:
-            return None
-        else:
-            return map_single_or_double(
-                lambda r: sub_wildcards_path(p, {"ref_src_key": r, "build_key": bk}),
-                rsks,
-            )
-
-    gap_src = sub_rsk(gaps, si_to_gaps)
-    refseq_src = sub_rsk(refseq, si_to_cds)
-    mhc_src = sub_rsk(mhc, si_to_mhc)
-    kir_src = sub_rsk(kir, si_to_kir)
-    vdj_src = sub_rsk(vdj, si_to_vdj)
-
-    other_src = {
-        k: o for k, p in other.items() if (o := sub_rsk_other(p, k)) is not None
-    }
-
-    bd = sconf.to_build_data(rk, bk)
-
-    return OtherDifficultSources(
-        gaps=gap_src,
-        refseq=(
-            refseq_src
-            if (bd.want_vdj and vdj_src is None)
-            or (bd.want_kir and kir_src is not None)
-            or (bd.want_mhc and mhc_src is not None)
-            or bd.want_cds
-            else None
-        ),
-        vdj=vdj_src if bd.want_vdj else None,
-        mhc=mhc_src if bd.want_mhc else None,
-        kir=kir_src if bd.want_kir else None,
-        other=other_src,
-    )
-
-
-def all_otherdifficult_paths(
-    sconf: GiabStrats,
-    rk: RefKeyFullS,
-    bk: BuildKey,
-    # sources
-    gaps_src: Path,
-    refseq_src: Path,
-    kir_src: Path,
-    mhc_src: Path,
-    vdj_src: Path,
-    other_srcs: dict[OtherStratKey, Path],
-    # outputs
-    gaps: Path,
-    cds: Path,
-    not_cds: Path,
-    kir: Path,
-    mhc: Path,
-    vdj: Path,
-    other: dict[OtherStratKey, Path],
-) -> OtherDifficultPaths:
-    sources = all_otherdifficult_sources(
-        sconf,
-        strip_full_refkey(rk),
-        bk,
-        gaps_src,
-        refseq_src,
-        kir_src,
-        mhc_src,
-        vdj_src,
-        other_srcs,
-    )
-
-    def sub_rk(p: Path) -> Path:
-        return sub_wildcards_path(p, {"ref_final_key": rk, "build_key": bk})
-
-    other_output = {k: sub_rk(p) for k, p in other.items() if k in sources.other}
-
-    bd = sconf.to_build_data_full(rk, bk)
-
-    return OtherDifficultPaths(
-        sources=sources,
-        gaps_output=sub_rk(gaps) if sources.gaps is not None else None,
-        cds_output=sub_rk(cds) if sources.refseq is not None else None,
-        not_cds_output=sub_rk(not_cds) if sources.refseq is not None else None,
-        vdj_output=(
-            sub_rk(vdj)
-            if bd.want_vdj and (sources.refseq is not None or sources.vdj is not None)
-            else None
-        ),
-        mhc_output=(
-            sub_rk(mhc)
-            if bd.want_mhc and (sources.refseq is not None or sources.mhc is not None)
-            else None
-        ),
-        kir_output=(
-            sub_rk(kir)
-            if bd.want_kir and (sources.refseq is not None or sources.kir is not None)
-            else None
-        ),
-        other_outputs=other_output,
-    )
 
 
 ################################################################################
@@ -5168,6 +4828,346 @@ class GiabStrats(BaseModel):
     def all_refkey_vdj(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
             lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_vdj(bd))
+        )
+
+    # source and output functions
+
+    def all_low_complexity_sources(
+        self,
+        rk: RefKey,
+        bk: BuildKey,
+        rmsk: Path,
+        censat: Path,
+        trf: Path,
+    ) -> LowComplexitySources:
+        # TODO not DRY
+        def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
+            rsks = self.refkey_to_bed_refsrckeys(f, rk)
+            if rsks is None:
+                return None
+            else:
+                return map_single_or_double(
+                    lambda s: sub_wildcards_path(
+                        p, {"ref_src_key": s, "build_key": bk}
+                    ),
+                    rsks,
+                )
+
+        return LowComplexitySources(
+            rmsk=sub_rsk(rmsk, si_to_rmsk),
+            sat=sub_rsk(censat, si_to_satellites),
+            trf=sub_rsk(trf, si_to_simreps),
+        )
+
+    def all_low_complexity(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        # sources
+        rmsk_src: Path,
+        censat_src: Path,
+        trf_src: Path,
+        # uniform
+        perfect: list[Path],
+        imperfect: list[Path],
+        homopolymers: Path,
+        not_homopolymers: Path,
+        # satellites
+        sats: Path,
+        notsats: Path,
+        # all repeats
+        filtered_trs: list[Path],
+        all_trs: Path,
+        not_all_trs: Path,
+        all_repeats: Path,
+        not_all_repeats: Path,
+    ) -> LowComplexityPaths | None:
+        def sub_rk(p: Path) -> Path:
+            return sub_wildcard_path(p, "ref_final_key", rk)
+
+        bd = self.to_build_data_full(rk, bk)
+
+        # TODO is this necessary
+        if not bd.want_low_complexity:
+            return None
+
+        sources = self.all_low_complexity_sources(
+            strip_full_refkey(rk), bk, rmsk_src, censat_src, trf_src
+        )
+
+        # homopolymers and uniform repeats are included no matter what
+        uniform = UniformRepeatPaths(
+            perfect=[sub_rk(p) for p in perfect],
+            imperfect=[sub_rk(p) for p in imperfect],
+            homopolymers=sub_rk(homopolymers),
+            not_homopolymers=sub_rk(not_homopolymers),
+        )
+
+        # include tandem repeats and merged output if we have rmsk/censat and simreps
+        tm: tuple[Path1or2, Path1or2] | None = maybe2((sources.trf, sources.rmsk))
+        if tm is None:
+            repeats = None
+        else:
+            repeats = RepeatsPaths(
+                trf_src=tm[0],
+                rmsk_src=tm[1],
+                filtered_trs=[sub_rk(p) for p in filtered_trs],
+                all_trs=sub_rk(all_trs),
+                not_all_trs=sub_rk(not_all_trs),
+                all_repeats=sub_rk(all_repeats),
+                not_all_repeats=sub_rk(not_all_repeats),
+            )
+
+        # include satellites only if we have rmsk or censat
+        s: Path1or2 | None = from_maybe(sources.rmsk, sources.sat)
+        if s is None:
+            satpaths = None
+        else:
+            satpaths = SatellitesPaths(
+                sat_src=s,
+                sats=sub_rk(sats),
+                not_sats=sub_rk(notsats),
+                used_censat=sources.sat is not None,
+                all_repeats=repeats,
+            )
+
+        return LowComplexityPaths(uniform_repeats=uniform, satellites=satpaths)
+
+    def all_otherdifficult_sources(
+        self,
+        rk: RefKey,
+        bk: BuildKey,
+        gaps: Path,
+        refseq: Path,
+        kir: Path,
+        mhc: Path,
+        vdj: Path,
+        other: dict[OtherStratKey, Path],
+    ) -> OtherDifficultSources:
+        def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
+            rsks = self.refkey_to_bed_refsrckeys(f, rk)
+            if rsks is None:
+                return None
+            else:
+                return map_single_or_double(
+                    lambda r: sub_wildcards_path(
+                        p, {"ref_src_key": r, "build_key": bk}
+                    ),
+                    rsks,
+                )
+
+        def sub_rsk_other(p: Path, k: OtherStratKey) -> Path1or2 | None:
+            # TODO don't hardcode
+            rsks = self.buildkey_to_bed_refsrckeys(
+                lambda bd: bd_to_other(OtherLevelKey("OtherDifficult"), k, bd), rk, bk
+            )
+            if rsks is None:
+                return None
+            else:
+                return map_single_or_double(
+                    lambda r: sub_wildcards_path(
+                        p, {"ref_src_key": r, "build_key": bk}
+                    ),
+                    rsks,
+                )
+
+        gap_src = sub_rsk(gaps, si_to_gaps)
+        refseq_src = sub_rsk(refseq, si_to_cds)
+        mhc_src = sub_rsk(mhc, si_to_mhc)
+        kir_src = sub_rsk(kir, si_to_kir)
+        vdj_src = sub_rsk(vdj, si_to_vdj)
+
+        other_src = {
+            k: o for k, p in other.items() if (o := sub_rsk_other(p, k)) is not None
+        }
+
+        bd = self.to_build_data(rk, bk)
+
+        return OtherDifficultSources(
+            gaps=gap_src,
+            refseq=(
+                refseq_src
+                if (bd.want_vdj and vdj_src is None)
+                or (bd.want_kir and kir_src is not None)
+                or (bd.want_mhc and mhc_src is not None)
+                or bd.want_cds
+                else None
+            ),
+            vdj=vdj_src if bd.want_vdj else None,
+            mhc=mhc_src if bd.want_mhc else None,
+            kir=kir_src if bd.want_kir else None,
+            other=other_src,
+        )
+
+    def all_otherdifficult_paths(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        # sources
+        gaps_src: Path,
+        refseq_src: Path,
+        kir_src: Path,
+        mhc_src: Path,
+        vdj_src: Path,
+        other_srcs: dict[OtherStratKey, Path],
+        # outputs
+        gaps: Path,
+        cds: Path,
+        not_cds: Path,
+        kir: Path,
+        mhc: Path,
+        vdj: Path,
+        other: dict[OtherStratKey, Path],
+    ) -> OtherDifficultPaths:
+        sources = self.all_otherdifficult_sources(
+            strip_full_refkey(rk),
+            bk,
+            gaps_src,
+            refseq_src,
+            kir_src,
+            mhc_src,
+            vdj_src,
+            other_srcs,
+        )
+
+        def sub_rk(p: Path) -> Path:
+            return sub_wildcards_path(p, {"ref_final_key": rk, "build_key": bk})
+
+        other_output = {k: sub_rk(p) for k, p in other.items() if k in sources.other}
+
+        bd = self.to_build_data_full(rk, bk)
+
+        return OtherDifficultPaths(
+            sources=sources,
+            gaps_output=sub_rk(gaps) if sources.gaps is not None else None,
+            cds_output=sub_rk(cds) if sources.refseq is not None else None,
+            not_cds_output=sub_rk(not_cds) if sources.refseq is not None else None,
+            vdj_output=(
+                sub_rk(vdj)
+                if bd.want_vdj
+                and (sources.refseq is not None or sources.vdj is not None)
+                else None
+            ),
+            mhc_output=(
+                sub_rk(mhc)
+                if bd.want_mhc
+                and (sources.refseq is not None or sources.mhc is not None)
+                else None
+            ),
+            kir_output=(
+                sub_rk(kir)
+                if bd.want_kir
+                and (sources.refseq is not None or sources.kir is not None)
+                else None
+            ),
+            other_outputs=other_output,
+        )
+
+    def all_xy_paths(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        # sources
+        features_src: Path,
+        # outputs
+        xtr: Path,
+        ampliconic: Path,
+        par: Path,
+        nonpar: Path,
+        auto: Path,
+    ) -> SexPaths:
+        def sub_rsk(p: Path) -> Path:
+            return sub_wildcard_path(p, "ref_src_key", strip_full_refkey(rk))
+
+        def sub_rk(p: Path) -> Path:
+            return sub_wildcard_path(p, "ref_final_key", rk)
+
+        def sub_sex1(p: Path, sub_x: bool) -> Path:
+            c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).chr_name
+            return sub_wildcard_path(p, "sex_chr", c)
+
+        def sub_sex(p: Path, sub_x: bool) -> Path:
+            c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).chr_name
+            return sub_wildcards_path(
+                p,
+                {"sex_chr": c, "ref_final_key": rk, "build_key": bk},
+            )
+
+        def to_features(use_x: bool, features: XYFeatures, src: Path) -> XYFeaturePaths:
+            return XYFeaturePaths(
+                src=sub_sex1(sub_rsk(src), use_x),
+                bed=features.x_bed if use_x else features.y_bed,
+                xtr_path=sub_sex(xtr, use_x) if features.xtr is not None else None,
+                ampliconic_path=(
+                    sub_sex(xtr, use_x) if features.ampliconic is not None else None
+                ),
+                xtr=features.xtr,
+                ampliconic=features.ampliconic,
+            )
+
+        def to_par(use_x: bool, xy: XY) -> PARPaths | None:
+            return fmap_maybe(
+                lambda z: PARPaths(
+                    path=sub_sex(par, use_x),
+                    non_path=sub_sex(nonpar, use_x),
+                    doc=z.comment,
+                ),
+                xy.x_par if use_x else xy.y_par,
+            )
+
+        def to_paths(use_x: bool, xy: XY) -> SubSexPaths:
+            return SubSexPaths(
+                features=fmap_maybe(
+                    lambda z: to_features(use_x, z, features_src), xy.features
+                ),
+                par=to_par(use_x, xy),
+            )
+
+        def hap(bd: HapBuildData) -> AnySexPaths:
+            cis = bd.refdata.ref.hap_chrs(bd.build_chrs)
+            xy = bd.refdata.strat_inputs.xy
+            return MaleHapSexPaths(
+                x=to_paths(True, xy) if ChrIndex.CHRX in cis else None,
+                y=to_paths(False, xy) if ChrIndex.CHRY in cis else None,
+            )
+
+        def dip1(bd: Dip1BuildData) -> AnySexPaths:
+            cis = bd.refdata.ref.all_chrs(bd.build_chrs)
+            xy = bd.refdata.strat_inputs.xy
+            return Dip1SexPaths(
+                sex1=to_paths(True, xy) if ChrIndex.CHRX in cis else None,
+                sex2=to_paths(False, xy) if ChrIndex.CHRY in cis else None,
+            )
+
+        def dip2(hap: Haplotype, bd: Dip2BuildData) -> AnySexPaths:
+            cis = bd.refdata.ref.hap_chrs(bd.build_chrs, hap)
+            use_x = not (hap is Haplotype.PAT)
+            xy = bd.refdata.strat_inputs.xy
+            return Dip2SexPaths(
+                paths=(
+                    SubSexPaths(
+                        features=fmap_maybe(
+                            lambda z: to_features(use_x, z, features_src),
+                            xy.features,
+                        ),
+                        par=to_par(use_x, xy),
+                    )
+                    if (use_x and ChrIndex.CHRX in cis) or ChrIndex.CHRY in cis
+                    else None
+                ),
+                hap=hap,
+            )
+
+        sex = self.with_build_data_full(
+            rk,
+            bk,
+            hap,
+            dip1,
+            dip2,
+        )
+        return SexPaths(
+            sex=sex,
+            auto=sub_wildcards_path(auto, {"ref_final_key": rk, "build_key": bk}),
         )
 
     # other nice functions

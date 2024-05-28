@@ -6,8 +6,6 @@ from common.config import (
     si_to_rmsk,
     si_to_simreps,
     si_to_satellites,
-    all_low_complexity,
-    all_low_complexity_sources,
 )
 from functools import partial
 
@@ -391,8 +389,7 @@ rule all_uniform_repeats:
 
 
 def all_low_complexity_sources_smk(wildcards):
-    return all_low_complexity_sources(
-        config,
+    return config.all_low_complexity_sources(
         wildcards["ref_key"],
         wildcards["build_key"],
         Path(rules.download_rmsk.output[0]),
@@ -784,8 +781,7 @@ use rule invert_satellites as invert_HPs_and_TRs with:
 
 
 def all_low_complexity_smk(ref_final_key, build_key):
-    return all_low_complexity(
-        config,
+    return config.all_low_complexity(
         ref_final_key,
         build_key,
         rules.download_rmsk.output,

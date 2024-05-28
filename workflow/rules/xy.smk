@@ -1,4 +1,4 @@
-from common.config import CoreLevel, all_xy_paths
+from common.config import CoreLevel
 
 xy = config.to_bed_dirs(CoreLevel.XY)
 
@@ -198,8 +198,7 @@ rule filter_autosomes:
 
 
 def all_xy(ref_final_key, build_key):
-    return all_xy_paths(
-        config,
+    return config.all_xy_paths(
         ref_final_key,
         build_key,
         Path(rules.download_genome_features_bed.output[0]),

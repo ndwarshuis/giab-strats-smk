@@ -5,8 +5,6 @@ from common.config import (
     si_to_kir,
     si_to_vdj,
     strip_full_refkey,
-    all_otherdifficult_sources,
-    all_otherdifficult_paths,
 )
 
 # NOTE this contains rules that generate stratifications in Functional,
@@ -20,8 +18,7 @@ all_region_types = ["cds", "vdj", "kir", "mhc"]
 
 
 def all_otherdifficult_sources_smk(wildcards):
-    return all_otherdifficult_sources(
-        config,
+    return config.all_otherdifficult_sources(
         wildcards["ref_key"],
         wildcards["build_key"],
         Path(rules.download_gaps.output[0]),
@@ -35,8 +32,7 @@ def all_otherdifficult_sources_smk(wildcards):
 
 def all_otherdifficult_paths_smk(ref_final_key, build_key):
     # TODO actually make other work
-    return all_otherdifficult_paths(
-        config,
+    return config.all_otherdifficult_paths(
         ref_final_key,
         build_key,
         Path(rules.download_gaps.output[0]),
