@@ -1,7 +1,7 @@
 import jinja2 as j2
 from typing import Any
 import common.config as cfg
-from common.functional import DesignError, fmap_maybe
+from common.functional import DesignError, fmap_maybe, not_none_unsafe
 import template_utils as tu
 
 
@@ -30,15 +30,20 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     bk = cfg.wc_to_buildkey(ws)
     bd = sconf.to_build_data(rk, bk)
 
+    paths: cfg.OtherDifficultPaths = smk.params["paths"]
+
     cds_src = bd.refdata.strat_inputs.functional.cds
 
     if cds_src is None:
         raise DesignError()
 
+    if paths.sources.refseq is None:
+        raise DesignError()
+
     src_txt = sconf.with_build_data_and_bed_doc(
         rfk,
         bk,
-        cfg.smk_to_inputs_name(smk, "cds_inputs"),
+        paths.sources.refseq,
         cfg.bd_to_cds,
         "The GFF file",
         None,
@@ -46,13 +51,10 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
-    cds_path = cfg.smk_to_input_name(smk, "cds")
-    notcds_path = cfg.smk_to_input_name(smk, "notcds")
-
     def render_description(t: j2.Template) -> str:
         return t.render(
-            cds_file=cds_path.name,
-            notcds_file=notcds_path.name,
+            cds_file=not_none_unsafe(paths.cds_output, lambda z: z.name),
+            notcds_file=not_none_unsafe(paths.not_cds_output, lambda z: z.name),
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
