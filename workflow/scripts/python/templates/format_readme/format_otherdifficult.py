@@ -2,8 +2,11 @@ import jinja2 as j2
 from pathlib import Path
 from typing import Any
 import common.config as cfg
-from common.functional import fmap_maybe, DesignError
+from common.functional import fmap_maybe, DesignError, from_maybe
 import template_utils as tu
+
+# TODO booooo put this in the main config somewhere
+OTHERKEY = cfg.OtherLevelKey("OtherDifficult")
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
@@ -16,15 +19,29 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
+    def format_other(k: cfg.OtherStratKey) -> str:
+        d = sconf.with_build_data_full(
+            rfk,
+            bk,
+            lambda bd: fmap_maybe(
+                lambda x: x.description, cfg.bd_to_other(OTHERKEY, k, bd)
+            ),
+            lambda bd: fmap_maybe(
+                lambda x: x.description, cfg.bd_to_other(OTHERKEY, k, bd)
+            ),
+            lambda _, bd: fmap_maybe(
+                lambda x: x.description, cfg.bd_to_other(OTHERKEY, k, bd)
+            ),
+        )
+        return from_maybe("No description", d)
+
     def render_description(t: j2.Template) -> str:
         return t.render(
             gaps_file=fmap_maybe(lambda z: z.name, paths.gaps_output),
             vdj_file=fmap_maybe(lambda z: z.name, paths.vdj_output),
             kir_file=fmap_maybe(lambda z: z.name, paths.kir_output),
             mhc_file=fmap_maybe(lambda z: z.name, paths.mhc_output),
-            # TODO these need descriptions
-            # other_files=paths.other_outputs,
-            other_files={},
+            other_files={p: format_other(k) for k, p in paths.other_outputs.items()},
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
@@ -77,7 +94,6 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         else:
             mhc_para = None
 
-        # TODO add stuff about vdj/kir/mhc here if needed
         refseq_src = "\n\n".join(
             [refseq_para]
             + [
@@ -111,7 +127,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             rfk,
             bk,
             paths,
-            lambda bd: cfg.bd_to_other(cfg.OtherLevelKey("OtherDifficult"), k, bd),
+            lambda bd: cfg.bd_to_other(OTHERKEY, k, bd),
             None,
             None,
         )

@@ -2837,14 +2837,7 @@ class BedFile(GenericModel, Generic[Q]):
 
     bed: Q
     params: BedFileParams = BedFileParams()
-
-    # @property
-    # def bed_documentation(self) -> BedDoc:
-    #     return self._documentation
-
-    # @property
-    # def _documentation(self) -> BedDoc:
-    #     return BedDoc(params=self.params, bed=self.bed.documentation)
+    description: str | None = None
 
     def read(self, path: Path) -> pd.DataFrame:
         """Read bed file with params from Path."""
