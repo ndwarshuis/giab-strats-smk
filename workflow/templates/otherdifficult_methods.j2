@@ -7,7 +7,7 @@
 
 Regions were extended in either direction by 15000 base pairs using `slopBed`
 followed by `mergeBed`.
-{%- endif %}
+{% endif -%}
 
 {% if refseq_src is not none -%}
 ### Refseq
@@ -15,25 +15,25 @@ followed by `mergeBed`.
 {{ refseq_src }}
 
 {{ refseq_src }}
-{%- endif %}
+{% endif -%}
 
 {% if vdj_src is not none -%}
 ### VDJ
 
 {{ vdj_src }}
-{%- endif %}
+{% endif -%}
 
 {% if mhc_src is not none -%}
 ### MHC
 
 {{ mhc_src }}
-{%- endif %}
+{% endif -%}
 
 {% if kir_src is not none -%}
 ### KIR
 
 {{ kir_src }}
-{%- endif %}
+{% endif -%}
 
 {% if other_srcs|length > 0 -%}
 ### Other
@@ -45,7 +45,7 @@ These bed files were taken as is from their denoted sources.
 
 {{ other_src }}
 {% endfor %}
-{%- endif %}
+{% endif -%}
 
 ## Software
 {% for dep, version in deps.items() %}

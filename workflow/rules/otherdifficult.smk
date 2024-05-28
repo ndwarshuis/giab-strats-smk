@@ -1,4 +1,4 @@
-from common.config import CoreLevel
+from common.config import CoreLevel, all_otherdifficult_paths
 
 odiff = config.to_bed_dirs(CoreLevel.OTHER_DIFFICULT)
 
@@ -56,6 +56,26 @@ use rule remove_vdj_gaps as remove_kir_gaps with:
         odiff.final("KIR"),
 
 
+def all_otherdifficult(ref_final_key, build_key):
+    # TODO actually make other work
+    return all_otherdifficult_paths(
+        config,
+        ref_final_key,
+        build_key,
+        Path(rules.download_gaps.output[0]),
+        Path(rules.download_cds.output[0]),
+        Path(rules.download_vdj.output[0]),
+        Path(rules.download_kir.output[0]),
+        Path(rules.download_mhc.output[0]),
+        {},
+        Path(rules.get_gaps.output[0]),
+        Path(rules.remove_vdj_gaps.output[0]),
+        Path(rules.remove_kir_gaps.output[0]),
+        Path(rules.remove_mhc_gaps.output[0]),
+        {},
+    )
+
+
 rule otherdifficult_readme:
     input:
         common="workflow/templates/common.j2",
@@ -63,8 +83,8 @@ rule otherdifficult_readme:
         methods="workflow/templates/otherdifficult_methods.j2",
         bedtools_env="workflow/envs/bedtools.yml",
         # _sources=lambda w: all_xy(w["ref_final_key"], w["build_key"]).all_inputs,
-    # params:
-    #     paths=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
+    params:
+        paths=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
     output:
         odiff.readme,
     conda:

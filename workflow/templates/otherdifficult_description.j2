@@ -4,7 +4,8 @@
 This file contains all regions within 15 kilobases of a gap in the reference.
 
 `{{ gaps_file }}`
-{%- endif %}
+
+{% endif -%}
 
 {% if vdj_file is not none -%}
 ### VDJ
@@ -13,7 +14,8 @@ This contains the highly polymorphic and usually rearranged VDJ segments for the
 T and B cell receptors.
 
 `{{ vdj_file }}`
-{%- endif %}
+
+{% endif -%}
 
 {% if kir_file is not none -%}
 ### KIR
@@ -22,7 +24,8 @@ This contains the highly polymorphic killer-cell immunoglobulin-like receptor
 (KIR) region.
 
 `{{ kir_file }}`
-{%- endif %}
+
+{% endif -%}
 
 {% if mhc_file is not none -%}
 ### MHC
@@ -31,7 +34,8 @@ This contains the highly polymorphic major histocompatibility complex (MHC)
 region.
 
 `{{ mhc_file }}`
-{%- endif %}
+
+{% endif -%}
 
 {% if other_files|length > 0 -%}
 ### Other
@@ -41,4 +45,4 @@ region.
 
 `{{ other_file }}`
 {% endfor %}
-{%- endif %}
+{% endif -%}

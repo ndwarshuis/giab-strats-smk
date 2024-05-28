@@ -591,31 +591,32 @@ def si_to_vdj(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
 def bd_to_cds(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> CDS[AnyBedT] | None:
-    return si_to_cds(x.refdata.strat_inputs) if x.have_and_want_cds else None
+    return si_to_cds(x.refdata.strat_inputs)
 
 
 def bd_to_mhc(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
-    return si_to_mhc(x.refdata.strat_inputs) if x.have_and_want_mhc else None
+    return si_to_mhc(x.refdata.strat_inputs)
 
 
 def bd_to_kir(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
-    return si_to_kir(x.refdata.strat_inputs) if x.have_and_want_kir else None
+    return si_to_kir(x.refdata.strat_inputs)
 
 
 def bd_to_vdj(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
-    return si_to_vdj(x.refdata.strat_inputs) if x.have_and_want_vdj else None
+    return si_to_vdj(x.refdata.strat_inputs)
 
 
 def si_to_simreps(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
     return x.low_complexity.simreps
 
 
+# TODO take the boolean switch out of here
 def bd_to_simreps(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
@@ -626,6 +627,7 @@ def si_to_rmsk(x: StratInputs[AnyBedT]) -> RMSKFile[AnyBedT] | None:
     return x.low_complexity.rmsk
 
 
+# TODO take the boolean switch out of here
 def bd_to_rmsk(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> RMSKFile[AnyBedT] | None:
@@ -636,6 +638,7 @@ def si_to_satellites(x: StratInputs[AnyBedT]) -> SatFile[AnyBedT] | None:
     return x.low_complexity.satellites
 
 
+# TODO take the boolean switch out of here
 def bd_to_satellites(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> SatFile[AnyBedT] | None:
@@ -646,6 +649,7 @@ def si_to_superdups(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
     return x.segdups.superdups
 
 
+# TODO take the boolean switch out of here
 def bd_to_superdups(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
@@ -656,6 +660,7 @@ def si_to_gaps(x: StratInputs[AnyBedT]) -> BedFile[AnyBedT] | None:
     return x.gap
 
 
+# TODO take the boolean switch out of here
 def bd_to_gaps(
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT],
 ) -> BedFile[AnyBedT] | None:
@@ -1995,8 +2000,8 @@ def all_otherdifficult_paths(
     gaps_src: Path,
     refseq_src: Path,
     vdj_src: Path,
-    mhc_src: Path,
     kir_src: Path,
+    mhc_src: Path,
     other_srcs: dict[OtherStratKey, Path],
     # outputs
     gaps: Path,
@@ -2044,22 +2049,29 @@ def all_otherdifficult_paths(
     }
     _other_output = {k: sub_rk(p) for k, p in other.items() if k in _other_src}
 
-    # TODO add switches to bring in vdj/kir/mhc only if we want them from the build
+    bd = sconf.to_build_data_full(rk, bk)
+
     return OtherDifficultPaths(
         gaps_src=_gap_src,
-        refseq_src=_refseq_src,
-        vdj_src=sub_rsk(vdj_src, si_to_vdj),
-        mhc_src=sub_rsk(mhc_src, si_to_mhc),
-        kir_src=sub_rsk(kir_src, si_to_kir),
+        refseq_src=_refseq_src if bd.want_vdj or bd.want_kir or bd.want_mhc else None,
+        vdj_src=sub_rsk(vdj_src, si_to_vdj) if bd.want_vdj else None,
+        mhc_src=sub_rsk(mhc_src, si_to_mhc) if bd.want_mhc else None,
+        kir_src=sub_rsk(kir_src, si_to_kir) if bd.want_kir else None,
         gaps_output=sub_rk(gaps) if _gap_src is not None else None,
         vdj_output=(
-            sub_rk(vdj) if _refseq_src is not None or _vdj_src is not None else None
+            sub_rk(vdj)
+            if bd.want_vdj and (_refseq_src is not None or _vdj_src is not None)
+            else None
         ),
         mhc_output=(
-            sub_rk(mhc) if _refseq_src is not None or _mhc_src is not None else None
+            sub_rk(mhc)
+            if bd.want_mhc and (_refseq_src is not None or _mhc_src is not None)
+            else None
         ),
         kir_output=(
-            sub_rk(kir) if _refseq_src is not None or _kir_src is not None else None
+            sub_rk(kir)
+            if bd.want_kir and (_refseq_src is not None or _kir_src is not None)
+            else None
         ),
         other_src=_other_src,
         other_outputs=_other_output,
@@ -4163,7 +4175,7 @@ class GiabStrats(BaseModel):
         """
         # TODO this seems like a useful glue function (the labmda that is)
         return self.to_ref_data(rk).get_refkeys(
-            lambda si: fmap_maybe(lambda x: x.bed.src, f(si))
+            lambda rd: fmap_maybe(lambda x: x.bed.src, f(rd.strat_inputs))
         )
 
     def _refkey_to_src(self, f: RefDataToSrc, rk: RefKeyFullS) -> AnyBedSrc:
