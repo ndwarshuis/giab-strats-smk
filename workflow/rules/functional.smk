@@ -6,10 +6,16 @@ from common.config import (
     si_to_vdj,
     strip_full_refkey,
     all_otherdifficult_sources,
+    all_otherdifficult_paths,
 )
 
-func = config.to_bed_dirs(CoreLevel.FUNCTIONAL)
+# NOTE this contains rules that generate stratifications in Functional,
+# OtherDifficult, and others without explicit rules (Ancestry et al)
 
+func = config.to_bed_dirs(CoreLevel.FUNCTIONAL)
+odiff = config.to_bed_dirs(CoreLevel.OTHER_DIFFICULT)
+
+# TODO don't hardcode this...
 all_region_types = ["cds", "vdj", "kir", "mhc"]
 
 
@@ -23,6 +29,28 @@ def all_otherdifficult_sources_smk(wildcards):
         Path(rules.download_kir.output[0]),
         Path(rules.download_mhc.output[0]),
         Path(rules.download_vdj.output[0]),
+        {},
+    )
+
+
+def all_otherdifficult_paths_smk(ref_final_key, build_key):
+    # TODO actually make other work
+    return all_otherdifficult_paths(
+        config,
+        ref_final_key,
+        build_key,
+        Path(rules.download_gaps.output[0]),
+        Path(rules.download_cds.output[0]),
+        Path(rules.download_kir.output[0]),
+        Path(rules.download_mhc.output[0]),
+        Path(rules.download_vdj.output[0]),
+        {},
+        Path(rules.get_gaps.output[0]),
+        Path(rules.merge_cds.output[0]),
+        Path(rules.invert_cds.output[0]),
+        Path(rules.remove_kir_gaps.output[0]),
+        Path(rules.remove_mhc_gaps.output[0]),
+        Path(rules.remove_vdj_gaps.output[0]),
         {},
     )
 
@@ -67,26 +95,6 @@ use rule download_gaps as download_kir with:
         func.src.log / "kir.log",
 
 
-# def functional_inputs(wildcards):
-#     rk = wildcards.ref_key
-#     bk = wildcards.build_key
-#     bd = config.to_build_data(rk, bk)
-
-#     def go(test, name, f):
-#         if test:
-#             rs = getattr(rules, name).output
-#             return expand(rs, ref_src_key=config.refkey_to_bed_refsrckeys(f, rk))
-#         else:
-#             return []
-
-#     return {
-#         "cds": go(bd.want_cds_src, "download_cds", si_to_cds),
-#         "mhc": go(bd.want_mhc_src, "download_mhc", si_to_mhc),
-#         "kir": go(bd.want_kir_src, "download_kir", si_to_kir),
-#         "vdj": go(bd.want_vdj_src, "download_vdj", si_to_vdj),
-#     }
-
-
 def functional_inputs(wildcards):
     src = all_otherdifficult_sources_smk(wildcards)
     return {
@@ -100,10 +108,6 @@ def functional_inputs(wildcards):
 checkpoint normalize_cds:
     input:
         unpack(functional_inputs),
-        # cds=lambda w: all_otherdifficult_sources_smk(w).refseq_paths,
-        # mhc=lambda w: all_otherdifficult_sources_smk(w).mhc_paths,
-        # kir=lambda w: all_otherdifficult_sources_smk(w).kir_paths,
-        # vdj=lambda w: all_otherdifficult_sources_smk(w).vdj_paths,
     output:
         **{k: func.inter.filtersort.data / f"{k}.json" for k in all_region_types},
     params:
@@ -154,25 +158,92 @@ rule all_cds:
     localrule: True
 
 
+rule get_gaps:
+    input:
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+    output:
+        odiff.final("gaps_slop15kb"),
+    conda:
+        "../envs/bedtools.yml"
+    shell:
+        """
+        complementBed -i {input.gapless} -g {input.genome} | \
+        slopBed -i stdin -b 15000 -g {input.genome} | \
+        mergeBed -i stdin | \
+        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
+        bgzip -c > {output}
+        """
+
+
+rule remove_vdj_gaps:
+    input:
+        bed=lambda w: read_named_checkpoint("normalize_cds", "vdj", w),
+        genome=rules.filter_sort_ref.output["genome"],
+        gapless=rules.get_gapless.output.auto,
+    output:
+        odiff.final("VDJ"),
+    conda:
+        "../envs/bedtools.yml"
+    shell:
+        """
+        mergeBed -i {input.bed} | \
+        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
+        bgzip -c > {output}
+        """
+
+
+use rule remove_vdj_gaps as remove_mhc_gaps with:
+    input:
+        bed=lambda w: read_named_checkpoint("normalize_cds", "mhc", w),
+        genome=rules.filter_sort_ref.output["genome"],
+        gapless=rules.get_gapless.output.auto,
+    output:
+        odiff.final("MHC"),
+
+
+use rule remove_vdj_gaps as remove_kir_gaps with:
+    input:
+        bed=lambda w: read_named_checkpoint("normalize_cds", "kir", w),
+        genome=rules.filter_sort_ref.output["genome"],
+        gapless=rules.get_gapless.output.auto,
+    output:
+        odiff.final("KIR"),
+
+
 rule functional_readme:
     input:
         common="workflow/templates/common.j2",
         description="workflow/templates/functional_description.j2",
         methods="workflow/templates/functional_methods.j2",
-        cds_inputs=lambda w: expand(
-            rules.download_cds.output,
-            ref_src_key=config.refkey_to_bed_refsrckeys(
-                si_to_cds, strip_full_refkey(w["ref_final_key"])
-            ),
-        ),
-        # TODO put these in params so it doesn't wait to generate this until
-        # these files are actually build
-        cds=rules.merge_cds.output[0],
-        notcds=rules.invert_cds.output[0],
+        _sources=lambda w: all_otherdifficult(
+            w["ref_final_key"], w["build_key"]
+        ).sources.all_functional_inputs,
         bedtools_env="workflow/envs/bedtools.yml",
+    params:
+        paths=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
     output:
         func.readme,
     conda:
         "../envs/templates.yml"
     script:
         "../scripts/python/templates/format_readme/format_functional.py"
+
+
+rule otherdifficult_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/otherdifficult_description.j2",
+        methods="workflow/templates/otherdifficult_methods.j2",
+        bedtools_env="workflow/envs/bedtools.yml",
+        _sources=lambda w: all_otherdifficult(
+            w["ref_final_key"], w["build_key"]
+        ).sources.all_otherdifficult_inputs,
+    params:
+        paths=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
+    output:
+        odiff.readme,
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_otherdifficult.py"

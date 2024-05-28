@@ -2031,7 +2031,11 @@ class OtherDifficultSources:
     other: dict[OtherStratKey, Path1or2]
 
     @property
-    def all_inputs(self) -> list[Path]:
+    def all_functional_inputs(self) -> list[Path]:
+        return [] if self.refseq is None else single_or_double_to_list(self.refseq)
+
+    @property
+    def all_otherdifficult_inputs(self) -> list[Path]:
         return [
             i
             for p in [self.gaps, self.refseq, self.vdj, self.kir, self.mhc]
@@ -2067,15 +2071,13 @@ class OtherDifficultPaths:
     sources: OtherDifficultSources
 
     gaps_output: Path | None
+    cds_output: Path | None
+    not_cds_output: Path | None
     vdj_output: Path | None
     mhc_output: Path | None
     kir_output: Path | None
 
     other_outputs: dict[OtherStratKey, Path]
-
-    @property
-    def all_inputs(self) -> list[Path]:
-        return self.sources.all_inputs
 
 
 def all_otherdifficult_sources(
@@ -2183,6 +2185,8 @@ def all_otherdifficult_paths(
     return OtherDifficultPaths(
         sources=sources,
         gaps_output=sub_rk(gaps) if sources.gaps is not None else None,
+        cds_output=sub_rk(cds) if sources.refseq is not None else None,
+        not_cds_output=sub_rk(not_cds) if sources.refseq is not None else None,
         vdj_output=(
             sub_rk(vdj)
             if bd.want_vdj and (sources.refseq is not None or sources.vdj is not None)
