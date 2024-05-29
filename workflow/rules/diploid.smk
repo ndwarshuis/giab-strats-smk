@@ -265,7 +265,8 @@ use rule combine_dip1_hets as combine_SNVorSV_dip1_hets with:
 # nothing").
 rule concat_xy_nonpar:
     input:
-        lambda w: all_xy_nonPAR(w.ref_final_key, w.build_key),
+        lambda w: all_xy(w.ref_final_key, w.build_key).sex.nonpar_paths,
+        # lambda w: all_xy_nonPAR(w.ref_final_key, w.build_key),
     output:
         dip.inter.postsort.data / "xy_nonpar.bed",
     # /dev/null will keep cat from hanging in case there are no input files. The
