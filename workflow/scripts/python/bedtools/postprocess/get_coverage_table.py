@@ -18,7 +18,7 @@ def get_chr_paired_mapper(
     cis = sconf.to_build_data(cfg.strip_full_refkey(rk), bk).build_chrs
     xs = sconf.with_ref_data_full(
         rk,
-        lambda rd: rd.ref.chr_pattern.to_chr_data(cis, cfg.Haplotype.HAP1),
+        lambda rd: rd.ref.chr_pattern.to_chr_data(cis, cfg.Haplotype.PAT),
         lambda rd: rd.ref.chr_pattern.to_chr_data(cis),
         lambda hap, rd: rd.ref.chr_pattern.choose(hap).to_chr_data(cis, hap),
     )
