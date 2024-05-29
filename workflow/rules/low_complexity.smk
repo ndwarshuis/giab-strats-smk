@@ -784,9 +784,9 @@ def all_low_complexity_smk(ref_final_key, build_key):
     return config.all_low_complexity(
         ref_final_key,
         build_key,
-        rules.download_rmsk.output,
-        rules.download_censat.output,
-        rules.download_simreps.output,
+        Path(rules.download_rmsk.output[0]),
+        Path(rules.download_censat.output[0]),
+        Path(rules.download_simreps.output[0]),
         [Path(p) for p in rules._all_perfect_uniform_repeats.input],
         [
             Path(p)
