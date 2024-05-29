@@ -24,7 +24,7 @@ def expand_strat_targets_inner(ref_final_key, build_key):
         (all_other, True),
     ]
     rule_targets = [
-        (rules.filter_autosomes.output, bd.want_xy_auto),
+        # (rules.filter_autosomes.output, bd.want_xy_auto),
         (rules.all_segdups.input, bd.have_and_want_segdups),
         (rules.find_telomeres.output, bd.want_telomeres),
         (rules.all_segdup_and_map.input, bd.have_and_want_segdup_and_map),

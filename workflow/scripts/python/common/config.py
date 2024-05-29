@@ -133,6 +133,7 @@ from common.functional import (
     from_maybe,
     fmap_maybe,
     fmap_maybe_def,
+    maybe_to_list,
     both,
     with_first,
     DesignError,
@@ -1755,7 +1756,7 @@ AnySexPaths = MaleHapSexPaths | Dip1SexPaths | Dip2SexPaths
 
 class SexPaths(NamedTuple):
     sex: AnySexPaths
-    auto: Path
+    auto: Path | None
 
     @property
     def all_inputs(self) -> list[Path]:
@@ -1763,7 +1764,7 @@ class SexPaths(NamedTuple):
 
     @property
     def all_output_paths(self) -> list[Path]:
-        return [self.auto, *self.sex.all_output_paths]
+        return self.sex.all_output_paths + maybe_to_list(self.auto)
 
     @property
     def all_outputs(self) -> list[str]:
@@ -5158,6 +5159,8 @@ class GiabStrats(BaseModel):
                 hap=hap,
             )
 
+        bd = self.to_build_data_full(rk, bk)
+
         sex = self.with_build_data_full(
             rk,
             bk,
@@ -5165,9 +5168,10 @@ class GiabStrats(BaseModel):
             dip1,
             dip2,
         )
+        auto = sub_wildcards_path(auto, {"ref_final_key": rk, "build_key": bk})
         return SexPaths(
             sex=sex,
-            auto=sub_wildcards_path(auto, {"ref_final_key": rk, "build_key": bk}),
+            auto=auto if bd.want_xy_auto else None,
         )
 
     # other nice functions

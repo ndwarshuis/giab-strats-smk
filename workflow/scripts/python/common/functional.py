@@ -23,6 +23,10 @@ def fmap_maybe_def(default: Y, f: Callable[[X], Y], x: X | None) -> Y:
     return default if x is None else f(x)
 
 
+def maybe_to_list(x: X | None) -> list[X]:
+    return [] if x is None else [x]
+
+
 def fmap_maybe(f: Callable[[X], Y], x: X | None) -> None | Y:
     return fmap_maybe_def(None, f, x)
 
