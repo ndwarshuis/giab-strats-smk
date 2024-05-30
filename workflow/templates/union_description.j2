@@ -2,11 +2,16 @@ This contains all segmental duplications and low-mappability regions:
 
 `{{ segdup_map_file }}`
 
+{% if alldifficult_desc is not None -%}
 {{ alldifficult_desc }}
 
 `{{ alldifficult_file }}`
+{%- endif %}
 
 Also included are the complements of these:
 
 - `{{ not_segdup_map_file }}`
+{% if not_alldifficult_file is not None -%}
 - `{{ not_alldifficult_file }}`
+{%- endif %}
+
