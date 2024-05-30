@@ -5105,7 +5105,9 @@ class GiabStrats(BaseModel):
                 bed=features.x_bed if use_x else features.y_bed,
                 xtr_path=sub_sex(xtr, use_x) if features.xtr is not None else None,
                 ampliconic_path=(
-                    sub_sex(xtr, use_x) if features.ampliconic is not None else None
+                    sub_sex(ampliconic, use_x)
+                    if features.ampliconic is not None
+                    else None
                 ),
                 xtr=features.xtr,
                 ampliconic=features.ampliconic,
