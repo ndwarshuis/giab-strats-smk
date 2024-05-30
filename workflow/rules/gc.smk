@@ -64,8 +64,13 @@ checkpoint intersect_gc_ranges:
         unpack(range_inputs),
         genome=rules.filter_sort_ref.output["genome"],
         gapless=rules.get_gapless.output.auto,
+    # 'widest' is a symlink to the widest extreme gc range bed which should
+    # always be present if this rule is run. This minor complexifier allows
+    # other rules to refer to this particular file without invoking the
+    # checkpoint and possibly causing a global nuclear war.
     output:
-        gc.inter.postsort.data / "intersect_output.json",
+        all_gc=gc.inter.postsort.data / "intersect_output.json",
+        widest_extreme=gc.inter.postsort.data / "widest.bed.gz",
     log:
         gc.inter.postsort.log / "intersect_ranges.txt",
     conda:
@@ -81,21 +86,18 @@ checkpoint intersect_gc_ranges:
         "../scripts/python/bedtools/gc/intersect_ranges.py"
 
 
-# TODO check the ref/build key to see if these are wanted, and if not return
-# empty list; this will permit us to use this function in a safe way to build
-# input lists without triggering the checkpoint system
 def gc_inputs(ref_final_key, build_key):
     c = checkpoints.intersect_gc_ranges.get(
         ref_final_key=ref_final_key,
         build_key=build_key,
     )
-    with c.output[0].open() as f:
+    with c.output.all_gc.open() as f:
         return json.load(f)
 
 
 def gc_inputs_flat(ref_final_key, build_key):
     res = gc_inputs(ref_final_key, build_key)
-    return [*res["gc_ranges"], res["widest_extreme"], *res["other_extremes"]]
+    return [*res["gc_ranges"], *res["other_extremes"], *res["widest_extreme"]]
 
 
 rule gc_readme:

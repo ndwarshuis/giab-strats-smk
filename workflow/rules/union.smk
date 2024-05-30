@@ -47,7 +47,7 @@ def all_difficult_inputs(wildcards):
     rk = wildcards["ref_final_key"]
     bk = wildcards["build_key"]
     bd = config.to_build_data_full(rk, bk)
-    gc = {"gc": gc_inputs(rk, bk)["widest_extreme"]} if bd.want_gc else {}
+    gc = {"gc": rules.intersect_gc_ranges.output.widest_extreme} if bd.want_gc else {}
     return {
         **gc,
         **{
