@@ -1713,6 +1713,10 @@ class _SexPaths:
         return [p for x in self.all_paths if (p := x.ampliconic_path) is not None]
 
     @property
+    def all_features(self) -> list[Path]:
+        return self.xtr_paths + self.ampliconic_paths
+
+    @property
     def all_inputs(self) -> list[Path]:
         return [i for x in self.all_paths for i in x.all_inputs]
 
@@ -1877,9 +1881,64 @@ class OtherDifficultPaths:
 #     pass
 
 
-# @dataclass(frozen=True)
-# class UnionPaths:
-#     pass
+@dataclass(frozen=True)
+class MutualPathPair:
+    positive: Path
+    negative: Path
+
+    @property
+    def paths(self) -> list[Path]:
+        return [self.positive, self.negative]
+
+
+@dataclass(frozen=True)
+class SegdupLowmapPaths:
+    segdup_source: Path
+    lowmap_source: Path
+    output: MutualPathPair
+
+    @property
+    def sources(self) -> list[Path]:
+        return [self.segdup_source, self.lowmap_source]
+
+
+# ASSUME at least two of the sources are non-null
+@dataclass(frozen=True)
+class AllDifficultPaths:
+    gc_source: Path | None
+    repeat_source: Path | None
+    xy_sources: list[Path]
+    output: MutualPathPair
+
+    @property
+    def sources(self) -> list[Path]:
+        return [
+            p for p in [self.gc_source, self.repeat_source] if p is not None
+        ] + self.xy_sources
+
+
+@dataclass(frozen=True)
+class UnionPaths:
+    segdup_lowmap: SegdupLowmapPaths
+    all_difficult: AllDifficultPaths | None
+
+    @property
+    def segdup_lowmap_sources(self) -> list[Path]:
+        return self.segdup_lowmap.sources
+
+    @property
+    def all_difficult_sources(self) -> list[Path]:
+        empty: list[Path] = []
+        return fmap_maybe_def(empty, lambda x: x.sources, self.all_difficult)
+
+    @property
+    def segdup_lowmap_outputs(self) -> list[Path]:
+        return self.segdup_lowmap.output.paths
+
+    @property
+    def all_difficult_outputs(self) -> list[Path]:
+        empty: list[Path] = []
+        return fmap_maybe_def(empty, lambda x: x.output.paths, self.all_difficult)
 
 
 ################################################################################
@@ -5082,6 +5141,65 @@ class GiabStrats(BaseModel):
             ),
             other_outputs=other_output,
         )
+
+    def all_union_paths(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        # sources
+        segdups_src: Path,
+        lowmap_src: Path,
+        gc_src: Path,
+        lc: LowComplexityPaths | None,
+        xy: SexPaths | None,
+        # outputs
+        segdup_lowmap_output: Path,
+        not_segdup_lowmap_output: Path,
+        all_difficult: Path,
+        not_all_difficult: Path,
+    ) -> UnionPaths | None:
+        bd = self.to_build_data_full(rk, bk)
+
+        if not bd.want_union:
+            return None
+
+        # TODO make this contingent upon other objects from segdup and lowmap
+        if not bd.have_segdups and len(bd.mappability_params) == 0:
+            return None
+
+        sl = SegdupLowmapPaths(
+            segdup_source=segdups_src,
+            lowmap_source=lowmap_src,
+            output=MutualPathPair(
+                segdup_lowmap_output,
+                not_segdup_lowmap_output,
+            ),
+        )
+
+        _gc_src = gc_src if bd.want_gc else None
+        _repeat_src = fmap_maybe(
+            lambda x: fmap_maybe(
+                lambda y: fmap_maybe(lambda z: z.all_repeats, y.all_repeats),
+                x.satellites,
+            ),
+            lc,
+        )
+        empty: list[Path] = []
+        _xy_src = fmap_maybe_def(empty, lambda x: x.sex.all_features, xy)
+
+        all_diff = (
+            AllDifficultPaths(
+                gc_source=_gc_src,
+                repeat_source=_repeat_src,
+                xy_sources=_xy_src,
+                output=MutualPathPair(all_difficult, not_all_difficult),
+            )
+            if ((_gc_src is not None) + (_repeat_src is not None) + (len(_xy_src) > 0))
+            > 1
+            else None
+        )
+
+        return UnionPaths(segdup_lowmap=sl, all_difficult=all_diff)
 
     def all_xy_paths(
         self,

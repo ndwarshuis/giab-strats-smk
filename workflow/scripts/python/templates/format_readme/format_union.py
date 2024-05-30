@@ -2,11 +2,40 @@ from pathlib import Path
 import jinja2 as j2
 from typing import Any
 import common.config as cfg
+from common.functional import DesignError, fmap_maybe_def
 import template_utils as tu
+
+
+# TODO smells quite general ;)
+def concat_comma(xs: list[str]) -> str:
+    if len(xs) == 0:
+        return ""
+    elif len(xs) == 1:
+        return xs[0]
+    elif len(xs) == 2:
+        return f"{xs[0]} and {xs[1]}"
+    else:
+        first = ", ".join(xs[:-1])
+        return f"{first}, and {xs[-1]}"
 
 
 def relative_path(p: Path) -> str:
     return str(Path("..") / p.parent.name / p.name)
+
+
+def from_all_diff(a: cfg.AllDifficultPaths) -> tuple[str, str, str, list[str]]:
+    gc_txt = "high/low GC regions" if a.gc_source else None
+    repeat_txt = "tandem repeats" if a.repeat_source else None
+    xy_txt = "difficult XY regions" if a.xy_sources else None
+
+    src_txt = concat_comma([x for x in [gc_txt, repeat_txt, xy_txt] if x is not None])
+
+    return (
+        a.output.positive.name,
+        a.output.negative.name,
+        f"This contains the above regions plus {src_txt}.",
+        [relative_path(p) for p in a.sources],
+    )
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
@@ -14,47 +43,42 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     rfk = cfg.wc_to_reffinalkey(ws)
 
-    # NOTE: in theory I could have made this flexible enough that each of the
-    # inputs was optional, since the only thing 'union' implies is a
-    # multiintersect/merge. For other reasons, the only thing that is variable
-    # here is the xy input, thus only the following is needed:
-    xy = cfg.smk_to_inputs_name(smk, "xy")
-    xy_txt = "" if xy == [] else "difficult XY regions"
+    paths = smk.params["paths"]
 
-    alldifficult_desc = (
-        f"This contains the above regions plus {xy_txt}tandem "
-        "repeats, and high/low GC regions."
-    )
+    if not isinstance(paths, cfg.UnionPaths):
+        raise DesignError()
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
+    segdup_out = paths.segdup_lowmap.output
+    empty: tuple[str | None, str | None, str | None, list[str]] = (
+        None,
+        None,
+        None,
+        [],
+    )
+    alldiff_pos, alldiff_neg, alldiff_desc, alldiff_sources = fmap_maybe_def(
+        empty,
+        from_all_diff,
+        paths.all_difficult,
+    )
+
     def render_description(t: j2.Template) -> str:
         return t.render(
-            segdup_map_file=cfg.smk_to_param_path(smk, "segdup_map_path").name,
-            not_segdup_map_file=cfg.smk_to_param_path(smk, "not_segdup_map_path").name,
-            alldifficult_file=cfg.smk_to_param_path(smk, "alldifficult_path").name,
-            not_alldifficult_file=cfg.smk_to_param_path(
-                smk, "not_alldifficult_path"
-            ).name,
-            alldifficult_desc=alldifficult_desc,
+            segdup_map_file=segdup_out.positive.name,
+            not_segdup_map_file=segdup_out.negative.name,
+            alldifficult_file=alldiff_pos,
+            not_alldifficult_file=alldiff_neg,
+            alldifficult_desc=alldiff_desc,
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
 
-    all_difficult_files = [
-        relative_path(p)
-        for p in [
-            cfg.smk_to_input_name(smk, "repeats"),
-            *cfg.smk_to_inputs_name(smk, "xy"),
-            *([cfg.smk_to_input_name(smk, "gc")] if "gc" in smk.input else []),
-        ]
-    ]
-
     def render_methods(t: j2.Template) -> str:
         return t.render(
-            map_file=relative_path(cfg.smk_to_input_name(smk, "lowmap")),
-            segdup_file=relative_path(cfg.smk_to_input_name(smk, "segdups")),
-            all_difficult_files=all_difficult_files,
+            map_file=relative_path(paths.segdup_lowmap.lowmap_source),
+            segdup_file=relative_path(paths.segdup_lowmap.segdup_source),
+            all_difficult_files=alldiff_sources,
             deps=bedtools_deps,
         )
 
