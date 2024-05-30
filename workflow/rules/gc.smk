@@ -100,12 +100,27 @@ def gc_inputs_flat(ref_final_key, build_key):
     return [*res["gc_ranges"], *res["other_extremes"], res["widest_extreme"]]
 
 
+def all_gc(ref_final_key, build_key):
+    # guard to prevent checkpoint from firing if we don't need GC
+    bd = config.to_build_data_full(ref_final_key, build_key)
+    if not bd.want_gc:
+        return None
+
+    res = gc_inputs(ref_final_key, build_key)
+    return config.all_gc(
+        ref_final_key,
+        build_key,
+        [Path(p) for p in res["gc_ranges"]],
+        [Path(p) for p in [*res["other_extremes"], res["widest_extreme"]]],
+    )
+
+
 rule gc_readme:
     input:
         common="workflow/templates/common.j2",
         description="workflow/templates/gc_description.j2",
         methods="workflow/templates/gc_methods.j2",
-        gc_inputs=rules.intersect_gc_ranges.output[0],
+        # gc_inputs=rules.intersect_gc_ranges.output[0],
         bedtools_env="workflow/envs/bedtools.yml",
         seqtk_env="workflow/envs/seqtk.yml",
     output:

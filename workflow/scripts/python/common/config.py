@@ -1932,6 +1932,10 @@ class UnionPaths:
         return fmap_maybe_def(empty, lambda x: x.sources, self.all_difficult)
 
     @property
+    def all_sources(self) -> list[Path]:
+        return self.segdup_lowmap_sources + self.all_difficult_sources
+
+    @property
     def segdup_lowmap_outputs(self) -> list[Path]:
         return self.segdup_lowmap.output.paths
 
@@ -1940,15 +1944,33 @@ class UnionPaths:
         empty: list[Path] = []
         return fmap_maybe_def(empty, lambda x: x.output.paths, self.all_difficult)
 
+    @property
+    def all_outputs(self) -> list[Path]:
+        return self.segdup_lowmap_outputs + self.all_difficult_outputs
+
 
 @dataclass(frozen=True)
 class LowmapPaths:
     union: MutualPathPair
     single: list[Path]
+    params: list[LowMapParams]  # ASSUME non empty
 
     @property
     def all_outputs(self) -> list[Path]:
         return self.union.paths + self.single
+
+
+@dataclass(frozen=True)
+class GCPaths:
+    lowGC: Path
+    middleGC: list[Path]
+    highGC: Path
+    extremes: list[Path]
+    params: GCParams
+
+    @property
+    def all_outputs(self) -> list[Path]:
+        return [self.lowGC, *self.middleGC, self.highGC, *self.extremes]
 
 
 ################################################################################
@@ -3479,6 +3501,10 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
     ) -> tuple[list[int], list[int], list[int]]:
         ms = self.build.include.mappability
         return unzip3([(m.length, m.mismatches, m.indels) for m in ms])
+
+    @property
+    def want_mappability(self) -> bool:
+        return len(self.build.include.mappability) > 0
 
     # this is the only xy-ish flag that's here since this won't depend on the
     # haplotype (just remove X and Y from whatever filter we set)
@@ -5158,7 +5184,7 @@ class GiabStrats(BaseModel):
         bk: BuildKey,
         # sources
         segdups_src: Path,
-        lowmap_src: Path,
+        lowmap: Path,
         gc_src: Path,
         lc: LowComplexityPaths | None,
         xy: SexPaths | None,
@@ -5173,13 +5199,12 @@ class GiabStrats(BaseModel):
         if not bd.want_union:
             return None
 
-        # TODO make this contingent upon other objects from segdup and lowmap
-        if not bd.have_segdups and len(bd.mappability_params) == 0:
+        if not (bd.have_segdups and len(bd.mappability_params) > 0):
             return None
 
         sl = SegdupLowmapPaths(
             segdup_source=segdups_src,
-            lowmap_source=lowmap_src,
+            lowmap_source=lowmap,
             output=MutualPathPair(
                 segdup_lowmap_output,
                 not_segdup_lowmap_output,
@@ -5211,6 +5236,26 @@ class GiabStrats(BaseModel):
 
         return UnionPaths(segdup_lowmap=sl, all_difficult=all_diff)
 
+    def all_gc(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        ranges: list[Path],
+        extremes: list[Path],
+    ) -> GCPaths:
+        bd = self.to_build_data_full(rk, bk)
+
+        if not bd.build.include.gc:
+            raise DesignError()
+
+        return GCPaths(
+            lowGC=ranges[0],
+            middleGC=ranges[1:-1],
+            highGC=ranges[-1],
+            extremes=extremes,
+            params=bd.build.include.gc,
+        )
+
     def all_lowmap(
         self,
         rk: RefKeyFullS,
@@ -5218,15 +5263,18 @@ class GiabStrats(BaseModel):
         union: Path,
         not_union: Path,
         single: list[Path],
-    ) -> LowmapPaths | None:
+    ) -> LowmapPaths:
         bd = self.to_build_data_full(rk, bk)
 
-        if len(bd.mappability_params) == 0:
-            return None
+        # TODO sub path wildcards
+
+        if not bd.want_mappability:
+            raise DesignError()
 
         return LowmapPaths(
             union=MutualPathPair(union, not_union),
             single=single,
+            params=[*bd.build.include.mappability],
         )
 
     def all_xy_paths(

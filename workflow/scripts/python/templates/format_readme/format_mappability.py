@@ -10,22 +10,18 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
 
     rk = cfg.wc_to_reffinalkey(ws)
-    bk = cfg.wc_to_buildkey(ws)
 
     paths = smk.params["paths"]
 
     if not isinstance(paths, cfg.LowmapPaths):
         raise DesignError()
 
-    bd = sconf.to_build_data(cfg.strip_full_refkey(rk), bk)
-    map_params = [*bd.build.include.mappability]
-
     def render_description(t: j2.Template) -> str:
         return t.render(
             single_lowmap_files=[p.name for p in paths.single],
             all_lowmap_file=paths.union.positive.name,
             not_all_lowmap_file=paths.union.negative.name,
-            params=map_params,
+            params=paths.params,
         )
 
     map_env_path = cfg.smk_to_input_name(smk, "map_env")
@@ -37,7 +33,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     def render_methods(t: j2.Template) -> str:
         return t.render(
             gemurl=unquote(sconf.tools.gemlib),
-            params=map_params,
+            params=paths.params,
             deps={**map_deps, **bedtools_deps},
         )
 

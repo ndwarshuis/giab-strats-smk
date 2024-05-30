@@ -12,13 +12,16 @@ This file includes GC content that is less than X.
 
 This file includes GC content that is greater than X.
 
+{% if range_files|length > 0 %}
 ## Ranges
 {% for file in range_files %}
 `{{file}}`
 {%- endfor %}
 
 These files include regions where GC content is between X and Y percent.
+{%- endif %}
 
+{% if dual_files|length > 0 %}
 ## Dual Extremes
 {% for file in dual_files %}
 `{{file}}`
@@ -26,3 +29,4 @@ These files include regions where GC content is between X and Y percent.
 
 These files include regions where GC content is either less than (lt) X% or
 greater than (gt) Y%.
+{%- endfor %}

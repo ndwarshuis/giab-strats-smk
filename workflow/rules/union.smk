@@ -96,6 +96,7 @@ def all_union(ref_final_key, build_key):
         build_key,
         Path(rules.merge_superdups.output[0]),
         Path(rules.merge_nonunique.output.all_lowmap),
+        Path(rules.intersect_gc_ranges.output.widest_extreme),
         all_low_complexity(ref_final_key, build_key),
         all_xy(ref_final_key, build_key),
         Path(rules.intersect_segdup_and_map.output[0]),
@@ -111,12 +112,7 @@ rule union_readme:
         description="workflow/templates/union_description.j2",
         methods="workflow/templates/union_methods.j2",
         bedtools_env="workflow/envs/bedtools.yml",
-        _segdup_lowmap=lambda w: all_union(
-            w["ref_final_key"], w["build_key"]
-        ).segdup_lowmap_sources,
-        _all_difficult=lambda w: all_union(
-            w["ref_final_key"], w["build_key"]
-        ).all_difficult_sources,
+        _sources=lambda w: all_union(w["ref_final_key"], w["build_key"]).all_sources,
     params:
         paths=lambda w: all_union(w["ref_final_key"], w["build_key"]),
     output:

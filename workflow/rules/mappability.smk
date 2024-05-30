@@ -233,8 +233,12 @@ use rule _invert_autosomal_regions as invert_merged_nonunique with:
 
 
 def all_mappability(ref_final_key, build_key):
+    # guard to prevent checkpoint from firing when we call this function
+    bd = config.to_build_data_full(ref_final_key, build_key)
+    if bd.want_mappability:
+        return None
+
     ss = single_nonunique_inputs(ref_final_key, build_key)
-    # return [rules.merge_nonunique.output.all_lowmap, *res]
     return config.all_lowmap(
         ref_final_key,
         build_key,
