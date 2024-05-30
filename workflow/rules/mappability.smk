@@ -195,7 +195,7 @@ checkpoint merge_nonunique:
         genome=rules.filter_sort_ref.output["genome"],
     output:
         single_lowmap=mlty.inter.postsort.data / "single_lowmap.json",
-        all_lowmap=mlty.final("all_lowmap"),
+        all_lowmap=mlty.final("lowmappabilityall"),
     log:
         mlty.inter.postsort.log / "nonunique_output.txt",
     params:
