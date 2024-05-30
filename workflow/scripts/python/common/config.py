@@ -1973,6 +1973,21 @@ class GCPaths:
         return [self.lowGC, *self.middleGC, self.highGC, *self.extremes]
 
 
+@dataclass(frozen=True)
+class SegdupPaths:
+    superdup_src: Path1or2
+    all_segdups: MutualPathPair
+    long_segdups: MutualPathPair
+
+    @property
+    def sources(self) -> list[Path]:
+        return single_or_double_to_list(self.superdup_src)
+
+    @property
+    def all_outputs(self) -> list[Path]:
+        return self.all_segdups.paths + self.long_segdups.paths
+
+
 ################################################################################
 # Constants
 
@@ -3441,6 +3456,10 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT]):
     @property
     def want_telomeres(self) -> bool:
         return self.build.include.telomeres
+
+    @property
+    def want_segdups(self) -> bool:
+        return self.build.include.segdups
 
     @property
     def have_segdups(self) -> bool:
@@ -5276,6 +5295,45 @@ class GiabStrats(BaseModel):
             single=single,
             params=[*bd.build.include.mappability],
         )
+
+    # TODO sub paths
+    def all_segdups(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        # sources
+        superdups: Path,
+        # outputs
+        segdups: Path,
+        not_segdups: Path,
+        long_segdups: Path,
+        not_long_segdups: Path,
+    ) -> SegdupPaths | None:
+
+        def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
+            rsks = self.refkey_to_bed_refsrckeys(f, strip_full_refkey(rk))
+            if rsks is None:
+                return None
+            else:
+                return map_single_or_double(
+                    lambda s: sub_wildcards_path(
+                        p, {"ref_src_key": s, "build_key": bk}
+                    ),
+                    rsks,
+                )
+
+        src = sub_rsk(superdups, si_to_superdups)
+
+        bd = self.to_build_data_full(rk, bk)
+
+        if bd.want_segdups and src is not None:
+            return SegdupPaths(
+                superdup_src=src,
+                all_segdups=MutualPathPair(segdups, not_segdups),
+                long_segdups=MutualPathPair(long_segdups, not_long_segdups),
+            )
+        else:
+            return None
 
     def all_xy_paths(
         self,

@@ -78,13 +78,26 @@ use rule notin_superdups as notin_long_superdups with:
         segdup.final("notinsegdups_gt10kb"),
 
 
-rule all_segdups:
-    input:
-        rules.merge_superdups.output,
-        rules.filter_long_superdups.output,
-        rules.notin_superdups.output,
-        rules.notin_long_superdups.output,
-    localrule: True
+# rule all_segdups:
+#     input:
+#         rules.merge_superdups.output,
+#         rules.filter_long_superdups.output,
+#         rules.notin_superdups.output,
+#         rules.notin_long_superdups.output,
+#     localrule: True
+
+
+# TODO split into source function
+def all_segdups(ref_final_key, build_key):
+    return config.all_segdups(
+        ref_final_key,
+        build_key,
+        Path(rules.download_superdups.output[0]),
+        Path(rules.merge_superdups.output[0]),
+        Path(rules.filter_long_superdups.output[0]),
+        Path(rules.notin_superdups.output[0]),
+        Path(rules.notin_long_superdups.output[0]),
+    )
 
 
 rule segdups_readme:
@@ -92,18 +105,20 @@ rule segdups_readme:
         common="workflow/templates/common.j2",
         description="workflow/templates/segdups_description.j2",
         methods="workflow/templates/segdups_methods.j2",
-        segdups_inputs=lambda w: expand(
-            rules.download_superdups.output,
-            ref_src_key=config.refkey_to_bed_refsrckeys_smk(
-                si_to_superdups, strip_full_refkey(w["ref_final_key"])
-            ),
-        ),
+        _sources=lambda w: all_segdups(w["ref_final_key"], w["build_key"]).sources,
+        # segdups_inputs=lambda w: expand(
+        #     rules.download_superdups.output,
+        #     ref_src_key=config.refkey_to_bed_refsrckeys_smk(
+        #         si_to_superdups, strip_full_refkey(w["ref_final_key"])
+        #     ),
+        # ),
         bedtools_env="workflow/envs/bedtools.yml",
     params:
-        segdups_path=rules.merge_superdups.output[0],
-        long_segdups_path=rules.filter_long_superdups.output[0],
-        not_segdups_path=rules.notin_superdups.output[0],
-        not_long_segdups_path=rules.notin_long_superdups.output[0],
+        paths=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
+        # segdups_path=rules.merge_superdups.output[0],
+        # long_segdups_path=rules.filter_long_superdups.output[0],
+        # not_segdups_path=rules.notin_superdups.output[0],
+        # not_long_segdups_path=rules.notin_long_superdups.output[0],
     output:
         segdup.readme,
     conda:

@@ -9,19 +9,17 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
 
     rfk = cfg.wc_to_reffinalkey(ws)
-    rk = cfg.strip_full_refkey(rfk)
     bk = cfg.wc_to_buildkey(ws)
-    bd = sconf.to_build_data(rk, bk)
 
-    segdups_src = bd.refdata.strat_inputs.segdups
+    paths = smk.params["paths"]
 
-    if segdups_src is None:
+    if not isinstance(paths, cfg.SegdupPaths):
         raise DesignError()
 
     src_txt = sconf.with_build_data_and_bed_doc(
         rfk,
         bk,
-        cfg.smk_to_inputs_name(smk, "segdups_inputs"),
+        paths.superdup_src,
         cfg.bd_to_superdups,
         "The superdups file",
         None,
@@ -31,12 +29,10 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_description(t: j2.Template) -> str:
         return t.render(
-            segdups_file=cfg.smk_to_param_path(smk, "segdups_path").name,
-            not_segdups_file=cfg.smk_to_param_path(smk, "not_segdups_path").name,
-            long_segdups_file=cfg.smk_to_param_path(smk, "long_segdups_path").name,
-            not_long_segdups_file=cfg.smk_to_param_path(
-                smk, "not_long_segdups_path"
-            ).name,
+            segdups_file=paths.all_segdups.positive.name,
+            not_segdups_file=paths.all_segdups.negative.name,
+            long_segdups_file=paths.long_segdups.positive.name,
+            not_long_segdups_file=paths.long_segdups.negative.name,
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
