@@ -1,10 +1,9 @@
 import jinja2 as j2
-from os.path import basename
 from typing import Any
 import common.config as cfg
 import template_utils as tu
 from urllib.parse import unquote
-import json
+from common.functional import DesignError
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
@@ -12,32 +11,28 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     rk = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)
+
+    paths = smk.params["paths"]
+
+    if not isinstance(paths, cfg.LowmapPaths):
+        raise DesignError()
+
     bd = sconf.to_build_data(cfg.strip_full_refkey(rk), bk)
     map_params = [*bd.build.include.mappability]
 
-    lowmap_path = cfg.smk_to_input_name(smk, "lowmap")
-    notlowmap_path = cfg.smk_to_input_name(smk, "notinlowmap")
+    def render_description(t: j2.Template) -> str:
+        return t.render(
+            single_lowmap_files=[p.name for p in paths.single],
+            all_lowmap_file=paths.union.positive.name,
+            not_all_lowmap_file=paths.union.negative.name,
+            params=map_params,
+        )
 
     map_env_path = cfg.smk_to_input_name(smk, "map_env")
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
-    out = cfg.smk_to_output(smk)
-
-    with open(lowmap_path, "r") as f:
-        u = json.load(f)
-        all_lowmap: str = basename(u["all_lowmap"])
-        single_lowmap: list[str] = [*map(basename, u["single_lowmap"])]
-
     map_deps = tu.env_dependencies(map_env_path, {"bedops"})
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools"})
-
-    def render_description(t: j2.Template) -> str:
-        return t.render(
-            single_lowmap_files=single_lowmap,
-            all_lowmap_file=all_lowmap,
-            not_all_lowmap_file=basename(notlowmap_path),
-            params=map_params,
-        )
 
     def render_methods(t: j2.Template) -> str:
         return t.render(
@@ -54,6 +49,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         cfg.CoreLevel.MAPPABILITY,
         sconf.refkey_haplotypes(rk),
     )
+
+    out = cfg.smk_to_output(smk)
 
     with open(out, "w") as f:
         f.write(txt)

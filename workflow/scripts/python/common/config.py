@@ -1941,6 +1941,16 @@ class UnionPaths:
         return fmap_maybe_def(empty, lambda x: x.output.paths, self.all_difficult)
 
 
+@dataclass(frozen=True)
+class LowmapPaths:
+    union: MutualPathPair
+    single: list[Path]
+
+    @property
+    def all_outputs(self) -> list[Path]:
+        return self.union.paths + self.single
+
+
 ################################################################################
 # Constants
 
@@ -5200,6 +5210,24 @@ class GiabStrats(BaseModel):
         )
 
         return UnionPaths(segdup_lowmap=sl, all_difficult=all_diff)
+
+    def all_lowmap(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        union: Path,
+        not_union: Path,
+        single: list[Path],
+    ) -> LowmapPaths | None:
+        bd = self.to_build_data_full(rk, bk)
+
+        if len(bd.mappability_params) == 0:
+            return None
+
+        return LowmapPaths(
+            union=MutualPathPair(union, not_union),
+            single=single,
+        )
 
     def all_xy_paths(
         self,

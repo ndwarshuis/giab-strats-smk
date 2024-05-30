@@ -216,7 +216,7 @@ checkpoint merge_nonunique:
         "../scripts/python/bedtools/mappability/merge_nonunique.py"
 
 
-def nonunique_inputs(ref_final_key, build_key):
+def single_nonunique_inputs(ref_final_key, build_key):
     c = checkpoints.merge_nonunique.get(
         ref_final_key=ref_final_key, build_key=build_key
     )
@@ -232,17 +232,24 @@ use rule _invert_autosomal_regions as invert_merged_nonunique with:
         mlty.final("notinlowmappabilityall"),
 
 
-def nonunique_inputs_flat(ref_final_key, build_key):
-    res = nonunique_inputs(ref_final_key, build_key)
-    return [rules.merge_nonunique.output.all_lowmap, *res]
-
-
-def mappabilty_inputs(ref_final_key, build_key):
-    return nonunique_inputs_flat(ref_final_key, build_key) + expand(
-        rules.invert_merged_nonunique.output,
-        ref_final_key=ref_final_key,
-        build_key=build_key,
+def all_mappability(ref_final_key, build_key):
+    ss = single_nonunique_inputs(ref_final_key, build_key)
+    # return [rules.merge_nonunique.output.all_lowmap, *res]
+    return config.all_lowmap(
+        ref_final_key,
+        build_key,
+        Path(rules.merge_nonunique.output.all_lowmap),
+        Path(rules.invert_merged_nonunique.output[0]),
+        [Path(p) for p in ss],
     )
+
+
+# def mappabilty_inputs(ref_final_key, build_key):
+#     return nonunique_inputs_flat(ref_final_key, build_key) + expand(
+#         rules.invert_merged_nonunique.output,
+#         ref_final_key=ref_final_key,
+#         build_key=build_key,
+#     )
 
 
 # TODO what is the >0.9 thing in awk above?
@@ -251,10 +258,12 @@ rule mappability_readme:
         common="workflow/templates/common.j2",
         description="workflow/templates/mappability_description.j2",
         methods="workflow/templates/mappability_methods.j2",
-        lowmap=rules.merge_nonunique.output[0],
-        notinlowmap=rules.invert_merged_nonunique.output[0],
+        # lowmap=rules.merge_nonunique.output[0],
+        # notinlowmap=rules.invert_merged_nonunique.output[0],
         map_env="workflow/envs/map.yml",
         bedtools_env="workflow/envs/bedtools.yml",
+    params:
+        paths=lambda w: all_mappability(w["ref_final_key"], w["build_key"]),
     output:
         mlty.readme,
     conda:
