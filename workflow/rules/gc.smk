@@ -97,7 +97,7 @@ def gc_inputs(ref_final_key, build_key):
 
 def gc_inputs_flat(ref_final_key, build_key):
     res = gc_inputs(ref_final_key, build_key)
-    return [*res["gc_ranges"], *res["other_extremes"], *res["widest_extreme"]]
+    return [*res["gc_ranges"], *res["other_extremes"], res["widest_extreme"]]
 
 
 rule gc_readme:
