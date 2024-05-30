@@ -1543,7 +1543,12 @@ class UniformRepeatPaths(NamedTuple):
 
     @property
     def all_outputs(self) -> list[Path]:
-        return [*self.perfect, self.homopolymers, self.not_homopolymers]
+        return [
+            *self.perfect,
+            *self.imperfect,
+            self.homopolymers,
+            self.not_homopolymers,
+        ]
 
 
 class RepeatsPaths(NamedTuple):
