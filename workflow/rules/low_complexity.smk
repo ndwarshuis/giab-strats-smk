@@ -788,11 +788,7 @@ def all_low_complexity_smk(ref_final_key, build_key):
         Path(rules.download_censat.output[0]),
         Path(rules.download_simreps.output[0]),
         [Path(p) for p in rules._all_perfect_uniform_repeats.input],
-        [
-            Path(p)
-            for p in rules._all_imperfect_uniform_repeats.input
-            + rules._all_imperfect_uniform_repeats.input.imperfect_ge11
-        ],
+        [Path(p) for p in rules._all_imperfect_uniform_repeats.input],
         Path(rules.merge_all_uniform_repeats.output[0]),
         Path(rules.invert_all_uniform_repeats.output[0]),
         Path(rules.merge_satellites.output[0]),
