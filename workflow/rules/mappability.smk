@@ -194,7 +194,8 @@ checkpoint merge_nonunique:
         gapless=rules.get_gapless.output.auto,
         genome=rules.filter_sort_ref.output["genome"],
     output:
-        mlty.inter.postsort.data / "nonunique_output.json",
+        single_lowmap=mlty.inter.postsort.data / "single_lowmap.json",
+        all_lowmap=mlty.final("all_lowmap"),
     log:
         mlty.inter.postsort.log / "nonunique_output.txt",
     params:
@@ -219,20 +220,21 @@ def nonunique_inputs(ref_final_key, build_key):
     c = checkpoints.merge_nonunique.get(
         ref_final_key=ref_final_key, build_key=build_key
     )
-    with c.output[0].open() as f:
+    with c.output.single_lowmap.open() as f:
         return json.load(f)
 
 
 use rule _invert_autosomal_regions as invert_merged_nonunique with:
     input:
-        lambda w: nonunique_inputs(w.ref_final_key, w.build_key)["all_lowmap"],
+        rules.merge_nonunique.output.all_lowmap,
+        # lambda w: nonunique_inputs(w.ref_final_key, w.build_key)["all_lowmap"],
     output:
         mlty.final("notinlowmappabilityall"),
 
 
 def nonunique_inputs_flat(ref_final_key, build_key):
     res = nonunique_inputs(ref_final_key, build_key)
-    return [res["all_lowmap"], *res["single_lowmap"]]
+    return [rules.merge_nonunique.output.all_lowmap, *res]
 
 
 def mappabilty_inputs(ref_final_key, build_key):

@@ -1872,6 +1872,16 @@ class OtherDifficultPaths:
     other_outputs: dict[OtherStratKey, Path]
 
 
+# @dataclass(frozen=True)
+# class UnionSources:
+#     pass
+
+
+# @dataclass(frozen=True)
+# class UnionPaths:
+#     pass
+
+
 ################################################################################
 # Constants
 
@@ -4865,6 +4875,10 @@ class GiabStrats(BaseModel):
             trf=sub_rsk(trf, si_to_simreps),
         )
 
+    # TODO check incoming paths, inputs should all be in resources/{ref} and
+    # outputs should all be in results/final/{ref}. Obviously they should also
+    # be of type path, and this is coming from snakemake itself which I don't
+    # trust
     def all_low_complexity(
         self,
         rk: RefKeyFullS,

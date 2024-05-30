@@ -10,7 +10,7 @@ def segdup_and_map_inputs(wildcards):
     bd = config.to_build_data_full(rk, bk)
     s = {"segdups": rules.merge_superdups.output[0]} if bd.have_and_want_segdups else {}
     l = (
-        {"lowmap": nonunique_inputs(rk, bk)["all_lowmap"]}
+        {"lowmap": rules.merge_nonunique.output.all_lowmap}
         if bd.have_and_want_mappability
         else {}
     )
