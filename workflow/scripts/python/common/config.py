@@ -1988,6 +1988,24 @@ class SegdupPaths:
         return self.all_segdups.paths + self.long_segdups.paths
 
 
+@dataclass(frozen=True)
+class DiploidPaths:
+    hets: list[Path]
+    SNVorSV_hets: list[Path]
+    homs: list[Path]
+    SNVorSV_homs: list[Path]
+
+    nonpar: list[Path]
+
+    @property
+    def sources(self) -> list[Path]:
+        return self.nonpar
+
+    @property
+    def all_outputs(self) -> list[Path]:
+        return self.hets + self.homs + self.SNVorSV_hets + self.SNVorSV_homs
+
+
 ################################################################################
 # Constants
 
@@ -4962,6 +4980,47 @@ class GiabStrats(BaseModel):
 
     # source and output functions
 
+    def _test_if_final_path(
+        self,
+        p: Any,
+        c: CoreLevel,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+    ) -> None:
+        if isinstance(p, Path):
+            comp = sub_wildcards_path(
+                self.final_build_dir / c.value, {"ref_final_key": rk, "build_key": bk}
+            )
+            if comp != p.parent:
+                raise DesignError(f"{p} is not a within {comp}")
+        else:
+            raise DesignError(f"{p} is not a path")
+
+    def _test_if_source_path(self, p: Any, rk: RefKey) -> None:
+        if isinstance(p, Path):
+            comp = sub_wildcard_path(self.ref_src_dir, "ref_src_key", rk)
+            if comp != p.parent:
+                raise DesignError(f"{p} is not a within {comp}")
+        else:
+            raise DesignError(f"{p} is not a path")
+
+    def _sub_rsk(
+        self,
+        p: Path,
+        f: StratInputToBed,
+        rk: RefKey,
+        bk: BuildKey,
+    ) -> Path1or2 | None:
+        self._test_if_source_path(p, rk)
+        rsks = self.refkey_to_bed_refsrckeys(f, rk)
+        if rsks is None:
+            return None
+        else:
+            return map_single_or_double(
+                lambda s: sub_wildcards_path(p, {"ref_src_key": s, "build_key": bk}),
+                rsks,
+            )
+
     def all_low_complexity_sources(
         self,
         rk: RefKey,
@@ -4970,23 +5029,10 @@ class GiabStrats(BaseModel):
         censat: Path,
         trf: Path,
     ) -> LowComplexitySources:
-        # TODO not DRY
-        def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
-            rsks = self.refkey_to_bed_refsrckeys(f, rk)
-            if rsks is None:
-                return None
-            else:
-                return map_single_or_double(
-                    lambda s: sub_wildcards_path(
-                        p, {"ref_src_key": s, "build_key": bk}
-                    ),
-                    rsks,
-                )
-
         return LowComplexitySources(
-            rmsk=sub_rsk(rmsk, si_to_rmsk),
-            sat=sub_rsk(censat, si_to_satellites),
-            trf=sub_rsk(trf, si_to_simreps),
+            rmsk=self._sub_rsk(rmsk, si_to_rmsk, rk, bk),
+            sat=self._sub_rsk(censat, si_to_satellites, rk, bk),
+            trf=self._sub_rsk(trf, si_to_simreps, rk, bk),
         )
 
     # TODO check incoming paths, inputs should all be in resources/{ref} and
@@ -5016,12 +5062,12 @@ class GiabStrats(BaseModel):
         all_repeats: Path,
         not_all_repeats: Path,
     ) -> LowComplexityPaths | None:
+        # TODO probably don't need to sub so many things in these
         def sub_rk(p: Path) -> Path:
             return sub_wildcard_path(p, "ref_final_key", rk)
 
         bd = self.to_build_data_full(rk, bk)
 
-        # TODO is this necessary
         if not bd.want_low_complexity:
             return None
 
@@ -5078,18 +5124,6 @@ class GiabStrats(BaseModel):
         vdj: Path,
         other: dict[OtherStratKey, Path],
     ) -> OtherDifficultSources:
-        def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
-            rsks = self.refkey_to_bed_refsrckeys(f, rk)
-            if rsks is None:
-                return None
-            else:
-                return map_single_or_double(
-                    lambda r: sub_wildcards_path(
-                        p, {"ref_src_key": r, "build_key": bk}
-                    ),
-                    rsks,
-                )
-
         def sub_rsk_other(p: Path, k: OtherStratKey) -> Path1or2 | None:
             # TODO don't hardcode
             rsks = self.buildkey_to_bed_refsrckeys(
@@ -5105,11 +5139,11 @@ class GiabStrats(BaseModel):
                     rsks,
                 )
 
-        gap_src = sub_rsk(gaps, si_to_gaps)
-        refseq_src = sub_rsk(refseq, si_to_cds)
-        mhc_src = sub_rsk(mhc, si_to_mhc)
-        kir_src = sub_rsk(kir, si_to_kir)
-        vdj_src = sub_rsk(vdj, si_to_vdj)
+        gap_src = self._sub_rsk(gaps, si_to_gaps, rk, bk)
+        refseq_src = self._sub_rsk(refseq, si_to_cds, rk, bk)
+        mhc_src = self._sub_rsk(mhc, si_to_mhc, rk, bk)
+        kir_src = self._sub_rsk(kir, si_to_kir, rk, bk)
+        vdj_src = self._sub_rsk(vdj, si_to_vdj, rk, bk)
 
         other_src = {
             k: o for k, p in other.items() if (o := sub_rsk_other(p, k)) is not None
@@ -5296,7 +5330,6 @@ class GiabStrats(BaseModel):
             params=[*bd.build.include.mappability],
         )
 
-    # TODO sub paths
     def all_segdups(
         self,
         rk: RefKeyFullS,
@@ -5309,20 +5342,7 @@ class GiabStrats(BaseModel):
         long_segdups: Path,
         not_long_segdups: Path,
     ) -> SegdupPaths | None:
-
-        def sub_rsk(p: Path, f: StratInputToBed) -> Path1or2 | None:
-            rsks = self.refkey_to_bed_refsrckeys(f, strip_full_refkey(rk))
-            if rsks is None:
-                return None
-            else:
-                return map_single_or_double(
-                    lambda s: sub_wildcards_path(
-                        p, {"ref_src_key": s, "build_key": bk}
-                    ),
-                    rsks,
-                )
-
-        src = sub_rsk(superdups, si_to_superdups)
+        src = self._sub_rsk(superdups, si_to_superdups, strip_full_refkey(rk), bk)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5334,6 +5354,29 @@ class GiabStrats(BaseModel):
             )
         else:
             return None
+
+    def all_diploid(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        sex: SexPaths | None,
+        hets: list[Path],
+        homs: list[Path],
+        SNVorSV_hets: list[Path],
+        SNVorSV_homs: list[Path],
+    ) -> DiploidPaths | None:
+        bd = self.to_build_data_full(rk, bk)
+
+        if not bd.want_hets:
+            return None
+
+        return DiploidPaths(
+            hets=hets,
+            homs=homs,
+            SNVorSV_hets=SNVorSV_hets,
+            SNVorSV_homs=SNVorSV_homs,
+            nonpar=fmap_maybe_def([], lambda x: x.sex.nonpar_paths, sex),
+        )
 
     def all_xy_paths(
         self,
