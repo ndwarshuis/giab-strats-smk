@@ -1,4 +1,3 @@
-from pathlib import Path
 import jinja2 as j2
 from typing import Any
 import common.config as cfg
