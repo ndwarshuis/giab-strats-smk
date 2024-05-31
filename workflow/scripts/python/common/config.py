@@ -5489,26 +5489,19 @@ class GiabStrats(BaseModel):
         self._test_if_final_mutual_path(par, CoreLevel.XY, rk, bk)
         self._test_if_final_path(auto, CoreLevel.XY, rk, bk)
 
-        def sub_rsk(p: Path) -> Path:
-            return sub_wildcard_path(p, "ref_src_key", strip_full_refkey(rk))
-
-        def sub_rk(p: Path) -> Path:
-            return sub_wildcard_path(p, "ref_final_key", rk)
-
-        def sub_sex1(p: Path, sub_x: bool) -> Path:
-            c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).chr_name
-            return sub_wildcard_path(p, "sex_chr", c)
+        _features_src = sub_wildcard_path(
+            features_src,
+            "ref_src_key",
+            strip_full_refkey(rk),
+        )
 
         def sub_sex(p: Path, sub_x: bool) -> Path:
             c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).chr_name
-            return sub_wildcards_path(
-                p,
-                {"sex_chr": c, "ref_final_key": rk, "build_key": bk},
-            )
+            return sub_wildcard_path(p, "sex_chr", c)
 
-        def to_features(use_x: bool, features: XYFeatures, src: Path) -> XYFeaturePaths:
+        def to_features(use_x: bool, features: XYFeatures) -> XYFeaturePaths:
             return XYFeaturePaths(
-                src=sub_sex1(sub_rsk(src), use_x),
+                src=_features_src,
                 bed=features.x_bed if use_x else features.y_bed,
                 xtr_path=sub_sex(xtr, use_x) if features.xtr is not None else None,
                 ampliconic_path=(
@@ -5531,9 +5524,7 @@ class GiabStrats(BaseModel):
 
         def to_paths(use_x: bool, xy: XY) -> SubSexPaths:
             return SubSexPaths(
-                features=fmap_maybe(
-                    lambda z: to_features(use_x, z, features_src), xy.features
-                ),
+                features=fmap_maybe(lambda z: to_features(use_x, z), xy.features),
                 par=to_par(use_x, xy),
             )
 
@@ -5561,7 +5552,7 @@ class GiabStrats(BaseModel):
                 paths=(
                     SubSexPaths(
                         features=fmap_maybe(
-                            lambda z: to_features(use_x, z, features_src),
+                            lambda z: to_features(use_x, z),
                             xy.features,
                         ),
                         par=to_par(use_x, xy),
@@ -5581,7 +5572,6 @@ class GiabStrats(BaseModel):
             dip1,
             dip2,
         )
-        auto = sub_wildcards_path(auto, {"ref_final_key": rk, "build_key": bk})
         return SexPaths(
             sex=sex,
             auto=auto if bd.want_xy_auto else None,
