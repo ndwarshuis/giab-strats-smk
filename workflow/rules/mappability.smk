@@ -10,6 +10,31 @@ gem_wc_constraints = {
     "e": "\d+",
 }
 
+
+def single_nonunique_inputs(ref_final_key, build_key):
+    c = checkpoints.merge_nonunique.get(
+        ref_final_key=ref_final_key, build_key=build_key
+    )
+    with c.output.single_lowmap.open() as f:
+        return json.load(f)
+
+
+def all_mappability(ref_final_key, build_key):
+    # guard to prevent checkpoint from firing when we call this function
+    bd = config.to_build_data_full(ref_final_key, build_key)
+    if bd.want_mappability:
+        return None
+
+    ss = single_nonunique_inputs(ref_final_key, build_key)
+    return config.all_lowmap(
+        ref_final_key,
+        build_key,
+        Path(rules.merge_nonunique.output.all_lowmap),
+        Path(rules.invert_merged_nonunique.output[0]),
+        [Path(p) for p in ss],
+    )
+
+
 ################################################################################
 # index/align
 
@@ -216,36 +241,12 @@ checkpoint merge_nonunique:
         "../scripts/python/bedtools/mappability/merge_nonunique.py"
 
 
-def single_nonunique_inputs(ref_final_key, build_key):
-    c = checkpoints.merge_nonunique.get(
-        ref_final_key=ref_final_key, build_key=build_key
-    )
-    with c.output.single_lowmap.open() as f:
-        return json.load(f)
-
-
 use rule _invert_autosomal_regions as invert_merged_nonunique with:
     input:
         rules.merge_nonunique.output.all_lowmap,
         # lambda w: nonunique_inputs(w.ref_final_key, w.build_key)["all_lowmap"],
     output:
         mlty.final("notinlowmappabilityall"),
-
-
-def all_mappability(ref_final_key, build_key):
-    # guard to prevent checkpoint from firing when we call this function
-    bd = config.to_build_data_full(ref_final_key, build_key)
-    if bd.want_mappability:
-        return None
-
-    ss = single_nonunique_inputs(ref_final_key, build_key)
-    return config.all_lowmap(
-        ref_final_key,
-        build_key,
-        Path(rules.merge_nonunique.output.all_lowmap),
-        Path(rules.invert_merged_nonunique.output[0]),
-        [Path(p) for p in ss],
-    )
 
 
 # def mappabilty_inputs(ref_final_key, build_key):

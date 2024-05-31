@@ -18,10 +18,10 @@ odiff = config.to_bed_dirs(CoreLevel.OTHER_DIFFICULT)
 all_region_types = ["cds", "vdj", "kir", "mhc"]
 
 
-def all_otherdifficult_sources(wildcards):
+def all_otherdifficult_sources(ref_key, build_key):
     return config.all_otherdifficult_sources(
-        wildcards["ref_key"],
-        wildcards["build_key"],
+        ref_key,
+        build_key,
         Path(rules.download_gaps.output[0]),
         Path(rules.download_cds.output[0]),
         Path(rules.download_kir.output[0]),
@@ -33,7 +33,7 @@ def all_otherdifficult_sources(wildcards):
 
 def all_otherdifficult(ref_final_key, build_key):
     # TODO actually make other work
-    return config.all_otherdifficult_paths(
+    return config.all_otherdifficult(
         ref_final_key,
         build_key,
         all_otherdifficult_sources(strip_full_refkey(ref_final_key), build_key),
@@ -90,12 +90,12 @@ use rule download_gaps as download_kir with:
 
 
 def functional_inputs(wildcards):
-    src = all_otherdifficult_sources_smk(wildcards)
+    src = all_otherdifficult_sources(wildcards["ref_key"], wildcards["build_key"])
     return {
-        "cds": src.refseq_paths,
-        "mhc": src.mhc_paths,
-        "kir": src.kir_paths,
-        "vdj": src.vdj_paths,
+        "cds": src.refseq_sources,
+        "mhc": src.mhc_sources,
+        "kir": src.kir_sources,
+        "vdj": src.vdj_sources,
     }
 
 
@@ -212,7 +212,7 @@ rule functional_readme:
         methods="workflow/templates/functional_methods.j2",
         _sources=lambda w: all_otherdifficult(
             w["ref_final_key"], w["build_key"]
-        ).sources.all_functional_inputs,
+        ).sources.all_functional_sources,
         bedtools_env="workflow/envs/bedtools.yml",
     params:
         paths=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
@@ -232,7 +232,7 @@ rule otherdifficult_readme:
         bedtools_env="workflow/envs/bedtools.yml",
         _sources=lambda w: all_otherdifficult(
             w["ref_final_key"], w["build_key"]
-        ).sources.all_otherdifficult_inputs,
+        ).sources.all_otherdifficult_sources,
     params:
         paths=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
     output:

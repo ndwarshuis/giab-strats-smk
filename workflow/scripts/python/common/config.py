@@ -1800,21 +1800,21 @@ class LowComplexitySources:
     rmsk: Path1or2 | None
 
     @property
-    def trf_paths(self) -> list[Path]:
+    def trf_sources(self) -> list[Path]:
         if self.trf is None:
             raise DesignError()
         else:
             return single_or_double_to_list(self.trf)
 
     @property
-    def sat_paths(self) -> list[Path]:
+    def sat_sources(self) -> list[Path]:
         if self.sat is None:
             raise DesignError()
         else:
             return single_or_double_to_list(self.sat)
 
     @property
-    def rmsk_paths(self) -> list[Path]:
+    def rmsk_sources(self) -> list[Path]:
         if self.rmsk is None:
             raise DesignError()
         else:
@@ -1836,43 +1836,31 @@ class OtherDifficultSources(_HasSources):
     mhc: Path1or2 | None
     other: dict[OtherStratKey, Path1or2]
 
-    @property
-    def all_functional_inputs(self) -> list[Path]:
-        return [] if self.refseq is None else single_or_double_to_list(self.refseq)
-
-    @property
-    def all_otherdifficult_inputs(self) -> list[Path]:
-        return [
-            i
-            for p in [self.gaps, self.refseq, self.vdj, self.kir, self.mhc]
-            + [*self.other.values()]
-            if p is not None
-            for i in single_or_double_to_list(p)
-        ]
+    _other_difficult_need_refseq: bool
 
     # NOTE return empty lists here to avoid failure when calling in rules
     @property
-    def gaps_paths(self) -> list[Path]:
+    def gaps_sources(self) -> list[Path]:
         return [] if self.gaps is None else single_or_double_to_list(self.gaps)
 
     @property
-    def refseq_paths(self) -> list[Path]:
+    def refseq_sources(self) -> list[Path]:
         return [] if self.refseq is None else single_or_double_to_list(self.refseq)
 
     @property
-    def vdj_paths(self) -> list[Path]:
+    def vdj_sources(self) -> list[Path]:
         return [] if self.vdj is None else single_or_double_to_list(self.vdj)
 
     @property
-    def kir_paths(self) -> list[Path]:
+    def kir_sources(self) -> list[Path]:
         return [] if self.kir is None else single_or_double_to_list(self.kir)
 
     @property
-    def mhc_paths(self) -> list[Path]:
+    def mhc_sources(self) -> list[Path]:
         return [] if self.mhc is None else single_or_double_to_list(self.mhc)
 
     @property
-    def other_paths(self) -> list[Path]:
+    def other_sources(self) -> list[Path]:
         return [
             i
             for p in self.other.values()
@@ -1881,15 +1869,23 @@ class OtherDifficultSources(_HasSources):
         ]
 
     @property
-    def all_sources(self) -> list[Path]:
+    def all_functional_sources(self) -> list[Path]:
+        return self.refseq_sources
+
+    @property
+    def all_otherdifficult_sources(self) -> list[Path]:
         return (
-            self.gaps_paths
-            + self.refseq_paths
-            + self.vdj_paths
-            + self.kir_paths
-            + self.mhc_paths
-            + self.other_paths
+            self.gaps_sources
+            + (self.refseq_sources if self._other_difficult_need_refseq else [])
+            + self.vdj_sources
+            + self.kir_sources
+            + self.mhc_sources
+            + self.other_sources
         )
+
+    @property
+    def all_sources(self) -> list[Path]:
+        return list(set(self.all_functional_sources + self.all_otherdifficult_sources))
 
 
 @dataclass(frozen=True)
@@ -1950,6 +1946,15 @@ class GCPaths(_HasFinalBeds):
 
 
 @dataclass(frozen=True)
+class TelomerePaths(_HasFinalBeds):
+    telomeres: Path
+
+    @property
+    def all_final(self) -> list[Path]:
+        return [self.telomeres]
+
+
+@dataclass(frozen=True)
 class SegdupSources(_HasSources):
     superdup: Path1or2 | None
 
@@ -1994,15 +1999,14 @@ class DiploidPaths(_HasFinalBeds):
 
 
 @dataclass(frozen=True)
-class SegdupLowmapPaths(_HasFinalBeds, _HasSources):
-    segdup_source: SegdupSources
-    lowmap_source: Path
+class SegdupLowmapPaths(_HasFinalBeds):
+    segdup_input: SegdupPaths
+    lowmap_input: Path
     output: MutualPathPair
 
     @property
-    def all_sources(self) -> list[Path]:
-        s = self.segdup_source.superdup
-        return [self.lowmap_source] + [] if s is None else single_or_double_to_list(s)
+    def all_inputs(self) -> list[Path]:
+        return [self.lowmap_input, self.segdup_input.all_segdups.positive]
 
     @property
     def all_final(self) -> list[Path]:
@@ -2012,16 +2016,16 @@ class SegdupLowmapPaths(_HasFinalBeds, _HasSources):
 # ASSUME at least two of the sources are non-null
 @dataclass(frozen=True)
 class AllDifficultPaths(_HasSources, _HasFinalBeds):
-    gc_source: Path | None
-    repeat_source: Path | None
-    xy_sources: list[Path]
+    gc_input: Path | None
+    repeat_input: Path | None
+    xy_inputs: list[Path]
     output: MutualPathPair
 
     @property
-    def all_sources(self) -> list[Path]:
+    def all_inputs(self) -> list[Path]:
         return [
-            p for p in [self.gc_source, self.repeat_source] if p is not None
-        ] + self.xy_sources
+            p for p in [self.gc_input, self.repeat_input] if p is not None
+        ] + self.xy_inputs
 
     @property
     def all_final(self) -> list[Path]:
@@ -2029,22 +2033,22 @@ class AllDifficultPaths(_HasSources, _HasFinalBeds):
 
 
 @dataclass(frozen=True)
-class UnionPaths(_HasSources, _HasFinalBeds):
+class UnionPaths(_HasFinalBeds):
     segdup_lowmap: SegdupLowmapPaths
     all_difficult: AllDifficultPaths | None
 
     @property
-    def segdup_lowmap_sources(self) -> list[Path]:
-        return self.segdup_lowmap.all_sources
+    def segdup_lowmap_inputs(self) -> list[Path]:
+        return self.segdup_lowmap.all_inputs
 
     @property
-    def all_difficult_sources(self) -> list[Path]:
+    def all_difficult_inputs(self) -> list[Path]:
         empty: list[Path] = []
-        return fmap_maybe_def(empty, lambda x: x.all_sources, self.all_difficult)
+        return fmap_maybe_def(empty, lambda x: x.all_inputs, self.all_difficult)
 
     @property
-    def all_sources(self) -> list[Path]:
-        return self.segdup_lowmap_sources + self.all_difficult_sources
+    def all_inputs(self) -> list[Path]:
+        return self.segdup_lowmap_inputs + self.all_difficult_inputs
 
     @property
     def segdup_lowmap_final(self) -> list[Path]:
@@ -5221,20 +5225,20 @@ class GiabStrats(BaseModel):
 
         bd = self.to_build_data(rk, bk)
 
+        other_diff_need_refseq = (
+            (bd.want_vdj and vdj_src is None)
+            or (bd.want_kir and kir_src is not None)
+            or (bd.want_mhc and mhc_src is not None)
+        )
+
         return OtherDifficultSources(
             gaps=gap_src,
-            refseq=(
-                refseq_src
-                if (bd.want_vdj and vdj_src is None)
-                or (bd.want_kir and kir_src is not None)
-                or (bd.want_mhc and mhc_src is not None)
-                or bd.want_cds
-                else None
-            ),
+            refseq=(refseq_src if other_diff_need_refseq or bd.want_cds else None),
             vdj=vdj_src if bd.want_vdj else None,
             mhc=mhc_src if bd.want_mhc else None,
             kir=kir_src if bd.want_kir else None,
             other=other_src,
+            _other_difficult_need_refseq=other_diff_need_refseq,
         )
 
     def all_otherdifficult_paths(
@@ -5267,7 +5271,12 @@ class GiabStrats(BaseModel):
         return OtherDifficultPaths(
             sources=src,
             gaps_output=sub_rk(gaps) if src.gaps is not None else None,
-            cds_output=cds.both(sub_rk) if src.refseq is not None else None,
+            cds_output=(
+                cds.both(sub_rk)
+                if src.refseq is not None
+                and (src._other_difficult_need_refseq or bd.want_cds)
+                else None
+            ),
             vdj_output=(
                 sub_rk(vdj)
                 if bd.want_vdj and (src.refseq is not None or src.vdj is not None)
@@ -5286,12 +5295,12 @@ class GiabStrats(BaseModel):
             other_outputs=other_output,
         )
 
-    def all_union_paths(
+    def all_union(
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
         # sources
-        segdups_src: SegdupSources,
+        segdups_src: SegdupPaths,
         lowmap: Path,
         gc_src: Path,
         lc: LowComplexityPaths | None,
@@ -5312,8 +5321,8 @@ class GiabStrats(BaseModel):
             return None
 
         sl = SegdupLowmapPaths(
-            segdup_source=segdups_src,
-            lowmap_source=lowmap,
+            segdup_input=segdups_src,
+            lowmap_input=lowmap,
             output=segdup_lowmap_output,
         )
 
@@ -5330,9 +5339,9 @@ class GiabStrats(BaseModel):
 
         all_diff = (
             AllDifficultPaths(
-                gc_source=_gc_src,
-                repeat_source=_repeat_src,
-                xy_sources=_xy_src,
+                gc_input=_gc_src,
+                repeat_input=_repeat_src,
+                xy_inputs=_xy_src,
                 output=all_difficult,
             )
             if ((_gc_src is not None) + (_repeat_src is not None) + (len(_xy_src) > 0))
@@ -5447,7 +5456,22 @@ class GiabStrats(BaseModel):
             nonpar=fmap_maybe_def([], lambda x: x.sex.nonpar_paths, sex),
         )
 
-    def all_xy_paths(
+    def all_telomeres(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        telomeres: Path,
+    ) -> TelomerePaths | None:
+        self._test_if_final_paths(telomeres, CoreLevel.TELOMERES, rk, bk)
+
+        bd = self.to_build_data_full(rk, bk)
+
+        if not bd.want_telomeres:
+            return None
+
+        return TelomerePaths(telomeres=telomeres)
+
+    def all_xy(
         self,
         rk: RefKeyFullS,
         bk: BuildKey,

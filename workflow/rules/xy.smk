@@ -1,6 +1,21 @@
-from common.config import CoreLevel
+from common.config import CoreLevel, MutualPathPair
 
 xy = config.to_bed_dirs(CoreLevel.XY)
+
+
+def all_xy(ref_final_key, build_key):
+    return config.all_xy(
+        ref_final_key,
+        build_key,
+        Path(rules.download_genome_features_bed.output[0]),
+        Path(rules.filter_XTR_features.output[0]),
+        Path(rules.filter_ampliconic_features.output[0]),
+        MutualPathPair(
+            Path(rules.write_PAR_final.output[0]),
+            Path(rules.invert_PAR.output[0]),
+        ),
+        Path(rules.filter_autosomes.output[0]),
+    )
 
 
 use rule download_gaps as download_genome_features_bed with:
@@ -197,21 +212,8 @@ rule filter_autosomes:
 #     )
 
 
-def all_xy(ref_final_key, build_key):
-    return config.all_xy_paths(
-        ref_final_key,
-        build_key,
-        Path(rules.download_genome_features_bed.output[0]),
-        Path(rules.filter_XTR_features.output[0]),
-        Path(rules.filter_ampliconic_features.output[0]),
-        Path(rules.write_PAR_final.output[0]),
-        Path(rules.invert_PAR.output[0]),
-        Path(rules.filter_autosomes.output[0]),
-    )
-
-
-def all_xy_flat(ref_final_key, build_key):
-    return all_xy(ref_final_key, build_key).all_outputs
+# def all_xy_flat(ref_final_key, build_key):
+#     return all_xy(ref_final_key, build_key).all_outputs
 
 
 rule xy_readme:
@@ -220,7 +222,7 @@ rule xy_readme:
         description="workflow/templates/xy_description.j2",
         methods="workflow/templates/xy_methods.j2",
         bedtools_env="workflow/envs/bedtools.yml",
-        _sources=lambda w: all_xy(w["ref_final_key"], w["build_key"]).all_inputs,
+        _sources=lambda w: all_xy(w["ref_final_key"], w["build_key"]).all_sources,
     params:
         paths=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
     output:

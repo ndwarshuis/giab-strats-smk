@@ -5,10 +5,34 @@ from common.config import (
     flip_full_refkey,
 )
 
-dip = config.to_bed_dirs(CoreLevel.DIPLOID)
-
 # TODO don't hardcode minimap2 params (which might be changed if we move to a
 # different asm)
+
+dip = config.to_bed_dirs(CoreLevel.DIPLOID)
+
+
+def all_diploid(ref_final_key, build_key):
+    bd = config.to_build_data_full(ref_final_key, build_key)
+
+    def go(name):
+        return [
+            Path(p)
+            for p in expand(
+                getattr(rules, name).output,
+                allow_missing=True,
+                merge_len=bd.build.include.hets,
+            )
+        ]
+
+    return config.all_diploid(
+        ref_final_key,
+        build_key,
+        all_xy(ref_final_key, build_key),
+        go("merge_het_regions"),
+        go("invert_het_regions"),
+        go("merge_het_SNVorSV_regions"),
+        go("invert_het_SNVorSV_regions"),
+    )
 
 
 def minimap_inputs(wildcards):
@@ -356,30 +380,6 @@ use rule invert_het_regions as invert_het_SNVorSV_regions with:
         merge_len=f"\d+",
 
 
-def all_diploid(ref_final_key, build_key):
-    bd = config.to_build_data_full(ref_final_key, build_key)
-
-    def go(name):
-        return [
-            Path(p)
-            for p in expand(
-                getattr(rules, name).output,
-                allow_missing=True,
-                merge_len=bd.build.include.hets,
-            )
-        ]
-
-    return config.all_diploid(
-        ref_final_key,
-        build_key,
-        all_xy(ref_final_key, build_key),
-        go("merge_het_regions"),
-        go("invert_het_regions"),
-        go("merge_het_SNVorSV_regions"),
-        go("invert_het_SNVorSV_regions"),
-    )
-
-
 # def het_hom_inputs(ref_final_key, build_key):
 #     bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
 #     return expand(
@@ -402,7 +402,7 @@ rule diploid_readme:
         diploid_env="workflow/envs/quasi-dipcall.yml",
         _sources=lambda w: all_diploid(w["ref_final_key"], w["build_key"]).all_sources,
     params:
-        paths=lambda w: all_union(w["ref_final_key"], w["build_key"]),
+        paths=lambda w: all_diploid(w["ref_final_key"], w["build_key"]),
     output:
         uni.readme,
     conda:

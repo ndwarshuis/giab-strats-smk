@@ -10,49 +10,69 @@ post_bench_dir = config.bench_build_dir / "postprocess"
 validation_dir = config.final_root_dir / "validation"
 
 
-def expand_strat_targets_inner(ref_final_key, build_key):
-    # TODO this is crude
-    # NOTE we need to do this because despite the final key potentially having
-    # one or two haps, the configuration applies to both haps simultaneously
-    bd = config.to_build_data_full(ref_final_key, build_key)
-    function_targets = [
-        (all_low_complexity_flat, bd.want_low_complexity),
-        (gc_inputs_flat, bd.want_gc),
-        (mappabilty_inputs, bd.have_and_want_mappability),
-        (het_hom_inputs, bd.want_hets),
-        (all_xy_flat, True),
-        (all_other, True),
+# def expand_strat_targets_inner(ref_final_key, build_key):
+#     # TODO this is crude
+#     # NOTE we need to do this because despite the final key potentially having
+#     # one or two haps, the configuration applies to both haps simultaneously
+#     bd = config.to_build_data_full(ref_final_key, build_key)
+#     function_targets = [
+#         (all_low_complexity_flat, bd.want_low_complexity),
+#         (gc_inputs_flat, bd.want_gc),
+#         (mappabilty_inputs, bd.have_and_want_mappability),
+#         (het_hom_inputs, bd.want_hets),
+#         (all_xy_flat, True),
+#         (all_other, True),
+#     ]
+#     rule_targets = [
+#         # (rules.filter_autosomes.output, bd.want_xy_auto),
+#         (rules.all_segdups.input, bd.have_and_want_segdups),
+#         (rules.find_telomeres.output, bd.want_telomeres),
+#         (rules.all_segdup_and_map.input, bd.have_and_want_segdup_and_map),
+#         (rules.all_alldifficult.input, bd.have_and_want_alldifficult),
+#         (rules.get_gaps.output, bd.have_gaps),
+#         (rules.all_cds.input, bd.have_and_want_cds),
+#         (rules.remove_vdj_gaps.output, bd.have_and_want_vdj),
+#         (rules.remove_kir_gaps.output, bd.have_and_want_kir),
+#         (rules.remove_mhc_gaps.output, bd.have_and_want_mhc),
+#     ]
+#     all_function = [f(ref_final_key, build_key) for f, test in function_targets if test]
+#     all_rule = [tgt for tgt, test in rule_targets if test]
+
+#     # combine and ensure that all "targets" refer to final bed files
+#     all_targets = [y for xs in all_function + all_rule for y in xs]
+#     invalid = [f for f in all_targets if not f.startswith(str(config.final_root_dir))]
+#     if len(invalid) > 0:
+#         raise DesignError(f"invalid targets: {invalid}")
+#     return all_targets
+
+
+# def expand_strat_targets(wildcards):
+#     return expand_strat_targets_inner(wildcards.ref_final_key, wildcards.build_key)
+
+
+def all_strat_targets(wildcards):
+    rk = wildcards["ref_final_key"]
+    bk = wildcards["build_key"]
+
+    # TODO what about telomeres?
+    fs = [
+        all_diploid,
+        all_otherdifficult,
+        all_gc,
+        all_low_complexity,
+        all_mappability,
+        all_segdups,
+        all_telomeres,
+        all_union,
+        all_xy,
     ]
-    rule_targets = [
-        # (rules.filter_autosomes.output, bd.want_xy_auto),
-        (rules.all_segdups.input, bd.have_and_want_segdups),
-        (rules.find_telomeres.output, bd.want_telomeres),
-        (rules.all_segdup_and_map.input, bd.have_and_want_segdup_and_map),
-        (rules.all_alldifficult.input, bd.have_and_want_alldifficult),
-        (rules.get_gaps.output, bd.have_gaps),
-        (rules.all_cds.input, bd.have_and_want_cds),
-        (rules.remove_vdj_gaps.output, bd.have_and_want_vdj),
-        (rules.remove_kir_gaps.output, bd.have_and_want_kir),
-        (rules.remove_mhc_gaps.output, bd.have_and_want_mhc),
-    ]
-    all_function = [f(ref_final_key, build_key) for f, test in function_targets if test]
-    all_rule = [tgt for tgt, test in rule_targets if test]
-
-    # combine and ensure that all "targets" refer to final bed files
-    all_targets = [y for xs in all_function + all_rule for y in xs]
-    invalid = [f for f in all_targets if not f.startswith(str(config.final_root_dir))]
-    if len(invalid) > 0:
-        raise DesignError(f"invalid targets: {invalid}")
-    return all_targets
-
-
-def expand_strat_targets(wildcards):
-    return expand_strat_targets_inner(wildcards.ref_final_key, wildcards.build_key)
+    return [t for f in fs if (r := f(rk, bk)) is not None for t in r.all_final]
 
 
 rule list_all_strats:
     input:
-        expand_strat_targets,
+        all_strat_targets,
+        # expand_strat_targets,
     output:
         post_inter_dir / "all_strats.txt",
     localrule: True

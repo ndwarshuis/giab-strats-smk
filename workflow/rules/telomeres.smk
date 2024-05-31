@@ -3,6 +3,14 @@ from common.config import CoreLevel
 telo = config.to_bed_dirs(CoreLevel.TELOMERES)
 
 
+def all_telomeres(ref_final_key, build_key):
+    return config.all_telomeres(
+        ref_final_key,
+        build_key,
+        Path(rules.find_telomeres.output[0]),
+    )
+
+
 rule find_telomeres:
     input:
         ref=rules.filter_sort_ref.output["fa"],
@@ -31,7 +39,7 @@ rule telomere_readme:
         methods="workflow/templates/telomeres_methods.j2",
         seqtk_env="workflow/envs/seqtk.yml",
     params:
-        path=rules.find_telomeres.output[0],
+        paths=lambda w: all_telomeres(w["ref_final_key"], w["build_key"]),
     output:
         telo.readme,
     conda:

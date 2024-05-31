@@ -3,12 +3,35 @@ from common.config import CoreLevel, si_to_superdups, strip_full_refkey, MutualP
 segdup = config.to_bed_dirs(CoreLevel.SEGDUPS)
 
 
+def all_segdups_sources(ref_key, build_key):
+    return config.all_segdups_sources(
+        ref_key,
+        build_key,
+        Path(rules.download_superdups.output[0]),
+    )
+
+
+def all_segdups(ref_final_key, build_key):
+    return config.all_segdups(
+        ref_final_key,
+        build_key,
+        all_segdups_sources(strip_full_refkey(ref_final_key), build_key),
+        MutualPathPair(
+            Path(rules.merge_superdups.output[0]),
+            Path(rules.notin_superdups.output[0]),
+        ),
+        MutualPathPair(
+            Path(rules.filter_long_superdups.output[0]),
+            Path(rules.notin_long_superdups.output[0]),
+        ),
+    )
+
+
 use rule download_gaps as download_superdups with:
     output:
         segdup.src.data / "superdups.txt.gz",
     log:
         segdup.src.log / "superdups.log",
-    # TODO also replace this monstrosity with a type-checked function in pythonland
     params:
         src=lambda w: config.refsrckey_to_bed_src(si_to_superdups, w.ref_src_key),
     localrule: True
@@ -88,36 +111,12 @@ use rule notin_superdups as notin_long_superdups with:
 #     localrule: True
 
 
-def all_segdups_sources(ref_key, build_key):
-    return config.all_segdups_sources(
-        ref_key,
-        build_key,
-        Path(rules.download_superdups.output[0]),
-    )
-
-
-def all_segdups(ref_final_key, build_key):
-    return config.all_segdups(
-        ref_final_key,
-        build_key,
-        all_segdups_sources(strip_full_refkey(ref_final_key), build_key),
-        MutualPathPair(
-            Path(rules.merge_superdups.output[0]),
-            Path(rules.notin_superdups.output[0]),
-        ),
-        MutualPathPair(
-            Path(rules.filter_long_superdups.output[0]),
-            Path(rules.notin_long_superdups.output[0]),
-        ),
-    )
-
-
 rule segdups_readme:
     input:
         common="workflow/templates/common.j2",
         description="workflow/templates/segdups_description.j2",
         methods="workflow/templates/segdups_methods.j2",
-        _sources=lambda w: all_segdups(w["ref_final_key"], w["build_key"]).sources,
+        _sources=lambda w: all_segdups(w["ref_final_key"], w["build_key"]).all_sources,
         bedtools_env="workflow/envs/bedtools.yml",
     output:
         segdup.readme,
