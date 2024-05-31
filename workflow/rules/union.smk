@@ -4,11 +4,10 @@ uni = config.to_bed_dirs(CoreLevel.UNION)
 
 
 def all_union(ref_final_key, build_key):
-    _rk = strip_full_refkey(ref_final_key)
     return config.all_union(
         ref_final_key,
         build_key,
-        all_segdups_sources(_rk, bk),
+        all_segdups(ref_final_key, build_key),
         Path(rules.merge_nonunique.output.all_lowmap),
         Path(rules.intersect_gc_ranges.output.widest_extreme),
         all_low_complexity(ref_final_key, build_key),

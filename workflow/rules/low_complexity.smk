@@ -30,8 +30,10 @@ def all_low_complexity(ref_final_key, build_key):
         all_low_complexity_sources(strip_full_refkey(ref_final_key), build_key),
         [Path(p) for p in rules._all_perfect_uniform_repeats.input],
         [Path(p) for p in rules._all_imperfect_uniform_repeats.input],
-        Path(rules.merge_all_uniform_repeats.output[0]),
-        Path(rules.invert_all_uniform_repeats.output[0]),
+        MutualPathPair(
+            Path(rules.merge_all_uniform_repeats.output[0]),
+            Path(rules.invert_all_uniform_repeats.output[0]),
+        ),
         MutualPathPair(
             Path(rules.merge_satellites.output[0]),
             Path(rules.invert_satellites.output[0]),

@@ -404,7 +404,7 @@ rule diploid_readme:
     params:
         paths=lambda w: all_diploid(w["ref_final_key"], w["build_key"]),
     output:
-        uni.readme,
+        dip.readme,
     conda:
         "../envs/templates.yml"
     script:

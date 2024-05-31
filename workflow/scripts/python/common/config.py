@@ -3901,7 +3901,7 @@ class GiabStrats(BaseModel):
 
     @property
     def ref_src_dir(self) -> Path:
-        return self.paths.resources / "{ref_src_key}"
+        return self.resources_dir / "{ref_src_key}"
 
     @property
     def results_dir(self) -> Path:
@@ -5046,9 +5046,7 @@ class GiabStrats(BaseModel):
         bk: BuildKey,
     ) -> None:
         if isinstance(p, Path):
-            comp = sub_wildcards_path(
-                self.final_build_dir / c.value, {"ref_final_key": rk, "build_key": bk}
-            )
+            comp = self.final_build_dir / c.value
             if comp != p.parent:
                 raise DesignError(f"{p} is not a within {comp}")
         else:
@@ -5082,9 +5080,8 @@ class GiabStrats(BaseModel):
 
     def _test_if_source_path(self, p: Any, rk: RefKey) -> None:
         if isinstance(p, Path):
-            comp = sub_wildcard_path(self.ref_src_dir, "ref_src_key", rk)
-            if comp != p.parent:
-                raise DesignError(f"{p} is not a within {comp}")
+            if not p.is_relative_to(self.resources_dir):
+                raise DesignError(f"{p} is not a within {self.resources_dir}")
         else:
             raise DesignError(f"{p} is not a path")
 
@@ -5237,7 +5234,7 @@ class GiabStrats(BaseModel):
             _other_difficult_need_refseq=other_diff_need_refseq,
         )
 
-    def all_otherdifficult_paths(
+    def all_otherdifficult(
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
@@ -5293,7 +5290,7 @@ class GiabStrats(BaseModel):
         rk: RefKeyFullS,
         bk: BuildKey,
         # sources
-        segdups_src: SegdupPaths,
+        segdups_src: SegdupPaths | None,
         lowmap: Path,
         gc_src: Path,
         lc: LowComplexityPaths | None,
@@ -5307,10 +5304,19 @@ class GiabStrats(BaseModel):
 
         bd = self.to_build_data_full(rk, bk)
 
+        if segdups_src is not None and not isinstance(segdups_src, SegdupPaths):
+            raise DesignError()
+
+        if lc is not None and not isinstance(lc, LowComplexityPaths):
+            raise DesignError()
+
+        if xy is not None and not isinstance(xy, SexPaths):
+            raise DesignError()
+
         if not bd.want_union:
             return None
 
-        if not (bd.have_segdups and len(bd.mappability_params) > 0):
+        if segdups_src is None or len(bd.mappability_params) == 0:
             return None
 
         sl = SegdupLowmapPaths(
@@ -5454,7 +5460,7 @@ class GiabStrats(BaseModel):
         bk: BuildKey,
         telomeres: Path,
     ) -> TelomerePaths | None:
-        self._test_if_final_paths(telomeres, CoreLevel.TELOMERES, rk, bk)
+        self._test_if_final_path(telomeres, CoreLevel.TELOMERES, rk, bk)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5475,7 +5481,6 @@ class GiabStrats(BaseModel):
         par: MutualPathPair,
         auto: Path,
     ) -> SexPaths:
-        self._test_if_source_path(features_src, strip_full_refkey(rk))
         self._test_if_final_path(xtr, CoreLevel.XY, rk, bk)
         self._test_if_final_path(ampliconic, CoreLevel.XY, rk, bk)
         self._test_if_final_mutual_path(par, CoreLevel.XY, rk, bk)
@@ -5486,6 +5491,8 @@ class GiabStrats(BaseModel):
             "ref_src_key",
             strip_full_refkey(rk),
         )
+
+        self._test_if_source_path(_features_src, strip_full_refkey(rk))
 
         def sub_sex(p: Path, sub_x: bool) -> Path:
             c = (ChrIndex.CHRX if sub_x else ChrIndex.CHRY).chr_name
