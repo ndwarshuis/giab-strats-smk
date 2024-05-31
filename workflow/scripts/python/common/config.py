@@ -1974,14 +1974,25 @@ class GCPaths:
 
 
 @dataclass(frozen=True)
+class SegdupSources:
+    superdup: Path1or2 | None
+
+    @property
+    def all_sources(self) -> list[Path]:
+        return (
+            single_or_double_to_list(self.superdup) if self.superdup is not None else []
+        )
+
+
+@dataclass(frozen=True)
 class SegdupPaths:
-    superdup_src: Path1or2
+    sources: SegdupSources
     all_segdups: MutualPathPair
     long_segdups: MutualPathPair
 
     @property
-    def sources(self) -> list[Path]:
-        return single_or_double_to_list(self.superdup_src)
+    def all_sources(self) -> list[Path]:
+        return self.sources.all_sources
 
     @property
     def all_outputs(self) -> list[Path]:
@@ -5330,25 +5341,32 @@ class GiabStrats(BaseModel):
             params=[*bd.build.include.mappability],
         )
 
+    def all_segdups_sources(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        superdups: Path,
+    ) -> SegdupSources:
+        sd = self._sub_rsk(superdups, si_to_superdups, strip_full_refkey(rk), bk)
+        return SegdupSources(superdup=sd)
+
     def all_segdups(
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
         # sources
-        superdups: Path,
+        src: SegdupSources,
         # outputs
         segdups: Path,
         not_segdups: Path,
         long_segdups: Path,
         not_long_segdups: Path,
     ) -> SegdupPaths | None:
-        src = self._sub_rsk(superdups, si_to_superdups, strip_full_refkey(rk), bk)
-
         bd = self.to_build_data_full(rk, bk)
 
         if bd.want_segdups and src is not None:
             return SegdupPaths(
-                superdup_src=src,
+                sources=src,
                 all_segdups=MutualPathPair(segdups, not_segdups),
                 long_segdups=MutualPathPair(long_segdups, not_long_segdups),
             )

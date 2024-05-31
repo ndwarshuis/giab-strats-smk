@@ -1,4 +1,4 @@
-from common.config import CoreLevel, si_to_superdups
+from common.config import CoreLevel, si_to_superdups, strip_full_refkey
 
 segdup = config.to_bed_dirs(CoreLevel.SEGDUPS)
 
@@ -8,6 +8,7 @@ use rule download_gaps as download_superdups with:
         segdup.src.data / "superdups.txt.gz",
     log:
         segdup.src.log / "superdups.log",
+    # TODO also replace this monstrosity with a type-checked function in pythonland
     params:
         src=lambda w: config.refsrckey_to_bed_src(si_to_superdups, w.ref_src_key),
     localrule: True
@@ -15,7 +16,8 @@ use rule download_gaps as download_superdups with:
 
 checkpoint normalize_superdups:
     input:
-        lambda w: bed_src_inputs(rules.download_superdups.output, si_to_superdups, w),
+        lambda w: all_segdups_sources(w["ref_key"], w["build_key"]).all_sources,
+        # lambda w: bed_src_inputs(rules.download_superdups.output, si_to_superdups, w),
     output:
         segdup.inter.filtersort.data / "segdups.json",
     params:
@@ -87,12 +89,19 @@ use rule notin_superdups as notin_long_superdups with:
 #     localrule: True
 
 
-# TODO split into source function
+def all_segdups_sources(ref_key, build_key):
+    return config.all_segdups_sources(
+        ref_key,
+        build_key,
+        Path(rules.download_superdups.output[0]),
+    )
+
+
 def all_segdups(ref_final_key, build_key):
     return config.all_segdups(
         ref_final_key,
         build_key,
-        Path(rules.download_superdups.output[0]),
+        all_segdups_sources(strip_full_refkey(ref_final_key), build_key),
         Path(rules.merge_superdups.output[0]),
         Path(rules.filter_long_superdups.output[0]),
         Path(rules.notin_superdups.output[0]),
@@ -113,14 +122,14 @@ rule segdups_readme:
         #     ),
         # ),
         bedtools_env="workflow/envs/bedtools.yml",
+    output:
+        segdup.readme,
     params:
         paths=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
         # segdups_path=rules.merge_superdups.output[0],
         # long_segdups_path=rules.filter_long_superdups.output[0],
         # not_segdups_path=rules.notin_superdups.output[0],
         # not_long_segdups_path=rules.notin_long_superdups.output[0],
-    output:
-        segdup.readme,
     conda:
         "../envs/templates.yml"
     script:
