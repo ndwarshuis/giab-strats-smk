@@ -5144,19 +5144,15 @@ class GiabStrats(BaseModel):
         self._test_if_final_mutual_path(all_trs, CoreLevel.LOWCOMPLEXITY, rk, bk)
         self._test_if_final_mutual_path(all_repeats, CoreLevel.LOWCOMPLEXITY, rk, bk)
 
-        # TODO probably don't need to sub so many things in these
-        def sub_rk(p: Path) -> Path:
-            return sub_wildcard_path(p, "ref_final_key", rk)
-
         bd = self.to_build_data_full(rk, bk)
 
         if not bd.want_low_complexity:
             return None
         # homopolymers and uniform repeats are included no matter what
         uniform = UniformRepeatPaths(
-            perfect=[sub_rk(p) for p in perfect],
-            imperfect=[sub_rk(p) for p in imperfect],
-            homopolymers=homopolymers.both(sub_rk),
+            perfect=perfect,
+            imperfect=imperfect,
+            homopolymers=homopolymers,
         )
 
         # include tandem repeats and merged output if we have rmsk/censat and simreps
@@ -5167,9 +5163,9 @@ class GiabStrats(BaseModel):
             repeats = RepeatsPaths(
                 trf_src=tm[0],
                 rmsk_src=tm[1],
-                filtered_trs=[sub_rk(p) for p in filtered_trs],
-                all_trs=all_trs.both(sub_rk),
-                all_repeats=all_repeats.both(sub_rk),
+                filtered_trs=filtered_trs,
+                all_trs=all_trs,
+                all_repeats=all_repeats,
             )
 
         # include satellites only if we have rmsk or censat
@@ -5179,7 +5175,7 @@ class GiabStrats(BaseModel):
         else:
             satpaths = SatellitesPaths(
                 sat_src=s,
-                sats=sats.both(sub_rk),
+                sats=sats,
                 used_censat=src.sat is not None,
                 all_repeats=repeats,
             )
@@ -5261,34 +5257,31 @@ class GiabStrats(BaseModel):
         for p in other.values():
             self._test_if_final_path(p, CoreLevel.OTHER_DIFFICULT, rk, bk)
 
-        def sub_rk(p: Path) -> Path:
-            return sub_wildcards_path(p, {"ref_final_key": rk, "build_key": bk})
-
-        other_output = {k: sub_rk(p) for k, p in other.items() if k in src.other}
+        other_output = {k: p for k, p in other.items() if k in src.other}
 
         bd = self.to_build_data_full(rk, bk)
 
         return OtherDifficultPaths(
             sources=src,
-            gaps_output=sub_rk(gaps) if src.gaps is not None else None,
+            gaps_output=gaps if src.gaps is not None else None,
             cds_output=(
-                cds.both(sub_rk)
+                cds
                 if src.refseq is not None
                 and (src._other_difficult_need_refseq or bd.want_cds)
                 else None
             ),
             vdj_output=(
-                sub_rk(vdj)
+                vdj
                 if bd.want_vdj and (src.refseq is not None or src.vdj is not None)
                 else None
             ),
             mhc_output=(
-                sub_rk(mhc)
+                mhc
                 if bd.want_mhc and (src.refseq is not None or src.mhc is not None)
                 else None
             ),
             kir_output=(
-                sub_rk(kir)
+                kir
                 if bd.want_kir and (src.refseq is not None or src.kir is not None)
                 else None
             ),
@@ -5386,8 +5379,6 @@ class GiabStrats(BaseModel):
 
         bd = self.to_build_data_full(rk, bk)
 
-        # TODO sub path wildcards
-
         if not bd.want_mappability:
             raise DesignError()
 
@@ -5448,6 +5439,7 @@ class GiabStrats(BaseModel):
         if not bd.want_hets:
             return None
 
+        # ASSUME merge_len has already been subbed here
         return DiploidPaths(
             hets=hets,
             homs=homs,
