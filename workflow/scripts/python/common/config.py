@@ -4997,6 +4997,32 @@ class GiabStrats(BaseModel):
         else:
             raise DesignError(f"{p} is not a path")
 
+    def _test_if_final_paths(
+        self,
+        p: Any,
+        c: CoreLevel,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+    ) -> None:
+        if isinstance(p, list):
+            for x in p:
+                self._test_if_final_path(x, c, rk, bk)
+        else:
+            raise DesignError(f"Not a list {p}")
+
+    def _test_if_final_mutual_path(
+        self,
+        p: Any,
+        c: CoreLevel,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+    ) -> None:
+        if isinstance(p, MutualPathPair):
+            self._test_if_final_path(p.positive, c, rk, bk)
+            self._test_if_final_path(p.negative, c, rk, bk)
+        else:
+            raise DesignError(f"Not a mutual pair path: {p}")
+
     def _test_if_source_path(self, p: Any, rk: RefKey) -> None:
         if isinstance(p, Path):
             comp = sub_wildcard_path(self.ref_src_dir, "ref_src_key", rk)
@@ -5036,10 +5062,6 @@ class GiabStrats(BaseModel):
             trf=self._sub_rsk(trf, si_to_simreps, rk, bk),
         )
 
-    # TODO check incoming paths, inputs should all be in resources/{ref} and
-    # outputs should all be in results/final/{ref}. Obviously they should also
-    # be of type path, and this is coming from snakemake itself which I don't
-    # trust
     def all_low_complexity(
         self,
         rk: RefKeyFullS,
@@ -5057,6 +5079,14 @@ class GiabStrats(BaseModel):
         all_trs: MutualPathPair,
         all_repeats: MutualPathPair,
     ) -> LowComplexityPaths | None:
+        self._test_if_final_paths(perfect, CoreLevel.LOWCOMPLEXITY, rk, bk)
+        self._test_if_final_paths(imperfect, CoreLevel.LOWCOMPLEXITY, rk, bk)
+        self._test_if_final_mutual_path(homopolymers, CoreLevel.LOWCOMPLEXITY, rk, bk)
+        self._test_if_final_mutual_path(sats, CoreLevel.LOWCOMPLEXITY, rk, bk)
+        self._test_if_final_paths(filtered_trs, CoreLevel.LOWCOMPLEXITY, rk, bk)
+        self._test_if_final_mutual_path(all_trs, CoreLevel.LOWCOMPLEXITY, rk, bk)
+        self._test_if_final_mutual_path(all_repeats, CoreLevel.LOWCOMPLEXITY, rk, bk)
+
         # TODO probably don't need to sub so many things in these
         def sub_rk(p: Path) -> Path:
             return sub_wildcard_path(p, "ref_final_key", rk)
@@ -5111,6 +5141,7 @@ class GiabStrats(BaseModel):
         other: dict[OtherStratKey, Path],
     ) -> OtherDifficultSources:
         def sub_rsk_other(p: Path, k: OtherStratKey) -> Path1or2 | None:
+            self._test_if_source_path(p, rk)
             # TODO don't hardcode
             rsks = self.buildkey_to_bed_refsrckeys(
                 lambda bd: bd_to_other(OtherLevelKey("OtherDifficult"), k, bd), rk, bk
@@ -5165,6 +5196,14 @@ class GiabStrats(BaseModel):
         vdj: Path,
         other: dict[OtherStratKey, Path],
     ) -> OtherDifficultPaths:
+        self._test_if_final_path(gaps, CoreLevel.OTHER_DIFFICULT, rk, bk)
+        self._test_if_final_mutual_path(cds, CoreLevel.FUNCTIONAL, rk, bk)
+        self._test_if_final_path(kir, CoreLevel.OTHER_DIFFICULT, rk, bk)
+        self._test_if_final_path(mhc, CoreLevel.OTHER_DIFFICULT, rk, bk)
+        self._test_if_final_path(vdj, CoreLevel.OTHER_DIFFICULT, rk, bk)
+        for p in other.values():
+            self._test_if_final_path(p, CoreLevel.OTHER_DIFFICULT, rk, bk)
+
         def sub_rk(p: Path) -> Path:
             return sub_wildcards_path(p, {"ref_final_key": rk, "build_key": bk})
 
@@ -5208,6 +5247,9 @@ class GiabStrats(BaseModel):
         segdup_lowmap_output: MutualPathPair,
         all_difficult: MutualPathPair,
     ) -> UnionPaths | None:
+        self._test_if_final_mutual_path(segdup_lowmap_output, CoreLevel.UNION, rk, bk)
+        self._test_if_final_mutual_path(all_difficult, CoreLevel.UNION, rk, bk)
+
         bd = self.to_build_data_full(rk, bk)
 
         if not bd.want_union:
@@ -5254,6 +5296,9 @@ class GiabStrats(BaseModel):
         ranges: list[Path],
         extremes: list[Path],
     ) -> GCPaths:
+        self._test_if_final_paths(ranges, CoreLevel.GC, rk, bk)
+        self._test_if_final_paths(extremes, CoreLevel.GC, rk, bk)
+
         bd = self.to_build_data_full(rk, bk)
 
         if not bd.build.include.gc:
@@ -5271,10 +5316,12 @@ class GiabStrats(BaseModel):
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
-        union: Path,
-        not_union: Path,
+        union: MutualPathPair,
         single: list[Path],
     ) -> LowmapPaths:
+        self._test_if_final_mutual_path(union, CoreLevel.MAPPABILITY, rk, bk)
+        self._test_if_final_paths(single, CoreLevel.MAPPABILITY, rk, bk)
+
         bd = self.to_build_data_full(rk, bk)
 
         # TODO sub path wildcards
@@ -5283,7 +5330,7 @@ class GiabStrats(BaseModel):
             raise DesignError()
 
         return LowmapPaths(
-            union=MutualPathPair(union, not_union),
+            union=union,
             single=single,
             params=[*bd.build.include.mappability],
         )
@@ -5305,6 +5352,9 @@ class GiabStrats(BaseModel):
         segdups: MutualPathPair,
         long_segdups: MutualPathPair,
     ) -> SegdupPaths | None:
+        self._test_if_final_mutual_path(segdups, CoreLevel.SEGDUPS, rk, bk)
+        self._test_if_final_mutual_path(long_segdups, CoreLevel.SEGDUPS, rk, bk)
+
         bd = self.to_build_data_full(rk, bk)
 
         if bd.want_segdups and src is not None:
@@ -5326,6 +5376,11 @@ class GiabStrats(BaseModel):
         SNVorSV_hets: list[Path],
         SNVorSV_homs: list[Path],
     ) -> DiploidPaths | None:
+        self._test_if_final_paths(hets, CoreLevel.DIPLOID, rk, bk)
+        self._test_if_final_paths(SNVorSV_hets, CoreLevel.DIPLOID, rk, bk)
+        self._test_if_final_paths(homs, CoreLevel.DIPLOID, rk, bk)
+        self._test_if_final_paths(SNVorSV_homs, CoreLevel.DIPLOID, rk, bk)
+
         bd = self.to_build_data_full(rk, bk)
 
         if not bd.want_hets:
@@ -5351,6 +5406,12 @@ class GiabStrats(BaseModel):
         par: MutualPathPair,
         auto: Path,
     ) -> SexPaths:
+        self._test_if_source_path(features_src, strip_full_refkey(rk))
+        self._test_if_final_path(xtr, CoreLevel.XY, rk, bk)
+        self._test_if_final_path(ampliconic, CoreLevel.XY, rk, bk)
+        self._test_if_final_mutual_path(par, CoreLevel.XY, rk, bk)
+        self._test_if_final_path(auto, CoreLevel.XY, rk, bk)
+
         def sub_rsk(p: Path) -> Path:
             return sub_wildcard_path(p, "ref_src_key", strip_full_refkey(rk))
 
