@@ -6,6 +6,7 @@ from common.config import (
     si_to_rmsk,
     si_to_simreps,
     si_to_satellites,
+    MutualPathPair,
 )
 from functools import partial
 
@@ -388,14 +389,14 @@ rule all_uniform_repeats:
 ## simple repeats
 
 
-def all_low_complexity_sources_smk(wildcards):
-    return config.all_low_complexity_sources(
-        wildcards["ref_key"],
-        wildcards["build_key"],
-        Path(rules.download_rmsk.output[0]),
-        Path(rules.download_censat.output[0]),
-        Path(rules.download_simreps.output[0]),
-    )
+# def all_low_complexity_sources_smk(wildcards):
+#     return config.all_low_complexity_sources(
+#         wildcards["ref_key"],
+#         wildcards["build_key"],
+#         Path(rules.download_rmsk.output[0]),
+#         Path(rules.download_censat.output[0]),
+#         Path(rules.download_simreps.output[0]),
+#     )
 
 
 use rule download_gaps as download_simreps with:
@@ -780,24 +781,38 @@ use rule invert_satellites as invert_HPs_and_TRs with:
 #     )
 
 
-def all_low_complexity_smk(ref_final_key, build_key):
-    return config.all_low_complexity(
-        ref_final_key,
+def all_low_complexity_sources(ref_key, build_key):
+    return config.all_low_complexity_sources(
+        ref_key,
         build_key,
         Path(rules.download_rmsk.output[0]),
         Path(rules.download_censat.output[0]),
         Path(rules.download_simreps.output[0]),
+    )
+
+
+def all_low_complexity(ref_final_key, build_key):
+    return config.all_low_complexity(
+        ref_final_key,
+        build_key,
+        all_low_complexity_sources(strip_full_refkey(ref_final_key), build_key),
         [Path(p) for p in rules._all_perfect_uniform_repeats.input],
         [Path(p) for p in rules._all_imperfect_uniform_repeats.input],
         Path(rules.merge_all_uniform_repeats.output[0]),
         Path(rules.invert_all_uniform_repeats.output[0]),
-        Path(rules.merge_satellites.output[0]),
-        Path(rules.invert_satellites.output[0]),
+        MutualPathPair(
+            Path(rules.merge_satellites.output[0]),
+            Path(rules.invert_satellites.output[0]),
+        ),
         [Path(p) for p in rules.all_TRs.input],
-        Path(rules.merge_filtered_TRs.output[0]),
-        Path(rules.invert_TRs.output[0]),
-        Path(rules.merge_HPs_and_TRs.output[0]),
-        Path(rules.invert_HPs_and_TRs.output[0]),
+        MutualPathPair(
+            Path(rules.merge_filtered_TRs.output[0]),
+            Path(rules.invert_TRs.output[0]),
+        ),
+        MutualPathPair(
+            Path(rules.merge_HPs_and_TRs.output[0]),
+            Path(rules.invert_HPs_and_TRs.output[0]),
+        ),
     )
 
 

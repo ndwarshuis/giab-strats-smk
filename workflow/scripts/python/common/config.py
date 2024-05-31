@@ -1538,17 +1538,11 @@ class BedDoc(NamedTuple):
 class UniformRepeatPaths(NamedTuple):
     perfect: list[Path]  # ASSUME this will always be non-empty
     imperfect: list[Path]  # ASSUME this will always be non-empty
-    homopolymers: Path
-    not_homopolymers: Path
+    homopolymers: MutualPathPair
 
     @property
     def all_outputs(self) -> list[Path]:
-        return [
-            *self.perfect,
-            *self.imperfect,
-            self.homopolymers,
-            self.not_homopolymers,
-        ]
+        return [*self.perfect, *self.imperfect, *self.homopolymers.paths]
 
 
 class RepeatsPaths(NamedTuple):
@@ -1556,27 +1550,22 @@ class RepeatsPaths(NamedTuple):
     rmsk_src: Path1or2
 
     filtered_trs: list[Path]  # ASSUME this is non-empty
-    all_trs: Path
-    not_all_trs: Path
-    all_repeats: Path
-    not_all_repeats: Path
+    all_trs: MutualPathPair
+    all_repeats: MutualPathPair
 
     @property
     def all_outputs(self) -> list[Path]:
         return [
             *self.filtered_trs,
-            self.all_trs,
-            self.not_all_trs,
-            self.all_repeats,
-            self.not_all_repeats,
+            *self.all_trs.paths,
+            *self.all_repeats.paths,
         ]
 
 
 class SatellitesPaths(NamedTuple):
     sat_src: Path1or2
 
-    sats: Path
-    not_sats: Path
+    sats: MutualPathPair
 
     used_censat: bool
     all_repeats: RepeatsPaths | None
@@ -1584,8 +1573,7 @@ class SatellitesPaths(NamedTuple):
     @property
     def all_outputs(self) -> list[Path]:
         return [
-            self.sats,
-            self.not_sats,
+            *self.sats.paths,
             *(r.all_outputs if (r := self.all_repeats) is not None else []),
         ]
 
@@ -1644,8 +1632,7 @@ class XYFeaturePaths(NamedTuple):
 
 
 class PARPaths(NamedTuple):
-    path: Path
-    non_path: Path
+    path: MutualPathPair
     doc: str
 
 
@@ -1660,11 +1647,11 @@ class SubSexPaths(NamedTuple):
 
     @property
     def par_path(self) -> Path | None:
-        return fmap_maybe(lambda z: z.path, self.par)
+        return fmap_maybe(lambda z: z.path.positive, self.par)
 
     @property
     def nonpar_path(self) -> Path | None:
-        return fmap_maybe(lambda z: z.non_path, self.par)
+        return fmap_maybe(lambda z: z.path.negative, self.par)
 
     @property
     def xtr_path(self) -> Path | None:
@@ -1867,8 +1854,7 @@ class OtherDifficultPaths:
     sources: OtherDifficultSources
 
     gaps_output: Path | None
-    cds_output: Path | None
-    not_cds_output: Path | None
+    cds_output: MutualPathPair | None
     vdj_output: Path | None
     mhc_output: Path | None
     kir_output: Path | None
@@ -1886,67 +1872,12 @@ class MutualPathPair:
     positive: Path
     negative: Path
 
+    def both(self, f: Callable[[Path], Path]) -> MutualPathPair:
+        return MutualPathPair(f(self.positive), f(self.negative))
+
     @property
     def paths(self) -> list[Path]:
         return [self.positive, self.negative]
-
-
-@dataclass(frozen=True)
-class SegdupLowmapPaths:
-    segdup_source: Path
-    lowmap_source: Path
-    output: MutualPathPair
-
-    @property
-    def sources(self) -> list[Path]:
-        return [self.segdup_source, self.lowmap_source]
-
-
-# ASSUME at least two of the sources are non-null
-@dataclass(frozen=True)
-class AllDifficultPaths:
-    gc_source: Path | None
-    repeat_source: Path | None
-    xy_sources: list[Path]
-    output: MutualPathPair
-
-    @property
-    def sources(self) -> list[Path]:
-        return [
-            p for p in [self.gc_source, self.repeat_source] if p is not None
-        ] + self.xy_sources
-
-
-@dataclass(frozen=True)
-class UnionPaths:
-    segdup_lowmap: SegdupLowmapPaths
-    all_difficult: AllDifficultPaths | None
-
-    @property
-    def segdup_lowmap_sources(self) -> list[Path]:
-        return self.segdup_lowmap.sources
-
-    @property
-    def all_difficult_sources(self) -> list[Path]:
-        empty: list[Path] = []
-        return fmap_maybe_def(empty, lambda x: x.sources, self.all_difficult)
-
-    @property
-    def all_sources(self) -> list[Path]:
-        return self.segdup_lowmap_sources + self.all_difficult_sources
-
-    @property
-    def segdup_lowmap_outputs(self) -> list[Path]:
-        return self.segdup_lowmap.output.paths
-
-    @property
-    def all_difficult_outputs(self) -> list[Path]:
-        empty: list[Path] = []
-        return fmap_maybe_def(empty, lambda x: x.output.paths, self.all_difficult)
-
-    @property
-    def all_outputs(self) -> list[Path]:
-        return self.segdup_lowmap_outputs + self.all_difficult_outputs
 
 
 @dataclass(frozen=True)
@@ -2015,6 +1946,65 @@ class DiploidPaths:
     @property
     def all_outputs(self) -> list[Path]:
         return self.hets + self.homs + self.SNVorSV_hets + self.SNVorSV_homs
+
+
+@dataclass(frozen=True)
+class SegdupLowmapPaths:
+    segdup_source: SegdupSources
+    lowmap_source: Path
+    output: MutualPathPair
+
+    @property
+    def sources(self) -> list[Path]:
+        s = self.segdup_source.superdup
+        return [self.lowmap_source] + [] if s is None else single_or_double_to_list(s)
+
+
+# ASSUME at least two of the sources are non-null
+@dataclass(frozen=True)
+class AllDifficultPaths:
+    gc_source: Path | None
+    repeat_source: Path | None
+    xy_sources: list[Path]
+    output: MutualPathPair
+
+    @property
+    def sources(self) -> list[Path]:
+        return [
+            p for p in [self.gc_source, self.repeat_source] if p is not None
+        ] + self.xy_sources
+
+
+@dataclass(frozen=True)
+class UnionPaths:
+    segdup_lowmap: SegdupLowmapPaths
+    all_difficult: AllDifficultPaths | None
+
+    @property
+    def segdup_lowmap_sources(self) -> list[Path]:
+        return self.segdup_lowmap.sources
+
+    @property
+    def all_difficult_sources(self) -> list[Path]:
+        empty: list[Path] = []
+        return fmap_maybe_def(empty, lambda x: x.sources, self.all_difficult)
+
+    @property
+    def all_sources(self) -> list[Path]:
+        return self.segdup_lowmap_sources + self.all_difficult_sources
+
+    @property
+    def segdup_lowmap_outputs(self) -> list[Path]:
+        return self.segdup_lowmap.output.paths
+
+    @property
+    def all_difficult_outputs(self) -> list[Path]:
+        empty: list[Path] = []
+        return fmap_maybe_def(empty, lambda x: x.output.paths, self.all_difficult)
+
+    @property
+    def all_outputs(self) -> list[Path]:
+        return self.segdup_lowmap_outputs + self.all_difficult_outputs
 
 
 ################################################################################
@@ -5055,23 +5045,17 @@ class GiabStrats(BaseModel):
         rk: RefKeyFullS,
         bk: BuildKey,
         # sources
-        rmsk_src: Path,
-        censat_src: Path,
-        trf_src: Path,
+        src: LowComplexitySources,
         # uniform
         perfect: list[Path],
         imperfect: list[Path],
-        homopolymers: Path,
-        not_homopolymers: Path,
+        homopolymers: MutualPathPair,
         # satellites
-        sats: Path,
-        notsats: Path,
+        sats: MutualPathPair,
         # all repeats
         filtered_trs: list[Path],
-        all_trs: Path,
-        not_all_trs: Path,
-        all_repeats: Path,
-        not_all_repeats: Path,
+        all_trs: MutualPathPair,
+        all_repeats: MutualPathPair,
     ) -> LowComplexityPaths | None:
         # TODO probably don't need to sub so many things in these
         def sub_rk(p: Path) -> Path:
@@ -5081,21 +5065,15 @@ class GiabStrats(BaseModel):
 
         if not bd.want_low_complexity:
             return None
-
-        sources = self.all_low_complexity_sources(
-            strip_full_refkey(rk), bk, rmsk_src, censat_src, trf_src
-        )
-
         # homopolymers and uniform repeats are included no matter what
         uniform = UniformRepeatPaths(
             perfect=[sub_rk(p) for p in perfect],
             imperfect=[sub_rk(p) for p in imperfect],
-            homopolymers=sub_rk(homopolymers),
-            not_homopolymers=sub_rk(not_homopolymers),
+            homopolymers=homopolymers.both(sub_rk),
         )
 
         # include tandem repeats and merged output if we have rmsk/censat and simreps
-        tm: tuple[Path1or2, Path1or2] | None = maybe2((sources.trf, sources.rmsk))
+        tm: tuple[Path1or2, Path1or2] | None = maybe2((src.trf, src.rmsk))
         if tm is None:
             repeats = None
         else:
@@ -5103,22 +5081,19 @@ class GiabStrats(BaseModel):
                 trf_src=tm[0],
                 rmsk_src=tm[1],
                 filtered_trs=[sub_rk(p) for p in filtered_trs],
-                all_trs=sub_rk(all_trs),
-                not_all_trs=sub_rk(not_all_trs),
-                all_repeats=sub_rk(all_repeats),
-                not_all_repeats=sub_rk(not_all_repeats),
+                all_trs=all_trs.both(sub_rk),
+                all_repeats=all_repeats.both(sub_rk),
             )
 
         # include satellites only if we have rmsk or censat
-        s: Path1or2 | None = from_maybe(sources.rmsk, sources.sat)
+        s: Path1or2 | None = from_maybe(src.rmsk, src.sat)
         if s is None:
             satpaths = None
         else:
             satpaths = SatellitesPaths(
                 sat_src=s,
-                sats=sub_rk(sats),
-                not_sats=sub_rk(notsats),
-                used_censat=sources.sat is not None,
+                sats=sats.both(sub_rk),
+                used_censat=src.sat is not None,
                 all_repeats=repeats,
             )
 
@@ -5182,61 +5157,38 @@ class GiabStrats(BaseModel):
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
-        # sources
-        gaps_src: Path,
-        refseq_src: Path,
-        kir_src: Path,
-        mhc_src: Path,
-        vdj_src: Path,
-        other_srcs: dict[OtherStratKey, Path],
-        # outputs
+        src: OtherDifficultSources,
         gaps: Path,
-        cds: Path,
-        not_cds: Path,
+        cds: MutualPathPair,
         kir: Path,
         mhc: Path,
         vdj: Path,
         other: dict[OtherStratKey, Path],
     ) -> OtherDifficultPaths:
-        sources = self.all_otherdifficult_sources(
-            strip_full_refkey(rk),
-            bk,
-            gaps_src,
-            refseq_src,
-            kir_src,
-            mhc_src,
-            vdj_src,
-            other_srcs,
-        )
-
         def sub_rk(p: Path) -> Path:
             return sub_wildcards_path(p, {"ref_final_key": rk, "build_key": bk})
 
-        other_output = {k: sub_rk(p) for k, p in other.items() if k in sources.other}
+        other_output = {k: sub_rk(p) for k, p in other.items() if k in src.other}
 
         bd = self.to_build_data_full(rk, bk)
 
         return OtherDifficultPaths(
-            sources=sources,
-            gaps_output=sub_rk(gaps) if sources.gaps is not None else None,
-            cds_output=sub_rk(cds) if sources.refseq is not None else None,
-            not_cds_output=sub_rk(not_cds) if sources.refseq is not None else None,
+            sources=src,
+            gaps_output=sub_rk(gaps) if src.gaps is not None else None,
+            cds_output=cds.both(sub_rk) if src.refseq is not None else None,
             vdj_output=(
                 sub_rk(vdj)
-                if bd.want_vdj
-                and (sources.refseq is not None or sources.vdj is not None)
+                if bd.want_vdj and (src.refseq is not None or src.vdj is not None)
                 else None
             ),
             mhc_output=(
                 sub_rk(mhc)
-                if bd.want_mhc
-                and (sources.refseq is not None or sources.mhc is not None)
+                if bd.want_mhc and (src.refseq is not None or src.mhc is not None)
                 else None
             ),
             kir_output=(
                 sub_rk(kir)
-                if bd.want_kir
-                and (sources.refseq is not None or sources.kir is not None)
+                if bd.want_kir and (src.refseq is not None or src.kir is not None)
                 else None
             ),
             other_outputs=other_output,
@@ -5247,16 +5199,14 @@ class GiabStrats(BaseModel):
         rk: RefKeyFullS,
         bk: BuildKey,
         # sources
-        segdups_src: Path,
+        segdups_src: SegdupSources,
         lowmap: Path,
         gc_src: Path,
         lc: LowComplexityPaths | None,
         xy: SexPaths | None,
         # outputs
-        segdup_lowmap_output: Path,
-        not_segdup_lowmap_output: Path,
-        all_difficult: Path,
-        not_all_difficult: Path,
+        segdup_lowmap_output: MutualPathPair,
+        all_difficult: MutualPathPair,
     ) -> UnionPaths | None:
         bd = self.to_build_data_full(rk, bk)
 
@@ -5269,16 +5219,13 @@ class GiabStrats(BaseModel):
         sl = SegdupLowmapPaths(
             segdup_source=segdups_src,
             lowmap_source=lowmap,
-            output=MutualPathPair(
-                segdup_lowmap_output,
-                not_segdup_lowmap_output,
-            ),
+            output=segdup_lowmap_output,
         )
 
         _gc_src = gc_src if bd.want_gc else None
-        _repeat_src = fmap_maybe(
+        _repeat_src: Path | None = fmap_maybe(
             lambda x: fmap_maybe(
-                lambda y: fmap_maybe(lambda z: z.all_repeats, y.all_repeats),
+                lambda y: fmap_maybe(lambda z: z.all_repeats.positive, y.all_repeats),
                 x.satellites,
             ),
             lc,
@@ -5291,7 +5238,7 @@ class GiabStrats(BaseModel):
                 gc_source=_gc_src,
                 repeat_source=_repeat_src,
                 xy_sources=_xy_src,
-                output=MutualPathPair(all_difficult, not_all_difficult),
+                output=all_difficult,
             )
             if ((_gc_src is not None) + (_repeat_src is not None) + (len(_xy_src) > 0))
             > 1
@@ -5354,21 +5301,17 @@ class GiabStrats(BaseModel):
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
-        # sources
         src: SegdupSources,
-        # outputs
-        segdups: Path,
-        not_segdups: Path,
-        long_segdups: Path,
-        not_long_segdups: Path,
+        segdups: MutualPathPair,
+        long_segdups: MutualPathPair,
     ) -> SegdupPaths | None:
         bd = self.to_build_data_full(rk, bk)
 
         if bd.want_segdups and src is not None:
             return SegdupPaths(
                 sources=src,
-                all_segdups=MutualPathPair(segdups, not_segdups),
-                long_segdups=MutualPathPair(long_segdups, not_long_segdups),
+                all_segdups=segdups,
+                long_segdups=long_segdups,
             )
         else:
             return None
@@ -5405,8 +5348,7 @@ class GiabStrats(BaseModel):
         # outputs
         xtr: Path,
         ampliconic: Path,
-        par: Path,
-        nonpar: Path,
+        par: MutualPathPair,
         auto: Path,
     ) -> SexPaths:
         def sub_rsk(p: Path) -> Path:
@@ -5443,8 +5385,7 @@ class GiabStrats(BaseModel):
         def to_par(use_x: bool, xy: XY) -> PARPaths | None:
             return fmap_maybe(
                 lambda z: PARPaths(
-                    path=sub_sex(par, use_x),
-                    non_path=sub_sex(nonpar, use_x),
+                    path=par.both(lambda x: sub_sex(x, use_x)),
                     doc=z.comment,
                 ),
                 xy.x_par if use_x else xy.y_par,
