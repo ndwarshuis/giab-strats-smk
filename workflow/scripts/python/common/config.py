@@ -1535,17 +1535,50 @@ class BedDoc(NamedTuple):
 # Rule aggregation classes
 
 
-class UniformRepeatPaths(NamedTuple):
+class _HasFinalBeds:
+
+    @property
+    def all_final(self) -> list[Path]:
+        return NotImplemented
+
+    @property
+    def all_final_str(self) -> list[str]:
+        return [str(x) for x in self.all_final]
+
+
+class _HasSources:
+
+    @property
+    def all_sources(self) -> list[Path]:
+        return NotImplemented
+
+
+@dataclass(frozen=True)
+class MutualPathPair:
+    positive: Path
+    negative: Path
+
+    def both(self, f: Callable[[Path], Path]) -> MutualPathPair:
+        return MutualPathPair(f(self.positive), f(self.negative))
+
+    @property
+    def paths(self) -> list[Path]:
+        return [self.positive, self.negative]
+
+
+@dataclass(frozen=True)
+class UniformRepeatPaths(_HasFinalBeds):
     perfect: list[Path]  # ASSUME this will always be non-empty
     imperfect: list[Path]  # ASSUME this will always be non-empty
     homopolymers: MutualPathPair
 
     @property
-    def all_outputs(self) -> list[Path]:
+    def all_final(self) -> list[Path]:
         return [*self.perfect, *self.imperfect, *self.homopolymers.paths]
 
 
-class RepeatsPaths(NamedTuple):
+@dataclass(frozen=True)
+class RepeatsPaths(_HasSources):
     trf_src: Path1or2
     rmsk_src: Path1or2
 
@@ -1554,7 +1587,7 @@ class RepeatsPaths(NamedTuple):
     all_repeats: MutualPathPair
 
     @property
-    def all_outputs(self) -> list[Path]:
+    def all_final(self) -> list[Path]:
         return [
             *self.filtered_trs,
             *self.all_trs.paths,
@@ -1562,7 +1595,8 @@ class RepeatsPaths(NamedTuple):
         ]
 
 
-class SatellitesPaths(NamedTuple):
+@dataclass(frozen=True)
+class SatellitesPaths(_HasFinalBeds):
     sat_src: Path1or2
 
     sats: MutualPathPair
@@ -1571,19 +1605,20 @@ class SatellitesPaths(NamedTuple):
     all_repeats: RepeatsPaths | None
 
     @property
-    def all_outputs(self) -> list[Path]:
+    def all_final(self) -> list[Path]:
         return [
             *self.sats.paths,
-            *(r.all_outputs if (r := self.all_repeats) is not None else []),
+            *(r.all_final if (r := self.all_repeats) is not None else []),
         ]
 
 
-class LowComplexityPaths(NamedTuple):
+@dataclass(frozen=True)
+class LowComplexityPaths(_HasSources, _HasFinalBeds):
     uniform_repeats: UniformRepeatPaths
     satellites: SatellitesPaths | None
 
     @property
-    def all_inputs(self) -> list[Path]:
+    def all_sources(self) -> list[Path]:
         return fmap_maybe_def(
             [],
             lambda s: fmap_maybe_def(
@@ -1596,32 +1631,25 @@ class LowComplexityPaths(NamedTuple):
             self.satellites,
         )
 
-    @property
-    def sat_inputs(self) -> list[Path] | None:
-        return fmap_maybe(
-            lambda r: single_or_double_to_list(r.sat_src), self.satellites
-        )
+    # @property
+    # def sat_sources(self) -> list[Path] | None:
+    #     return fmap_maybe(
+    #         lambda r: single_or_double_to_list(r.sat_src), self.satellites
+    #     )
 
     @property
-    def all_output_paths(self) -> list[Path]:
+    def all_final(self) -> list[Path]:
         return [
             x
             for x in (
-                self.uniform_repeats.all_outputs
-                + (self.satellites.all_outputs if self.satellites is not None else [])
+                self.uniform_repeats.all_final
+                + (self.satellites.all_final if self.satellites is not None else [])
             )
         ]
 
-    @property
-    def all_outputs(self) -> list[str]:
-        return [str(x) for x in self.all_output_paths]
 
-    @property
-    def all_output_files(self) -> list[str]:
-        return [x.name for x in self.all_output_paths]
-
-
-class XYFeaturePaths(NamedTuple):
+@dataclass(frozen=True)
+class XYFeaturePaths:
     src: Path
 
     bed: XYFile
@@ -1631,12 +1659,14 @@ class XYFeaturePaths(NamedTuple):
     ampliconic: str | None
 
 
-class PARPaths(NamedTuple):
+@dataclass(frozen=True)
+class PARPaths:
     path: MutualPathPair
     doc: str
 
 
-class SubSexPaths(NamedTuple):
+@dataclass(frozen=True)
+class SubSexPaths:
 
     par: PARPaths | None
     features: XYFeaturePaths | None
@@ -1677,7 +1707,6 @@ class SubSexPaths(NamedTuple):
 
 @dataclass(frozen=True)
 class _SexPaths:
-    pass
 
     @property
     def all_paths(self) -> list[SubSexPaths]:
@@ -1750,28 +1779,22 @@ class Dip2SexPaths(_SexPaths):
 AnySexPaths = MaleHapSexPaths | Dip1SexPaths | Dip2SexPaths
 
 
-class SexPaths(NamedTuple):
+@dataclass(frozen=True)
+class SexPaths(_HasSources, _HasFinalBeds):
     sex: AnySexPaths
     auto: Path | None
 
     @property
-    def all_inputs(self) -> list[Path]:
+    def all_sources(self) -> list[Path]:
         return self.sex.all_inputs
 
     @property
-    def all_output_paths(self) -> list[Path]:
+    def all_final(self) -> list[Path]:
         return self.sex.all_output_paths + maybe_to_list(self.auto)
 
-    @property
-    def all_outputs(self) -> list[str]:
-        return [str(x) for x in self.all_output_paths]
 
-    @property
-    def all_output_files(self) -> list[str]:
-        return [x.name for x in self.all_output_paths]
-
-
-class LowComplexitySources(NamedTuple):
+@dataclass(frozen=True)
+class LowComplexitySources:
     trf: Path1or2 | None
     sat: Path1or2 | None
     rmsk: Path1or2 | None
@@ -1805,7 +1828,7 @@ RefKeyFullS1or2 = SingleOrDouble[RefKeyFullS]
 
 
 @dataclass(frozen=True)
-class OtherDifficultSources:
+class OtherDifficultSources(_HasSources):
     gaps: Path1or2 | None
     refseq: Path1or2 | None
     vdj: Path1or2 | None
@@ -1848,9 +1871,29 @@ class OtherDifficultSources:
     def mhc_paths(self) -> list[Path]:
         return [] if self.mhc is None else single_or_double_to_list(self.mhc)
 
+    @property
+    def other_paths(self) -> list[Path]:
+        return [
+            i
+            for p in self.other.values()
+            if p is not None
+            for i in single_or_double_to_list(p)
+        ]
+
+    @property
+    def all_sources(self) -> list[Path]:
+        return (
+            self.gaps_paths
+            + self.refseq_paths
+            + self.vdj_paths
+            + self.kir_paths
+            + self.mhc_paths
+            + self.other_paths
+        )
+
 
 @dataclass(frozen=True)
-class OtherDifficultPaths:
+class OtherDifficultPaths(_HasSources, _HasFinalBeds):
     sources: OtherDifficultSources
 
     gaps_output: Path | None
@@ -1861,38 +1904,40 @@ class OtherDifficultPaths:
 
     other_outputs: dict[OtherStratKey, Path]
 
-
-# @dataclass(frozen=True)
-# class UnionSources:
-#     pass
-
-
-@dataclass(frozen=True)
-class MutualPathPair:
-    positive: Path
-    negative: Path
-
-    def both(self, f: Callable[[Path], Path]) -> MutualPathPair:
-        return MutualPathPair(f(self.positive), f(self.negative))
+    @property
+    def all_sources(self) -> list[Path]:
+        return self.sources.all_sources
 
     @property
-    def paths(self) -> list[Path]:
-        return [self.positive, self.negative]
+    def all_final(self) -> list[Path]:
+        empty: list[Path] = []
+        return [
+            p
+            for p in [
+                self.gaps_output,
+                *fmap_maybe_def(empty, lambda z: z.paths, self.cds_output),
+                self.vdj_output,
+                self.mhc_output,
+                self.kir_output,
+                *self.other_outputs.values(),
+            ]
+            if p is not None
+        ]
 
 
 @dataclass(frozen=True)
-class LowmapPaths:
+class LowmapPaths(_HasFinalBeds):
     union: MutualPathPair
     single: list[Path]
     params: list[LowMapParams]  # ASSUME non empty
 
     @property
-    def all_outputs(self) -> list[Path]:
+    def all_final(self) -> list[Path]:
         return self.union.paths + self.single
 
 
 @dataclass(frozen=True)
-class GCPaths:
+class GCPaths(_HasFinalBeds):
     lowGC: Path
     middleGC: list[Path]
     highGC: Path
@@ -1900,12 +1945,12 @@ class GCPaths:
     params: GCParams
 
     @property
-    def all_outputs(self) -> list[Path]:
+    def all_final(self) -> list[Path]:
         return [self.lowGC, *self.middleGC, self.highGC, *self.extremes]
 
 
 @dataclass(frozen=True)
-class SegdupSources:
+class SegdupSources(_HasSources):
     superdup: Path1or2 | None
 
     @property
@@ -1916,7 +1961,7 @@ class SegdupSources:
 
 
 @dataclass(frozen=True)
-class SegdupPaths:
+class SegdupPaths(_HasSources, _HasFinalBeds):
     sources: SegdupSources
     all_segdups: MutualPathPair
     long_segdups: MutualPathPair
@@ -1926,12 +1971,12 @@ class SegdupPaths:
         return self.sources.all_sources
 
     @property
-    def all_outputs(self) -> list[Path]:
+    def all_final(self) -> list[Path]:
         return self.all_segdups.paths + self.long_segdups.paths
 
 
 @dataclass(frozen=True)
-class DiploidPaths:
+class DiploidPaths(_HasFinalBeds):
     hets: list[Path]
     SNVorSV_hets: list[Path]
     homs: list[Path]
@@ -1940,71 +1985,79 @@ class DiploidPaths:
     nonpar: list[Path]
 
     @property
-    def sources(self) -> list[Path]:
+    def non_par(self) -> list[Path]:
         return self.nonpar
 
     @property
-    def all_outputs(self) -> list[Path]:
+    def all_final(self) -> list[Path]:
         return self.hets + self.homs + self.SNVorSV_hets + self.SNVorSV_homs
 
 
 @dataclass(frozen=True)
-class SegdupLowmapPaths:
+class SegdupLowmapPaths(_HasFinalBeds, _HasSources):
     segdup_source: SegdupSources
     lowmap_source: Path
     output: MutualPathPair
 
     @property
-    def sources(self) -> list[Path]:
+    def all_sources(self) -> list[Path]:
         s = self.segdup_source.superdup
         return [self.lowmap_source] + [] if s is None else single_or_double_to_list(s)
+
+    @property
+    def all_final(self) -> list[Path]:
+        return self.output.paths
 
 
 # ASSUME at least two of the sources are non-null
 @dataclass(frozen=True)
-class AllDifficultPaths:
+class AllDifficultPaths(_HasSources, _HasFinalBeds):
     gc_source: Path | None
     repeat_source: Path | None
     xy_sources: list[Path]
     output: MutualPathPair
 
     @property
-    def sources(self) -> list[Path]:
+    def all_sources(self) -> list[Path]:
         return [
             p for p in [self.gc_source, self.repeat_source] if p is not None
         ] + self.xy_sources
 
+    @property
+    def all_final(self) -> list[Path]:
+        return self.output.paths
+
 
 @dataclass(frozen=True)
-class UnionPaths:
+class UnionPaths(_HasSources, _HasFinalBeds):
     segdup_lowmap: SegdupLowmapPaths
     all_difficult: AllDifficultPaths | None
 
     @property
     def segdup_lowmap_sources(self) -> list[Path]:
-        return self.segdup_lowmap.sources
+        return self.segdup_lowmap.all_sources
 
     @property
     def all_difficult_sources(self) -> list[Path]:
         empty: list[Path] = []
-        return fmap_maybe_def(empty, lambda x: x.sources, self.all_difficult)
+        return fmap_maybe_def(empty, lambda x: x.all_sources, self.all_difficult)
 
     @property
     def all_sources(self) -> list[Path]:
         return self.segdup_lowmap_sources + self.all_difficult_sources
 
     @property
-    def segdup_lowmap_outputs(self) -> list[Path]:
+    def segdup_lowmap_final(self) -> list[Path]:
         return self.segdup_lowmap.output.paths
 
     @property
-    def all_difficult_outputs(self) -> list[Path]:
+    def all_difficult_final(self) -> list[Path]:
         empty: list[Path] = []
         return fmap_maybe_def(empty, lambda x: x.output.paths, self.all_difficult)
 
     @property
-    def all_outputs(self) -> list[Path]:
-        return self.segdup_lowmap_outputs + self.all_difficult_outputs
+    def all_final(self) -> list[Path]:
+        return self.segdup_lowmap_final + self.all_difficult_final
 
 
 ################################################################################
