@@ -408,4 +408,4 @@ rule diploid_readme:
     conda:
         "../envs/templates.yml"
     script:
-        "../scripts/python/templates/format_readme/format_union.py"
+        "../scripts/python/templates/format_readme/format_diploid.py"
