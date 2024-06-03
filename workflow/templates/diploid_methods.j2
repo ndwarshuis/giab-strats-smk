@@ -37,11 +37,11 @@ length in the 4th column for filtering):
 ```
 htsbox pileup -q5 -evcf <hap.fa> <hap.bam> | \
 grep -v '^#' | \
-awk 'OFS="\t" {{
+awk 'OFS="\t" {
   ref = length($4);
   alt = length($5);
   print $1, $2-1, $2+length($4)-1, (ref>alt) ? ref-alt : alt-ref
-}}' > <output>
+}' > <output>
 ```
 
 This was then filtered to produce a bed subset to SNV or SV variants (where SVs
