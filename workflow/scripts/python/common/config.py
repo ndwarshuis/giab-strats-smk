@@ -5054,11 +5054,17 @@ class GiabStrats(BaseModel):
         c: CoreLevel,
         rk: RefKeyFullS,
         bk: BuildKey,
+        sub: bool = False,
     ) -> None:
         if isinstance(p, Path):
             comp = self.final_build_dir / c.value
-            if comp != p.parent:
-                raise DesignError(f"{p} is not a within {comp}")
+            _comp = (
+                sub_wildcards_path(comp, {"ref_final_key": rk, "build_key": bk})
+                if sub
+                else comp
+            )
+            if _comp != p.parent:
+                raise DesignError(f"{p} is not a within {_comp}")
         else:
             raise DesignError(f"{p} is not a path")
 
@@ -5068,10 +5074,11 @@ class GiabStrats(BaseModel):
         c: CoreLevel,
         rk: RefKeyFullS,
         bk: BuildKey,
+        sub: bool = False,
     ) -> None:
         if isinstance(p, list):
             for x in p:
-                self._test_if_final_path(x, c, rk, bk)
+                self._test_if_final_path(x, c, rk, bk, sub)
         else:
             raise DesignError(f"Not a list {p}")
 
@@ -5081,10 +5088,11 @@ class GiabStrats(BaseModel):
         c: CoreLevel,
         rk: RefKeyFullS,
         bk: BuildKey,
+        sub: bool = False,
     ) -> None:
         if isinstance(p, MutualPathPair):
-            self._test_if_final_path(p.positive, c, rk, bk)
-            self._test_if_final_path(p.negative, c, rk, bk)
+            self._test_if_final_path(p.positive, c, rk, bk, sub)
+            self._test_if_final_path(p.negative, c, rk, bk, sub)
         else:
             raise DesignError(f"Not a mutual pair path: {p}")
 
@@ -5369,8 +5377,10 @@ class GiabStrats(BaseModel):
         ranges: list[Path],
         extremes: list[Path],
     ) -> GCPaths:
-        self._test_if_final_paths(ranges, CoreLevel.GC, rk, bk)
-        self._test_if_final_paths(extremes, CoreLevel.GC, rk, bk)
+        # sub wildcards here during test since these paths will come from a
+        # checkpoint which will automatically fill in the refkey/buildkey
+        self._test_if_final_paths(ranges, CoreLevel.GC, rk, bk, sub=True)
+        self._test_if_final_paths(extremes, CoreLevel.GC, rk, bk, sub=True)
 
         bd = self.to_build_data_full(rk, bk)
 
