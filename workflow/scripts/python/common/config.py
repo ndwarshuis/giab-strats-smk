@@ -5326,7 +5326,8 @@ class GiabStrats(BaseModel):
         if not bd.want_union:
             return None
 
-        if segdups_src is None or len(bd.mappability_params) == 0:
+        # can't do anything if we don't have segdups or lowmap
+        if segdups_src is None or not bd.want_mappability:
             return None
 
         sl = SegdupLowmapPaths(
@@ -5335,6 +5336,7 @@ class GiabStrats(BaseModel):
             output=segdup_lowmap_output,
         )
 
+        # make the alldifficult file if we have 2 of xy, repeats, or gc
         _gc_src = gc_src if bd.want_gc else None
         _repeat_src: Path | None = fmap_maybe(
             lambda x: fmap_maybe(
