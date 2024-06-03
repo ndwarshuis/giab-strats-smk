@@ -401,7 +401,6 @@ rule diploid_readme:
         methods="workflow/templates/diploid_methods.j2",
         bedtools_env="workflow/envs/bedtools.yml",
         diploid_env="workflow/envs/quasi-dipcall.yml",
-        _sources=lambda w: all_diploid(w["ref_final_key"], w["build_key"]).all_sources,
     params:
         paths=lambda w: all_diploid(w["ref_final_key"], w["build_key"]),
     output:
