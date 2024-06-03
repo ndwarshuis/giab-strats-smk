@@ -158,7 +158,7 @@ def main(smk: Any) -> None:
 
             write_bedpaths(g.output, bedpaths)
 
-    def to_io_group(name: str, f: GFF2Bed) -> IOGroup:
+    def to_io_group(name: str, f: GFF2Bed, allow_empty: bool) -> IOGroup:
         return IOGroup(
             inputs=cfg.smk_to_inputs_name(smk, name),
             output=cfg.smk_to_output_name(smk, name),
@@ -168,10 +168,10 @@ def main(smk: Any) -> None:
 
     # now actually do things...
 
-    cds = to_io_group("cds", filter_cds)
-    mhc = to_io_group("mhc", filter_mhc)
-    kir = to_io_group("kir", filter_kir)
-    vdj = to_io_group("vdj", filter_vdj)
+    cds = to_io_group("cds", filter_cds, False)
+    mhc = to_io_group("mhc", filter_mhc, True)
+    kir = to_io_group("kir", filter_kir, True)
+    vdj = to_io_group("vdj", filter_vdj, True)
 
     # first, read the GFF from the CDS source path
     gff = sconf.with_build_data_and_bed_i(
