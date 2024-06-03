@@ -97,7 +97,7 @@ def main(smk: Any) -> None:
     def dip1to2(i: Path, bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFile) -> list[GFFOut]:
         dfs = cfg.read_filter_sort_dip1to2_bed(bd, bf, i)
         rks = bd.refdata.ref.src.keys(rk)
-        return [GFFOut(d, k) for d, k in zip(dfs, rks)]
+        return [GFFOut(d, k) for d, k in zip(dfs, rks.as_tuple)]
 
     def dip2to1(
         i: tuple[Path, Path],

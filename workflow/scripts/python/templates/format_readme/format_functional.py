@@ -30,7 +30,10 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     bk = cfg.wc_to_buildkey(ws)
     bd = sconf.to_build_data(rk, bk)
 
-    paths: cfg.OtherDifficultPaths = smk.params["paths"]
+    paths = smk.params["paths"]
+
+    if not isinstance(paths, cfg.OtherDifficultPaths):
+        raise DesignError()
 
     cds_src = bd.refdata.strat_inputs.functional.cds
 
@@ -53,8 +56,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_description(t: j2.Template) -> str:
         return t.render(
-            cds_file=not_none_unsafe(paths.cds_output, lambda z: z.name),
-            notcds_file=not_none_unsafe(paths.not_cds_output, lambda z: z.name),
+            cds_file=not_none_unsafe(paths.cds_output, lambda z: z.positive.name),
+            notcds_file=not_none_unsafe(paths.cds_output, lambda z: z.positive.name),
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})

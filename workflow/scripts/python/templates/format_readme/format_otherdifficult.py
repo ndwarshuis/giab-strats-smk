@@ -15,7 +15,12 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     rfk = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)
 
-    paths: cfg.OtherDifficultPaths = smk.params["paths"]
+    paths = smk.params["paths"]
+
+    if not isinstance(paths, cfg.OtherDifficultPaths):
+        raise DesignError()
+
+    src = paths.sources
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
@@ -50,29 +55,29 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         sconf.with_build_data_and_bed_doc(
             rfk,
             bk,
-            paths.gaps_src,
+            src.gaps,
             cfg.bd_to_gaps,
             "Gaps file",
             None,
         )
-        if paths.gaps_src is not None
+        if src.gaps is not None
         else None
     )
 
-    if paths.refseq_src is not None and (
-        (paths.vdj_output is not None and paths.vdj_src is None)
-        or (paths.mhc_output is not None and paths.mhc_src is None)
-        or (paths.kir_output is not None and paths.kir_src is None)
+    if src.refseq is not None and (
+        (paths.vdj_output is not None and src.vdj is None)
+        or (paths.mhc_output is not None and src.mhc is None)
+        or (paths.kir_output is not None and src.kir is None)
     ):
         refseq_para = sconf.with_build_data_and_bed_doc(
             rfk,
             bk,
-            paths.refseq_src,
+            src.refseq,
             cfg.bd_to_cds,
             "Refseq GFF file",
             None,
         )
-        if paths.vdj_output is not None and paths.vdj_src is None:
+        if paths.vdj_output is not None and src.vdj is None:
             vdj_para = (
                 "VDJ regions were found by filtering the GFF for"
                 "attributes matching '^ID=gene-(IGH|IGK|IGL|TRA|TRB|TRG);'."
@@ -80,14 +85,14 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         else:
             vdj_para = None
 
-        if paths.kir_output is not None and paths.kir_src is None:
+        if paths.kir_output is not None and src.kir is None:
             raise DesignError(
                 "KIR regions were found in Mike Portnoy's last beer bottle."
             )
         else:
             kir_para = None
 
-        if paths.mhc_output is not None and paths.mhc_src is None:
+        if paths.mhc_output is not None and src.mhc is None:
             raise DesignError(
                 "MHC regions were found in Taylor Swift's secret torture chamber."
             )
@@ -118,9 +123,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         else:
             return None
 
-    vdj_src = immuno_src(paths.vdj_src, paths.vdj_output, cfg.bd_to_vdj, "VDJ")
-    kir_src = immuno_src(paths.kir_src, paths.kir_output, cfg.bd_to_kir, "KIR")
-    mhc_src = immuno_src(paths.mhc_src, paths.mhc_output, cfg.bd_to_mhc, "MHC")
+    vdj_src = immuno_src(src.vdj, paths.vdj_output, cfg.bd_to_vdj, "VDJ")
+    kir_src = immuno_src(src.kir, paths.kir_output, cfg.bd_to_kir, "KIR")
+    mhc_src = immuno_src(src.mhc, paths.mhc_output, cfg.bd_to_mhc, "MHC")
 
     other_srcs = {
         k: sconf.with_build_data_and_bed_doc(
@@ -131,7 +136,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             None,
             None,
         )
-        for k, paths in paths.other_src.items()
+        for k, paths in src.other.items()
     }
 
     def render_methods(t: j2.Template) -> str:

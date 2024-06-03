@@ -97,13 +97,17 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     rfk = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)
 
-    bed_paths: cfg.LowComplexityPaths = smk.params["paths"]
-    sat_paths = bed_paths.satellites
+    paths = smk.params["paths"]
+
+    if not isinstance(paths, cfg.LowComplexityPaths):
+        raise DesignError()
+
+    sat_paths = paths.satellites
     all_reps = fmap_maybe(lambda s: s.all_repeats, sat_paths)
 
     sat_src, rmsk_src, trf_src = format_sources(sconf, sat_paths, rfk, bk)
 
-    uniform = bed_paths.uniform_repeats
+    uniform = paths.uniform_repeats
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
@@ -111,17 +115,20 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         # uniform repeat section
         ("perfect_files", uniform.perfect),
         ("imperfect_files", uniform.imperfect),
-        ("homopolymers_file", uniform.homopolymers),
-        ("not_homopolymers_file", uniform.not_homopolymers),
+        ("homopolymers_file", uniform.homopolymers.positive),
+        ("not_homopolymers_file", uniform.homopolymers.negative),
         # sat section
-        ("sat_file", fmap_maybe(lambda x: x.sats, sat_paths)),
-        ("not_sat_file", fmap_maybe(lambda x: x.not_sats, sat_paths)),
+        ("sat_file", fmap_maybe(lambda x: x.sats.positive, sat_paths)),
+        ("not_sat_file", fmap_maybe(lambda x: x.sats.negative, sat_paths)),
         # tr section
         ("all_filtered_tr_files", fmap_maybe(lambda x: x.filtered_trs, all_reps)),
-        ("all_tr_file", fmap_maybe(lambda x: x.all_trs, all_reps)),
-        ("not_all_tr_file", fmap_maybe(lambda x: x.not_all_trs, all_reps)),
-        ("all_repeats_file", fmap_maybe(lambda x: x.all_repeats, all_reps)),
-        ("not_all_repeats_file", fmap_maybe(lambda x: x.not_all_repeats, all_reps)),
+        ("all_tr_file", fmap_maybe(lambda x: x.all_trs.positive, all_reps)),
+        ("not_all_tr_file", fmap_maybe(lambda x: x.all_trs.negative, all_reps)),
+        ("all_repeats_file", fmap_maybe(lambda x: x.all_repeats.positive, all_reps)),
+        (
+            "not_all_repeats_file",
+            fmap_maybe(lambda x: x.all_repeats.negative, all_reps),
+        ),
     ]
 
     all_paths = {

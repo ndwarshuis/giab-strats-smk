@@ -75,7 +75,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_description(t: j2.Template) -> str:
         return t.render(
-            all_auto_file=auto_path.name,
+            all_auto_file=fmap_maybe(lambda x: x.name, auto_path),
             par_files=[p.name for p in sex.par_paths],
             non_par_files=[p.name for p in sex.nonpar_paths],
             ampliconic_files=[p.name for p in sex.ampliconic_paths],

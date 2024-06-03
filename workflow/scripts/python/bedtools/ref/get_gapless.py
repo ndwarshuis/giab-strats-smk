@@ -66,7 +66,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
                 lambda i0, i1: cfg.read_filter_sort_dip2to2_bed(
                     bd,
                     bf,
-                    *hap.choose((i0, cfg.Haplotype.HAP1), (i1, cfg.Haplotype.HAP2))
+                    hap.choose(i0, i1),
+                    hap,
                 ),
             ),
         )

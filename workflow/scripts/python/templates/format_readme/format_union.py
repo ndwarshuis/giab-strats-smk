@@ -24,9 +24,9 @@ def relative_path(p: Path) -> str:
 
 
 def from_all_diff(a: cfg.AllDifficultPaths) -> tuple[str, str, str, list[str]]:
-    gc_txt = "high/low GC regions" if a.gc_source else None
-    repeat_txt = "tandem repeats" if a.repeat_source else None
-    xy_txt = "difficult XY regions" if a.xy_sources else None
+    gc_txt = "high/low GC regions" if a.gc_input else None
+    repeat_txt = "tandem repeats" if a.repeat_input else None
+    xy_txt = "difficult XY regions" if a.xy_inputs else None
 
     src_txt = concat_comma([x for x in [gc_txt, repeat_txt, xy_txt] if x is not None])
 
@@ -34,7 +34,7 @@ def from_all_diff(a: cfg.AllDifficultPaths) -> tuple[str, str, str, list[str]]:
         a.output.positive.name,
         a.output.negative.name,
         f"This contains the above regions plus {src_txt}.",
-        [relative_path(p) for p in a.sources],
+        [relative_path(p) for p in a.all_inputs],
     )
 
 
@@ -76,8 +76,10 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_methods(t: j2.Template) -> str:
         return t.render(
-            map_file=relative_path(paths.segdup_lowmap.lowmap_source),
-            segdup_file=relative_path(paths.segdup_lowmap.segdup_source),
+            map_file=relative_path(paths.segdup_lowmap.lowmap_input),
+            segdup_file=relative_path(
+                paths.segdup_lowmap.segdup_input.all_segdups.positive
+            ),
             all_difficult_files=alldiff_sources,
             deps=bedtools_deps,
         )
