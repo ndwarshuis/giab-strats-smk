@@ -831,7 +831,7 @@ rule low_complexity_readme:
             w["ref_final_key"], w["build_key"]
         ).all_sources,
     params:
-        paths=lambda w: all_low_complexity_smk(w.ref_final_key, w["build_key"]),
+        paths=lambda w: all_low_complexity(w["ref_final_key"], w["build_key"]),
     output:
         lc.readme,
     conda:
