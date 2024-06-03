@@ -1848,6 +1848,36 @@ class OtherDifficultSources:
     mhc: Path1or2 | None
     other: dict[OtherStratKey, Path1or2]
 
+    # NOTE return empty lists here to avoid failure when calling in rules
+    @property
+    def gaps_sources(self) -> list[Path]:
+        return [] if self.gaps is None else single_or_double_to_list(self.gaps)
+
+    @property
+    def refseq_sources(self) -> list[Path]:
+        return [] if self.refseq is None else single_or_double_to_list(self.refseq)
+
+    @property
+    def vdj_sources(self) -> list[Path]:
+        return [] if self.vdj is None else single_or_double_to_list(self.vdj)
+
+    @property
+    def kir_sources(self) -> list[Path]:
+        return [] if self.kir is None else single_or_double_to_list(self.kir)
+
+    @property
+    def mhc_sources(self) -> list[Path]:
+        return [] if self.mhc is None else single_or_double_to_list(self.mhc)
+
+    @property
+    def other_sources(self) -> list[Path]:
+        return [
+            i
+            for p in self.other.values()
+            if p is not None
+            for i in single_or_double_to_list(p)
+        ]
+
 
 @dataclass(frozen=True)
 class FunctionalPaths(_HasSources, _HasFinalBeds):
