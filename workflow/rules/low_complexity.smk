@@ -23,6 +23,13 @@ def all_low_complexity_sources(ref_key, build_key):
     )
 
 
+def all_low_complexity_sources_wc(wildcards):
+    return all_low_complexity_sources(
+        wildcards["ref_key"],
+        wildcards["build_key"],
+    )
+
+
 def all_low_complexity(ref_final_key, build_key):
     return config.all_low_complexity(
         ref_final_key,
@@ -439,7 +446,7 @@ use rule download_gaps as download_simreps with:
 
 checkpoint normalize_simreps:
     input:
-        lambda w: all_low_complexity_sources(w).trf_sources,
+        lambda w: all_low_complexity_sources_wc(w).trf_sources,
         # lambda w: bed_src_inputs(rules.download_simreps.output, si_to_simreps, w),
     output:
         lc.inter.filtersort.data / "simreps.json",
@@ -488,7 +495,7 @@ use rule download_gaps as download_rmsk with:
 
 checkpoint normalize_rmsk:
     input:
-        lambda w: all_low_complexity_sources(w).rmsk_sources,
+        lambda w: all_low_complexity_sources_wc(w).rmsk_sources,
         # lambda w: bed_src_inputs(rules.download_rmsk.output, si_to_rmsk, w),
     output:
         lc.inter.filtersort.data / "rmsk.txt.gz",
@@ -553,7 +560,7 @@ use rule download_gaps as download_censat with:
 # actually in them. 2-4k is probably a safe default
 checkpoint normalize_censat:
     input:
-        lambda w: all_low_complexity_sources(w).sat_sources,
+        lambda w: all_low_complexity_sources_wc(w).sat_sources,
         # lambda w: bed_src_inputs(rules.download_censat.output, si_to_satellites, w),
     output:
         lc.inter.filtersort.data / "censat.json",
