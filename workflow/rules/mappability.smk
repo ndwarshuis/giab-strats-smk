@@ -1,6 +1,6 @@
 from os.path import splitext, basename
 from pathlib import Path
-from common.config import CoreLevel
+from common.config import CoreLevel, MutualPathPair
 
 mlty = config.to_bed_dirs(CoreLevel.MAPPABILITY)
 
@@ -29,8 +29,10 @@ def all_mappability(ref_final_key, build_key):
     return config.all_lowmap(
         ref_final_key,
         build_key,
-        Path(rules.merge_nonunique.output.all_lowmap),
-        Path(rules.invert_merged_nonunique.output[0]),
+        MutualPathPair(
+            Path(rules.merge_nonunique.output.all_lowmap),
+            Path(rules.invert_merged_nonunique.output[0]),
+        ),
         [Path(p) for p in ss],
     )
 
