@@ -14,7 +14,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     # rk = cfg.strip_full_refkey(rfk)
     # bk = cfg.wc_to_buildkey(ws)
 
-    paths = smk.parms["paths"]
+    paths = smk.params["paths"]
 
     if not isinstance(paths, cfg.GCPaths):
         raise DesignError()

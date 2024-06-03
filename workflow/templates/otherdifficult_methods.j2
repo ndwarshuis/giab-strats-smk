@@ -17,7 +17,7 @@ followed by `mergeBed`.
 {{ refseq_src }}
 {% endif -%}
 
-{% for name, src in immuno_srcs -%}
+{% for name, src in immuno_srcs.items() -%}
 ### {{ name }}
 
 {{ src }}
