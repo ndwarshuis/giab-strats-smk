@@ -795,20 +795,26 @@ def smk_to_input(smk: Any, n: int = 0) -> Path:
         raise DesignError(f"Input files for {i} are a list")
 
 
-def smk_to_inputs(smk: Any, n: int = 0) -> list[Path]:
+def smk_to_inputs(smk: Any, n: int = 0, allow_empty: bool = False) -> list[Path]:
     i = smk.input[n]
     if isinstance(i, str):
         raise DesignError(f"Input files for {i} are not a list")
     else:
-        return [Path(p) for p in i]
+        ps = [Path(p) for p in i]
+        if len(i) == 0 and not allow_empty:
+            raise DesignError(f"Input files for {i} is an empty list")
+        return ps
 
 
-def smk_to_inputs_all(smk: Any) -> list[Path]:
+def smk_to_inputs_all(smk: Any, allow_empty: bool = False) -> list[Path]:
     i = smk.input
     if isinstance(i, str):
         raise DesignError(f"Input files for {i} are not a list")
     else:
-        return [Path(p) for p in i]
+        ps = [Path(p) for p in i]
+        if len(i) == 0 and not allow_empty:
+            raise DesignError(f"Input files for {i} is an empty list")
+        return ps
 
 
 def smk_to_input_name(smk: Any, name: str) -> Path:
@@ -823,14 +829,18 @@ def smk_to_input_name(smk: Any, name: str) -> Path:
         raise DesignError(f"Input files do not have name {name}")
 
 
-def smk_to_inputs_name(smk: Any, name: str) -> list[Path]:
+def smk_to_inputs_name(smk: Any, name: str, allow_empty: bool = False) -> list[Path]:
     i = smk.input
     if hasattr(i, name):
         x = i[name]
         if isinstance(x, str):
             raise DesignError(f"Input files for {name} are not a list")
         else:
-            return [Path(p) for p in x]
+            ps = [Path(p) for p in x]
+            if len(ps) == 0 and not allow_empty:
+                raise DesignError(f"Input files for {name} is an empty list")
+            return ps
+
     else:
         raise DesignError(f"Input files do not have name {name}")
 
