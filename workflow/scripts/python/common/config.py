@@ -5394,7 +5394,7 @@ class GiabStrats(BaseModel):
         # checkpoint which will automatically fill in the refkey/buildkey
         self._test_if_final_paths(ranges, CoreLevel.GC, rk, bk, sub=True)
         self._test_if_final_paths(extremes, CoreLevel.GC, rk, bk, sub=True)
-        self._test_if_final_path(readme, CoreLevel.GC, rk, bk, sub=True)
+        self._test_if_final_path(readme, CoreLevel.GC, rk, bk)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5422,7 +5422,7 @@ class GiabStrats(BaseModel):
         # sub wildcards here during test since these paths will come from a
         # checkpoint which will automatically fill in the refkey/buildkey
         self._test_if_final_paths(single, CoreLevel.MAPPABILITY, rk, bk, sub=True)
-        self._test_if_final_path(readme, CoreLevel.MAPPABILITY, rk, bk, sub=True)
+        self._test_if_final_path(readme, CoreLevel.MAPPABILITY, rk, bk)
 
         bd = self.to_build_data_full(rk, bk)
 
