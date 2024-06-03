@@ -164,7 +164,10 @@ def check_processes(
                     cmd = args.decode()
                 else:
                     cmd = str(args)
-                lf.write(f"{cmd}: {err.decode()}\n")
+                if err:
+                    lf.write(f"{cmd}: {err.decode()}\n")
+                else:
+                    lf.write(f"{cmd}: return code {p.returncode}\n")
 
     if some_error:
         exit(1)
