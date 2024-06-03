@@ -1967,13 +1967,13 @@ class SegdupSources(_HasSources):
 
 @dataclass(frozen=True)
 class SegdupPaths(_HasSources, _HasFinalBeds):
-    sources: SegdupSources
+    superdups: Path1or2
     all_segdups: MutualPathPair
     long_segdups: MutualPathPair
 
     @property
     def all_sources(self) -> list[Path]:
-        return self.sources.all_sources
+        return single_or_double_to_list(self.superdups)
 
     @property
     def all_final(self) -> list[Path]:
@@ -5416,9 +5416,9 @@ class GiabStrats(BaseModel):
 
         bd = self.to_build_data_full(rk, bk)
 
-        if bd.want_segdups and src is not None:
+        if bd.want_segdups and src is not None and src.superdup is not None:
             return SegdupPaths(
-                sources=src,
+                superdups=src.superdup,
                 all_segdups=segdups,
                 long_segdups=long_segdups,
             )

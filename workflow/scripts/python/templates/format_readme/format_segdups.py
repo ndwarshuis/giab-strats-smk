@@ -19,7 +19,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     src_txt = sconf.with_build_data_and_bed_doc(
         rfk,
         bk,
-        paths.superdup_src,
+        paths.superdups,
         cfg.bd_to_superdups,
         "The superdups file",
         None,
