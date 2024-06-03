@@ -160,7 +160,7 @@ def main(smk: Any) -> None:
 
     def to_io_group(name: str, f: GFF2Bed, allow_empty: bool) -> IOGroup:
         return IOGroup(
-            inputs=cfg.smk_to_inputs_name(smk, name),
+            inputs=cfg.smk_to_inputs_name(smk, name, allow_empty),
             output=cfg.smk_to_output_name(smk, name),
             pattern=cfg.smk_to_param_str(smk, name),
             gff2bed=f,
