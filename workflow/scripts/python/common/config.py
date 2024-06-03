@@ -5403,7 +5403,9 @@ class GiabStrats(BaseModel):
         single: list[Path],
     ) -> LowmapPaths:
         self._test_if_final_mutual_path(union, CoreLevel.MAPPABILITY, rk, bk)
-        self._test_if_final_paths(single, CoreLevel.MAPPABILITY, rk, bk)
+        # sub wildcards here during test since these paths will come from a
+        # checkpoint which will automatically fill in the refkey/buildkey
+        self._test_if_final_paths(single, CoreLevel.MAPPABILITY, rk, bk, sub=True)
 
         bd = self.to_build_data_full(rk, bk)
 
