@@ -21,7 +21,6 @@ def all_union(ref_final_key, build_key):
             Path(rules.invert_alldifficult.output[0]),
         ),
         Path(rules.union_readme.output[0]),
-        Path(rules.union_readme.output[0]),
     )
 
 
