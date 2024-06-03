@@ -22,7 +22,7 @@ def single_nonunique_inputs(ref_final_key, build_key):
 def all_mappability(ref_final_key, build_key):
     # guard to prevent checkpoint from firing when we call this function
     bd = config.to_build_data_full(ref_final_key, build_key)
-    if bd.want_mappability:
+    if not bd.want_mappability:
         return None
 
     ss = single_nonunique_inputs(ref_final_key, build_key)
