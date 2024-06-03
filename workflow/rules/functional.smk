@@ -222,7 +222,7 @@ rule functional_readme:
         methods="workflow/templates/functional_methods.j2",
         _sources=lambda w: all_functional(
             w["ref_final_key"], w["build_key"]
-        ).sources.all_sources,
+        ).all_sources,
         bedtools_env="workflow/envs/bedtools.yml",
     params:
         paths=lambda w: all_functional(w["ref_final_key"], w["build_key"]),
@@ -242,7 +242,7 @@ rule otherdifficult_readme:
         bedtools_env="workflow/envs/bedtools.yml",
         _sources=lambda w: all_otherdifficult(
             w["ref_final_key"], w["build_key"]
-        ).sources.all_sources,
+        ).all_sources,
     params:
         paths=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
     output:
