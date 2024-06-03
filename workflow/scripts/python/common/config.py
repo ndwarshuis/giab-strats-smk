@@ -5582,7 +5582,7 @@ class GiabStrats(BaseModel):
 
         def to_features(use_x: bool, features: XYFeatures) -> XYFeaturePaths:
             return XYFeaturePaths(
-                src=_features_src,
+                src=sub_sex(_features_src, use_x),
                 bed=features.x_bed if use_x else features.y_bed,
                 xtr_path=sub_sex(xtr, use_x) if features.xtr is not None else None,
                 ampliconic_path=(
