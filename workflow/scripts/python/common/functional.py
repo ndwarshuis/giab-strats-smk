@@ -174,3 +174,10 @@ def filter_dict_strict(ds: dict[str, X], xs: set[str]) -> dict[str, X]:
     if len(notindict) > 0:
         raise DesignError(f"Items not in input dictionary keys: {notindict}")
     return {k: v for k, v in ds.items() if k in xs}
+
+
+def uncons_maybe(xs: list[X]) -> tuple[X, list[X]] | None:
+    if len(xs) == 0:
+        return None
+    else:
+        return (xs[0], xs[1:])

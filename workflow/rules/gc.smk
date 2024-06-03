@@ -33,6 +33,7 @@ def all_gc(ref_final_key, build_key):
         build_key,
         [Path(p) for p in res["gc_ranges"]],
         [Path(p) for p in [*res["other_extremes"], res["widest_extreme"]]],
+        Path(rules.gc_readme.output[0]),
     )
 
 

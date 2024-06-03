@@ -1,12 +1,30 @@
 import jinja2 as j2
-from pathlib import Path
 from typing import Any
 import common.config as cfg
-from common.functional import fmap_maybe, DesignError, from_maybe
+from common.functional import fmap_maybe, DesignError, from_maybe, uncons_maybe
 import template_utils as tu
 
 # TODO booooo put this in the main config somewhere
 OTHERKEY = cfg.OtherLevelKey("OtherDifficult")
+
+
+# TODO implementme
+def kir_para() -> str:
+    raise DesignError("KIR regions were found in Mike Portnoy's last beer bottle.")
+
+
+# TODO implementme
+def mhc_para() -> str:
+    raise DesignError(
+        "MHC regions were found in Taylor Swift's secret torture chamber."
+    )
+
+
+def vdj_para() -> str:
+    return (
+        "VDJ regions were found by filtering the GFF for"
+        "attributes matching '^ID=gene-(IGH|IGK|IGL|TRA|TRB|TRG);'."
+    )
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
@@ -19,8 +37,6 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     if not isinstance(paths, cfg.OtherDifficultPaths):
         raise DesignError()
-
-    src = paths.sources
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
@@ -42,110 +58,89 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_description(t: j2.Template) -> str:
         return t.render(
-            gaps_file=fmap_maybe(lambda z: z.name, paths.gaps_output),
-            vdj_file=fmap_maybe(lambda z: z.name, paths.vdj_output),
-            kir_file=fmap_maybe(lambda z: z.name, paths.kir_output),
-            mhc_file=fmap_maybe(lambda z: z.name, paths.mhc_output),
-            other_files={p: format_other(k) for k, p in paths.other_outputs.items()},
+            gaps_file=fmap_maybe(lambda z: z.output.name, paths.gaps),
+            vdj_file=fmap_maybe(lambda z: z.output.name, paths.vdj),
+            kir_file=fmap_maybe(lambda z: z.output.name, paths.kir),
+            mhc_file=fmap_maybe(lambda z: z.output.name, paths.mhc),
+            other_files={p: format_other(k) for k, p in paths.other.items()},
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
 
+    # gaps is relatively straightforward, just get the source for the gaps if
+    # needed
     gaps_src = (
         sconf.with_build_data_and_bed_doc(
             rfk,
             bk,
-            src.gaps,
+            paths.gaps.source,
             cfg.bd_to_gaps,
             "Gaps file",
             None,
         )
-        if src.gaps is not None
+        if paths.gaps is not None
         else None
     )
 
-    if src.refseq is not None and (
-        (paths.vdj_output is not None and src.vdj is None)
-        or (paths.mhc_output is not None and src.mhc is None)
-        or (paths.kir_output is not None and src.kir is None)
-    ):
+    # The immuno sources (KIR/MHC/VDJ) need special treatment because some of
+    # them might be based on the refseq/cds bed file or they may have their
+    # own file. Partition the list of these to those from refseq and those not,
+    # then process independently. In the end, We will either have a separate
+    # section for KIR/MHC/VDJ or a GFF section in place of some/all of these.
+    immuno_pairs = [
+        (s, n, f, g)
+        for s, n, f, g in [
+            (paths.kir, "KIR", kir_para, cfg.bd_to_kir),
+            (paths.mhc, "MHC", mhc_para, cfg.bd_to_mhc),
+            (paths.vdj, "VDJ", vdj_para, cfg.bd_to_vdj),
+        ]
+        if s is not None
+    ]
+
+    refseq = [(s, f) for s, _, f, _ in immuno_pairs if s.source_is_refseq]
+    not_refseq = [(s, n, f) for s, n, _, f in immuno_pairs if not s.source_is_refseq]
+
+    if (r := uncons_maybe(refseq)) is None:
+        refseq_src = None
+    else:
+        s0, ss = r
+
         refseq_para = sconf.with_build_data_and_bed_doc(
             rfk,
             bk,
-            src.refseq,
+            s0[0].source,
             cfg.bd_to_cds,
             "Refseq GFF file",
             None,
         )
-        if paths.vdj_output is not None and src.vdj is None:
-            vdj_para = (
-                "VDJ regions were found by filtering the GFF for"
-                "attributes matching '^ID=gene-(IGH|IGK|IGL|TRA|TRB|TRG);'."
-            )
-        else:
-            vdj_para = None
-
-        if paths.kir_output is not None and src.kir is None:
-            raise DesignError(
-                "KIR regions were found in Mike Portnoy's last beer bottle."
-            )
-        else:
-            kir_para = None
-
-        if paths.mhc_output is not None and src.mhc is None:
-            raise DesignError(
-                "MHC regions were found in Taylor Swift's secret torture chamber."
-            )
-        else:
-            mhc_para = None
 
         refseq_src = "\n\n".join(
             [refseq_para]
-            + [
-                cfg.readme_fill(x)
-                for x in [vdj_para, kir_para, mhc_para]
-                if x is not None
-            ]
+            + [cfg.readme_fill(x) for x in [s[1]() for s in [s0, *ss]] if x is not None]
         )
-    else:
-        refseq_src = None
 
-    def immuno_src(
-        src: cfg.Path1or2 | None,
-        output: Path | None,
-        f: cfg.BuildDataToBed,
-        name: str,
-    ) -> str | None:
-        if src is not None and output is not None:
-            return sconf.with_build_data_and_bed_doc(
-                rfk, bk, src, f, f"{name} file", None
-            )
-        else:
-            return None
-
-    vdj_src = immuno_src(src.vdj, paths.vdj_output, cfg.bd_to_vdj, "VDJ")
-    kir_src = immuno_src(src.kir, paths.kir_output, cfg.bd_to_kir, "KIR")
-    mhc_src = immuno_src(src.mhc, paths.mhc_output, cfg.bd_to_mhc, "MHC")
+    immuno_srcs = {
+        n: sconf.with_build_data_and_bed_doc(rfk, bk, s.source, f, f"{n} file", None)
+        for s, n, f in not_refseq
+    }
 
     other_srcs = {
         k: sconf.with_build_data_and_bed_doc(
             rfk,
             bk,
-            paths,
+            p.source,
             lambda bd: cfg.bd_to_other(OTHERKEY, k, bd),
             None,
             None,
         )
-        for k, paths in src.other.items()
+        for k, p in paths.other.items()
     }
 
     def render_methods(t: j2.Template) -> str:
         return t.render(
             gaps_src=gaps_src,
             refseq_src=refseq_src,
-            vdj_src=vdj_src,
-            mhc_src=mhc_src,
-            kir_src=kir_src,
+            immuno_srcs=immuno_srcs,
             other_srcs=other_srcs,
             deps=bedtools_deps,
         )

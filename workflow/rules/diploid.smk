@@ -32,6 +32,7 @@ def all_diploid(ref_final_key, build_key):
         go("invert_het_regions"),
         go("merge_het_SNVorSV_regions"),
         go("invert_het_SNVorSV_regions"),
+        Path(rules.diploid_readme.output[0]),
     )
 
 

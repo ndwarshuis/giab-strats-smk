@@ -8,6 +8,7 @@ def all_telomeres(ref_final_key, build_key):
         ref_final_key,
         build_key,
         Path(rules.find_telomeres.output[0]),
+        Path(rules.telomere_readme.output[0]),
     )
 
 

@@ -31,6 +31,19 @@ def all_otherdifficult_sources(ref_key, build_key):
     )
 
 
+def all_functional(ref_final_key, build_key):
+    return config.all_otherdifficult(
+        ref_final_key,
+        build_key,
+        all_otherdifficult_sources(strip_full_refkey(ref_final_key), build_key),
+        MutualPathPair(
+            Path(rules.merge_cds.output[0]),
+            Path(rules.invert_cds.output[0]),
+        ),
+        Path(rules.functional_readme.output[0]),
+    )
+
+
 def all_otherdifficult(ref_final_key, build_key):
     # TODO actually make other work
     return config.all_otherdifficult(
@@ -38,14 +51,11 @@ def all_otherdifficult(ref_final_key, build_key):
         build_key,
         all_otherdifficult_sources(strip_full_refkey(ref_final_key), build_key),
         Path(rules.get_gaps.output[0]),
-        MutualPathPair(
-            Path(rules.merge_cds.output[0]),
-            Path(rules.invert_cds.output[0]),
-        ),
         Path(rules.remove_kir_gaps.output[0]),
         Path(rules.remove_mhc_gaps.output[0]),
         Path(rules.remove_vdj_gaps.output[0]),
         {},
+        Path(rules.otherdifficult_readme.output[0]),
     )
 
 
@@ -210,12 +220,12 @@ rule functional_readme:
         common="workflow/templates/common.j2",
         description="workflow/templates/functional_description.j2",
         methods="workflow/templates/functional_methods.j2",
-        _sources=lambda w: all_otherdifficult(
+        _sources=lambda w: all_functional(
             w["ref_final_key"], w["build_key"]
-        ).sources.all_functional_sources,
+        ).sources.all_sources,
         bedtools_env="workflow/envs/bedtools.yml",
     params:
-        paths=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
+        paths=lambda w: all_functional(w["ref_final_key"], w["build_key"]),
     output:
         func.readme,
     conda:
@@ -232,7 +242,7 @@ rule otherdifficult_readme:
         bedtools_env="workflow/envs/bedtools.yml",
         _sources=lambda w: all_otherdifficult(
             w["ref_final_key"], w["build_key"]
-        ).sources.all_otherdifficult_sources,
+        ).sources.all_sources,
     params:
         paths=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
     output:

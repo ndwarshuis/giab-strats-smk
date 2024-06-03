@@ -34,6 +34,7 @@ def all_mappability(ref_final_key, build_key):
             Path(rules.invert_merged_nonunique.output[0]),
         ),
         [Path(p) for p in ss],
+        Path(rules.mappability_readme.output[0]),
     )
 
 

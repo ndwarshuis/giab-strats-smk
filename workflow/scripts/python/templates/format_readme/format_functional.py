@@ -32,7 +32,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     paths = smk.params["paths"]
 
-    if not isinstance(paths, cfg.OtherDifficultPaths):
+    if not isinstance(paths, cfg.FunctionalPaths):
         raise DesignError()
 
     cds_src = bd.refdata.strat_inputs.functional.cds
@@ -40,13 +40,10 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     if cds_src is None:
         raise DesignError()
 
-    if paths.sources.refseq is None:
-        raise DesignError()
-
     src_txt = sconf.with_build_data_and_bed_doc(
         rfk,
         bk,
-        paths.sources.refseq,
+        paths.cds_source,
         cfg.bd_to_cds,
         "The GFF file",
         None,

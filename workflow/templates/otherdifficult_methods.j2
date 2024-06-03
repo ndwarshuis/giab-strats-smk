@@ -17,24 +17,12 @@ followed by `mergeBed`.
 {{ refseq_src }}
 {% endif -%}
 
-{% if vdj_src is not none -%}
-### VDJ
+{% for name, src in immuno_srcs -%}
+### {{ name }}
 
-{{ vdj_src }}
-{% endif -%}
+{{ src }}
 
-{% if mhc_src is not none -%}
-### MHC
-
-{{ mhc_src }}
-{% endif -%}
-
-{% if kir_src is not none -%}
-### KIR
-
-{{ kir_src }}
-{% endif -%}
-
+{% endfor -%}
 {% if other_srcs|length > 0 -%}
 ### Other
 

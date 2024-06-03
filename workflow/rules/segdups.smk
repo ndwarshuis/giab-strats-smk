@@ -24,6 +24,7 @@ def all_segdups(ref_final_key, build_key):
             Path(rules.filter_long_superdups.output[0]),
             Path(rules.notin_long_superdups.output[0]),
         ),
+        Path(rules.segdups_readme.output[0]),
     )
 
 

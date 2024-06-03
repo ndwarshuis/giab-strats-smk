@@ -15,6 +15,7 @@ def all_xy(ref_final_key, build_key):
             Path(rules.invert_PAR.output[0]),
         ),
         Path(rules.filter_autosomes.output[0]),
+        Path(rules.xy_readme.output[0]),
     )
 
 

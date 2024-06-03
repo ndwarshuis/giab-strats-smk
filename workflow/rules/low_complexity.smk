@@ -54,6 +54,7 @@ def all_low_complexity(ref_final_key, build_key):
             Path(rules.merge_HPs_and_TRs.output[0]),
             Path(rules.invert_HPs_and_TRs.output[0]),
         ),
+        Path(rules.low_complexity_readme.output[0]),
     )
 
 
