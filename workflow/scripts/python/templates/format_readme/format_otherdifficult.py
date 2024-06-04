@@ -27,7 +27,7 @@ def mhc_para() -> str:
 
 def vdj_para() -> str:
     return (
-        "VDJ regions were found by filtering the GFF for"
+        "VDJ regions were found by filtering the GFF for "
         "attributes matching '^ID=gene-(IGH|IGK|IGL|TRA|TRB|TRG);'."
     )
 
