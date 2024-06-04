@@ -4889,7 +4889,7 @@ class GiabStrats(BaseModel):
             dip_txt = " ".join(
                 [
                     "This source contained both haplotypes for this reference,",
-                    f"and only the {hap.value} haplotype was used to generate",
+                    f"and only the {hap.name} haplotype was used to generate",
                     "these bed files.",
                 ]
             )
@@ -4901,7 +4901,7 @@ class GiabStrats(BaseModel):
 
         def dip2to1(bf: Dip2BedFile) -> list[str]:
             def fmt_src(h: Haplotype) -> list[str]:
-                header = f"#### Haplotype {h.value}"
+                header = f"#### {h.name} haplotype"
                 src_txt = match_double_unsafe(
                     lambda p1, p2: format_src(
                         bf.bed.documentation.choose(h), h.choose(p1, p2), this
@@ -4923,7 +4923,7 @@ class GiabStrats(BaseModel):
         def dip2to2(bf: Dip2BedFile, hap: Haplotype) -> list[str]:
             dip_txt = " ".join(
                 [
-                    f"This source contained only the {hap.value} haplotype for",
+                    f"This source contained only the {hap.name} haplotype for",
                     "this reference, which was used to generate these bed files.",
                 ]
             )
