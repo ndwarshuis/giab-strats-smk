@@ -18,9 +18,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_description(t: j2.Template) -> str:
         return t.render(
-            single_lowmap_files=[p.name for p in paths.single],
-            all_lowmap_file=paths.union.positive.name,
-            not_all_lowmap_file=paths.union.negative.name,
+            single_lowmap_files=[tu.sub_rk(rk, p.name) for p in paths.single],
+            all_lowmap_file=tu.sub_rk(rk, paths.union.positive.name),
+            not_all_lowmap_file=tu.sub_rk(rk, paths.union.negative.name),
             params=paths.params,
         )
 
