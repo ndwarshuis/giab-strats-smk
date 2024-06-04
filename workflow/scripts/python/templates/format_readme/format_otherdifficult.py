@@ -1,7 +1,12 @@
 import jinja2 as j2
 from typing import Any
 import common.config as cfg
-from common.functional import fmap_maybe, DesignError, from_maybe, uncons_maybe
+from common.functional import (
+    fmap_maybe,
+    DesignError,
+    uncons_maybe,
+    fmap_maybe_def,
+)
 import template_utils as tu
 
 # TODO booooo put this in the main config somewhere
@@ -54,14 +59,17 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
                 lambda x: x.description, cfg.bd_to_other(OTHERKEY, k, bd)
             ),
         )
-        return from_maybe("No description", d)
+        return fmap_maybe_def("No description", lambda x: tu.sub_rk(rfk, x), d)
+
+    def fmt_maybe(p: cfg.GapsPaths | None) -> str | None:
+        return fmap_maybe(lambda z: tu.sub_rk(rfk, z.output.name), p)
 
     def render_description(t: j2.Template) -> str:
         return t.render(
-            gaps_file=fmap_maybe(lambda z: z.output.name, paths.gaps),
-            vdj_file=fmap_maybe(lambda z: z.output.name, paths.vdj),
-            kir_file=fmap_maybe(lambda z: z.output.name, paths.kir),
-            mhc_file=fmap_maybe(lambda z: z.output.name, paths.mhc),
+            gaps_file=fmt_maybe(paths.gaps),
+            vdj_file=fmt_maybe(paths.vdj),
+            kir_file=fmt_maybe(paths.kir),
+            mhc_file=fmt_maybe(paths.mhc),
             other_files={p: format_other(k) for k, p in paths.other.items()},
         )
 

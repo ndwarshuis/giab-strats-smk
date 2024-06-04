@@ -47,3 +47,7 @@ def render_readme(
         description=desc,
         haplotypes=[h.value for h in hs],
     )
+
+
+def sub_rk(rk: cfg.RefKeyFullS, n: str) -> str:
+    return cfg.sub_wildcard(n, "ref_final_key", rk)
