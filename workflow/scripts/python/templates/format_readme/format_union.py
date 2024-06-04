@@ -19,11 +19,14 @@ def concat_comma(xs: list[str]) -> str:
         return f"{first}, and {xs[-1]}"
 
 
-def relative_path(p: Path) -> str:
+def relative_path(rk: cfg.RefKeyFullS, p: Path) -> str:
     return str(Path("..") / p.parent.name / p.name)
 
 
-def from_all_diff(a: cfg.AllDifficultPaths) -> tuple[str, str, str, list[str]]:
+def from_all_diff(
+    rk: cfg.RefKeyFullS,
+    a: cfg.AllDifficultPaths,
+) -> tuple[str, str, str, list[str]]:
     gc_txt = "high/low GC regions" if a.gc_input else None
     repeat_txt = "tandem repeats" if a.repeat_input else None
     xy_txt = "difficult XY regions" if a.xy_inputs else None
@@ -34,7 +37,7 @@ def from_all_diff(a: cfg.AllDifficultPaths) -> tuple[str, str, str, list[str]]:
         a.output.positive.name,
         a.output.negative.name,
         f"This contains the above regions plus {src_txt}.",
-        [relative_path(p) for p in a.all_inputs],
+        [relative_path(rk, p) for p in a._all_inputs],
     )
 
 
@@ -59,14 +62,17 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     )
     alldiff_pos, alldiff_neg, alldiff_desc, alldiff_sources = fmap_maybe_def(
         empty,
-        from_all_diff,
+        lambda x: from_all_diff(rfk, x),
         paths.all_difficult,
     )
 
+    def fmt_name(p: Path) -> str:
+        return tu.sub_rk(rfk, p.name)
+
     def render_description(t: j2.Template) -> str:
         return t.render(
-            segdup_map_file=segdup_out.positive.name,
-            not_segdup_map_file=segdup_out.negative.name,
+            segdup_map_file=fmt_name(segdup_out.positive),
+            not_segdup_map_file=fmt_name(segdup_out.negative),
             alldifficult_file=alldiff_pos,
             not_alldifficult_file=alldiff_neg,
             alldifficult_desc=alldiff_desc,
@@ -76,9 +82,13 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_methods(t: j2.Template) -> str:
         return t.render(
-            map_file=relative_path(paths.segdup_lowmap.lowmap_input),
+            map_file=relative_path(
+                rfk,
+                paths.segdup_lowmap.lowmap_input,
+            ),
             segdup_file=relative_path(
-                paths.segdup_lowmap.segdup_input.all_segdups.positive
+                rfk,
+                paths.segdup_lowmap.segdup_input.all_segdups.positive,
             ),
             all_difficult_files=alldiff_sources,
             deps=bedtools_deps,
@@ -88,7 +98,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         smk,
         render_description,
         render_methods,
-        "unions of other difficult stratifications",
+        "combinations of other difficult stratifications",
         cfg.CoreLevel.UNION,
         sconf.refkey_haplotypes(rfk),
     )

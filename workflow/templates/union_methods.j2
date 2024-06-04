@@ -22,10 +22,10 @@ with the following:
 {% for file in all_difficult_files -%}
 `{{ file }}`
 {%- endfor %}
-{%- endif %}
 
+{% endif -%}
 ## Software
 {% for dep, version in deps.items() %}
 - {{ dep }}: version {{ version }}
-{%- endfor %}
+{%- endfor -%}
 
