@@ -57,7 +57,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
                 paths.cds_output, lambda z: tu.sub_rk(rfk, z.positive.name)
             ),
             notcds_file=not_none_unsafe(
-                paths.cds_output, lambda z: tu.sub_rk(rfk, z.positive.name)
+                paths.cds_output, lambda z: tu.sub_rk(rfk, z.negative.name)
             ),
         )
 
