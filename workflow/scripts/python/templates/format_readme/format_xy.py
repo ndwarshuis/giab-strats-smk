@@ -1,4 +1,5 @@
 import jinja2 as j2
+from pathlib import Path
 from typing import Any, assert_never
 import common.config as cfg
 from common.functional import DesignError, fmap_maybe
@@ -73,13 +74,16 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
+    def fmt_names(ps: list[Path]) -> list[str]:
+        return [tu.sub_rk(rfk, p.name) for p in ps]
+
     def render_description(t: j2.Template) -> str:
         return t.render(
-            all_auto_file=fmap_maybe(lambda x: x.name, auto_path),
-            par_files=[p.name for p in sex.par_paths],
-            non_par_files=[p.name for p in sex.nonpar_paths],
-            ampliconic_files=[p.name for p in sex.ampliconic_paths],
-            xtr_files=[p.name for p in sex.xtr_paths],
+            all_auto_file=fmap_maybe(lambda x: tu.sub_rk(rfk, x.name), auto_path),
+            par_files=fmt_names(sex.par_paths),
+            non_par_files=fmt_names(sex.nonpar_paths),
+            ampliconic_files=fmt_names(sex.ampliconic_paths),
+            xtr_files=fmt_names(sex.xtr_paths),
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
