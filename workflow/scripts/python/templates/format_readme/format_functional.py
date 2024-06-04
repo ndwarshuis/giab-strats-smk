@@ -53,8 +53,12 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_description(t: j2.Template) -> str:
         return t.render(
-            cds_file=not_none_unsafe(paths.cds_output, lambda z: z.positive.name),
-            notcds_file=not_none_unsafe(paths.cds_output, lambda z: z.positive.name),
+            cds_file=not_none_unsafe(
+                paths.cds_output, lambda z: tu.sub_rk(rfk, z.positive.name)
+            ),
+            notcds_file=not_none_unsafe(
+                paths.cds_output, lambda z: tu.sub_rk(rfk, z.positive.name)
+            ),
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
