@@ -11,6 +11,7 @@ validation_dir = config.final_root_dir / "validation"
 
 ALL_TARGETS = [
     all_diploid,
+    all_functional,
     all_otherdifficult,
     all_gc,
     all_low_complexity,
