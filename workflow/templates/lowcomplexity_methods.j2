@@ -70,8 +70,8 @@ Overlaps were then merged using `mergeBed`. This resulted in the following:
 This was then complemented with `complementBed` to produce the following:
 
 `{{ not_sat_file }}`
-{%- endif %}
 
+{% endif -%}
 {% if trf_src is not none -%}
 ### All Tandem Repeats and Homopolymers
 
@@ -123,8 +123,8 @@ following:
 
 `{{ not_all_tr_file }}`
 `{{ not_all_repeats_file }}`
-{%- endif %}
 
+{% endif -%}
 ## Software
 
 ### repseq
