@@ -47,11 +47,11 @@ The steps to make this file were:
    
 This resulted in the following:
 
-{{ homopolymers_file }}
+`{{ homopolymers_file }}`
 
 This was then flipped using `complementBed` to create the following:
 
-{{ not_homopolymers_file }}
+`{{ not_homopolymers_file }}`
 
 {% if sat_src is not none -%}
 ### Satellites
@@ -65,11 +65,11 @@ This was then flipped using `complementBed` to create the following:
 Regions were extended by 5 base pairs in either direction using `slopBed`.
 Overlaps were then merged using `mergeBed`. This resulted in the following:
 
-{{ sat_file }}
+`{{ sat_file }}`
 
 This was then complemented with `complementBed` to produce the following:
 
-{{ not_sat_file }}
+`{{ not_sat_file }}`
 {%- endif %}
 
 {% if trf_src is not none -%}
@@ -110,19 +110,19 @@ perfect repeats (see above section "Combined Simple Repeats") using
 Each of these was combined using `multiIntersectBed` and `mergeBed` to produce
 the following unfiltered tandem repeat file:
 
-{{ all_tr_file }}
+`{{ all_tr_file }}`
 
 This was then combined using `multiIntersectBed` and `mergeBed` with the
 perfect/imperfect homopolymer file to produce the following file with all
 repeats (including homopolymers):
 
-{{ all_repeats_file }}
+`{{ all_repeats_file }}`
 
 These files were then complemented using `complementBed` to produce the
 following:
 
-{{ not_all_tr_file }}
-{{ not_all_repeats_file }}
+`{{ not_all_tr_file }}`
+`{{ not_all_repeats_file }}`
 {%- endif %}
 
 ## Software
