@@ -83,8 +83,12 @@ def format_sources(
             return (sat_txt, rmsk_txt, trf_txt)
 
 
-def basenames(ps: list[Path]) -> list[str]:
-    return [x.name for x in ps]
+def sub_rk(rk: cfg.RefKeyFullS, n: str) -> str:
+    return cfg.sub_wildcard(n, "ref_final_key", rk)
+
+
+def basenames(rk: cfg.RefKeyFullS, ps: list[Path]) -> list[str]:
+    return [sub_rk(rk, x.name) for x in ps]
 
 
 def maybe_filename(p: Path | None) -> str | None:
@@ -132,7 +136,11 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ]
 
     all_paths = {
-        k: None if v is None else (basenames(v) if isinstance(v, list) else v.name)
+        k: (
+            None
+            if v is None
+            else (basenames(rfk, v) if isinstance(v, list) else sub_rk(rfk, v.name))
+        )
         for k, v in _all_paths
     }
 
