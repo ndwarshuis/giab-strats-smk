@@ -1,4 +1,5 @@
 import jinja2 as j2
+from pathlib import Path
 from typing import Any
 import common.config as cfg
 from common.functional import DesignError
@@ -18,12 +19,15 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
     dipcall_env_path = cfg.smk_to_input_name(smk, "diploid_env")
 
+    def fmt_names(ps: list[Path]) -> list[str]:
+        return [p.name for p in ps]
+
     def render_description(t: j2.Template) -> str:
         return t.render(
-            het_files=[p.name for p in paths.hets],
-            SNVorSV_het_files=[p.name for p in paths.SNVorSV_hets],
-            hom_files=[p.name for p in paths.homs],
-            SNVorSV_hom_files=[p.name for p in paths.SNVorSV_homs],
+            het_files=fmt_names(paths.hets),
+            SNVorSV_het_files=fmt_names(paths.SNVorSV_hets),
+            hom_files=fmt_names(paths.homs),
+            SNVorSV_hom_files=fmt_names(paths.SNVorSV_homs),
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
