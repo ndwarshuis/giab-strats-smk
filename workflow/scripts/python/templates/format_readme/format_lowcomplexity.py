@@ -37,7 +37,7 @@ def format_sources(
         sat_other_txt = " ".join(
             [
                 "This bed file was filtered for for values in column",
-                f"{lc.satellites.sat_col + 1} which started with `ct`.",
+                f"column {lc.satellites.sat_col + 1} which started with `ct`.",
                 overlap_txt,
             ]
         )
@@ -50,7 +50,7 @@ def format_sources(
         sat_other_txt = " ".join(
             [
                 "This bed file was then filtered for the `Satellite` class in",
-                f"{rmsk_col}.",
+                f"column {rmsk_col}.",
                 overlap_txt,
             ]
         )
@@ -67,7 +67,7 @@ def format_sources(
             rmsk_src_txt = go(cfg.bd_to_rmsk, ps.all_repeats.rmsk_src)
             rmsk_other_txt = cfg.readme_fill(
                 "This bed file was then filtered for `Low_complexity` "
-                f"and `Simple_Repeat` class in {rmsk_col}."
+                f"and `Simple_Repeat` classes in column {rmsk_col}."
             )
             return (
                 sat_txt,
@@ -78,7 +78,7 @@ def format_sources(
             rmsk_txt = cfg.readme_fill(
                 "The same repeat masker source from above was used here, "
                 "except that `Low_complexity` and `Simple_Repeat` classes were "
-                f"selected via {rmsk_col}."
+                f"selected via column {rmsk_col}."
             )
             return (sat_txt, rmsk_txt, trf_txt)
 
