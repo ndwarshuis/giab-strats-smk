@@ -1,4 +1,5 @@
 import jinja2 as j2
+from pathlib import Path
 from typing import Any
 import common.config as cfg
 from common.functional import DesignError
@@ -27,12 +28,15 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
+    def fmt_name(p: Path) -> str:
+        return tu.sub_rk(rfk, p.name)
+
     def render_description(t: j2.Template) -> str:
         return t.render(
-            segdups_file=paths.all_segdups.positive.name,
-            not_segdups_file=paths.all_segdups.negative.name,
-            long_segdups_file=paths.long_segdups.positive.name,
-            not_long_segdups_file=paths.long_segdups.negative.name,
+            segdups_file=fmt_name(paths.all_segdups.positive),
+            not_segdups_file=fmt_name(paths.all_segdups.negative),
+            long_segdups_file=fmt_name(paths.long_segdups.positive),
+            not_long_segdups_file=fmt_name(paths.long_segdups.negative),
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
