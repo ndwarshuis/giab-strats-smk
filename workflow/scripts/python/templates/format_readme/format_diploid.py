@@ -20,7 +20,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     dipcall_env_path = cfg.smk_to_input_name(smk, "diploid_env")
 
     def fmt_names(ps: list[Path]) -> list[str]:
-        return [p.name for p in ps]
+        return [tu.sub_rk(rfk, p.name) for p in ps]
 
     def render_description(t: j2.Template) -> str:
         return t.render(
