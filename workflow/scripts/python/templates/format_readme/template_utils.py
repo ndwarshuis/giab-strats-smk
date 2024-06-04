@@ -45,7 +45,7 @@ def render_readme(
         methods_text=render_methods(methods_template),
         group=level.value,
         description=desc,
-        haplotypes=[h.value for h in hs],
+        haplotypes=[h.name for h in hs],
     )
 
 
