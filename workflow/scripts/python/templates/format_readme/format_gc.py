@@ -62,8 +62,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         smk,
         render_description,
         render_methods,
-        "coding regions",
-        cfg.CoreLevel.FUNCTIONAL,
+        "GC rich/poor regions",
+        cfg.CoreLevel.GC,
         sconf.refkey_haplotypes(rfk),
     )
 
