@@ -19,7 +19,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     seqtk_deps = tu.env_dependencies(bedtools_env_path, {"seqtk"})
 
     def render_description(t: j2.Template) -> str:
-        return t.render(file=paths.telomeres.name)
+        return t.render(file=tu.sub_rk(rfk, paths.telomeres.name))
 
     def render_methods(t: j2.Template) -> str:
         return t.render(deps=seqtk_deps)
