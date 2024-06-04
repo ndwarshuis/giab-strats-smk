@@ -40,22 +40,22 @@ base:
 These contain all homopolymers >=7 base pairs and all imperfect homopolymers
 >=11 base pairs long:
 
-{{ homopolymers_file }}
+`{{ homopolymers_file }}`
 
 This is the complement of the above:
 
-{{ not_homopolymers_file }}
+`{{ not_homopolymers_file }}`
 
 {% if sat_file is not none -%}
 ### Satellites
 
 The following contains all satellite repeat regions:
 
-{{ sat_file }}
+`{{ sat_file }}`
 
 And this is the complement of the above:
 
-{{ not_sat_file }}
+`{{ not_sat_file }}`
 {%- endif %}
 
 {% if all_tr_file is not none -%}
@@ -71,20 +71,20 @@ contain perfect or imperfect homopolymers:
 
 This is a union of the above files:
 
-{{ all_tr_file }}
+`{{ all_tr_file }}`
 
 This is the complement of the above:
 
-{{ not_all_tr_file }}
+`{{ not_all_tr_file }}`
 
 #### All Repeats
 
 This has all tandem repeats from the above section with perfect/imperfect
 homopolymers:
 
-{{ all_repeats_file }}
+`{{ all_repeats_file }}`
 
 This is the complement of the above:
 
-{{ not_all_repeats_file }}
+`{{ not_all_repeats_file }}`
 {%- endif %}
