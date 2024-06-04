@@ -32,7 +32,7 @@ def all_otherdifficult_sources(ref_key, build_key):
 
 
 def all_functional(ref_final_key, build_key):
-    return config.all_otherdifficult(
+    return config.all_functional(
         ref_final_key,
         build_key,
         all_otherdifficult_sources(strip_full_refkey(ref_final_key), build_key),
