@@ -8,15 +8,15 @@ produce the non-PAR beds.
 ### X
 
 {{ x_par_src }}
-{%- endif %}
 
+{% endif -%}
 {% if y_par_src is not none -%}
 ### Y
 
 {{ y_par_src }}
-{%- endif %}
-{%- endif %}
 
+{% endif -%}
+{% endif -%}
 {% if x_features_src is not none and y_features_src is not none -%}
 ## Features
 
@@ -24,15 +24,15 @@ produce the non-PAR beds.
 ### X
 
 {{ x_features_src }}
-{%- endif %}
 
+{% endif -%}
 {% if y_features_src is not none -%}
 ### Y
 
 {{ y_features_src }}
-{%- endif %}
-{%- endif %}
 
+{% endif -%}
+{% endif -%}
 ## Software
 {% for dep, version in deps.items() %}
 - {{ dep }}: version {{ version }}
