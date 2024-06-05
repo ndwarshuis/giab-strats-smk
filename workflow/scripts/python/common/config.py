@@ -4859,7 +4859,7 @@ class GiabStrats(BaseModel):
         inputs: Path1or2,
         get_bed_f: BuildDataToBed,
         this: str | None,
-        extra: str | None,
+        level: int,
     ) -> str:
         """Format readme documentation for a given source.
 
@@ -4918,7 +4918,12 @@ class GiabStrats(BaseModel):
             )
             src_paras = [p for h in Haplotype for p in fmt_src(h)]
             params_txt = format_bed_params(bf.params)
-            return [dip_txt, *src_paras, "#### Both haplotypes", params_txt]
+            return [
+                dip_txt,
+                *src_paras,
+                f"{level*'#'} Both haplotypes",
+                params_txt,
+            ]
 
         def dip2to2(bf: Dip2BedFile, hap: Haplotype) -> list[str]:
             dip_txt = " ".join(
@@ -4947,12 +4952,7 @@ class GiabStrats(BaseModel):
             lambda hap, _, bf: dip2to2(bf, hap),
         )
 
-        return "\n\n".join(
-            [
-                readme_fill(p)
-                for p in fmap_maybe_def(paragraphs, lambda e: [*paragraphs, e], extra)
-            ]
-        )
+        return "\n\n".join([readme_fill(p) for p in paragraphs])
 
     # final refkey/buildkey lists (for the "all" target and related)
 

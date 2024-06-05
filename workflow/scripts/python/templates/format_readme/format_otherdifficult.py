@@ -84,7 +84,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             paths.gaps.source,
             cfg.bd_to_gaps,
             "Gaps file",
-            None,
+            4,
         )
         if paths.gaps is not None
         else None
@@ -119,7 +119,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             s0[0].source,
             cfg.bd_to_cds,
             "Refseq GFF file",
-            None,
+            4,
         )
 
         refseq_src = "\n\n".join(
@@ -128,7 +128,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         )
 
     immuno_srcs = {
-        n: sconf.with_build_data_and_bed_doc(rfk, bk, s.source, f, f"{n} file", None)
+        n: sconf.with_build_data_and_bed_doc(rfk, bk, s.source, f, f"{n} file", 4)
         for s, n, f in not_refseq
     }
 
@@ -139,7 +139,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             p.source,
             lambda bd: cfg.bd_to_other(OTHERKEY, k, bd),
             None,
-            None,
+            5,
         )
         for k, p in paths.other.items()
     }

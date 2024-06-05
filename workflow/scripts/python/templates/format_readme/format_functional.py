@@ -46,7 +46,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         paths.cds_source,
         cfg.bd_to_cds,
         "The GFF file",
-        None,
+        3,
     )
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")

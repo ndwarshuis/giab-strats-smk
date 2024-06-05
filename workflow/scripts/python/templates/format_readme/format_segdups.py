@@ -23,7 +23,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         paths.superdups,
         cfg.bd_to_superdups,
         "The superdups file",
-        None,
+        4,
     )
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
