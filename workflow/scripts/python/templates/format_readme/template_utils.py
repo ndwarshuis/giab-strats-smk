@@ -30,7 +30,7 @@ def render_readme(
     render_description: Callable[[j2.Template], str],
     render_methods: Callable[[j2.Template], str],
     desc: str,
-    level: cfg.CoreLevel,
+    level: str,
     hs: list[cfg.Haplotype],
 ) -> str:
     common_path = cfg.smk_to_input_name(smk, "common")
@@ -43,7 +43,7 @@ def render_readme(
     return load_template_path(common_path).render(
         description_text=render_description(desc_template),
         methods_text=render_methods(methods_template),
-        group=level.value,
+        group=level,
         description=desc,
         haplotypes=[h.name for h in hs],
     )

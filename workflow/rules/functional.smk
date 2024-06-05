@@ -27,7 +27,7 @@ def all_otherdifficult_sources(ref_key, build_key):
         Path(rules.download_kir.output[0]),
         Path(rules.download_mhc.output[0]),
         Path(rules.download_vdj.output[0]),
-        {},
+        Path(rules.download_other.output[0]),
     )
 
 
@@ -45,7 +45,6 @@ def all_functional(ref_final_key, build_key):
 
 
 def all_otherdifficult(ref_final_key, build_key):
-    # TODO actually make other work
     return config.all_otherdifficult(
         ref_final_key,
         build_key,
@@ -54,9 +53,46 @@ def all_otherdifficult(ref_final_key, build_key):
         Path(rules.remove_kir_gaps.output[0]),
         Path(rules.remove_mhc_gaps.output[0]),
         Path(rules.remove_vdj_gaps.output[0]),
-        {},
+        Path(rules.remove_gaps_other.output[0]),
         Path(rules.otherdifficult_readme.output[0]),
     )
+
+
+def all_misc(other_level_key, ref_final_key, build_key):
+    return config.all_misc(
+        ref_final_key,
+        build_key,
+        other_level_key,
+        all_otherdifficult_sources(strip_full_refkey(ref_final_key), build_key),
+        Path(rules.remove_gaps_other.output[0]),
+        Path(rules.misc_readme.output[0]),
+    )
+
+
+################################################################################
+# gaps
+
+
+rule get_gaps:
+    input:
+        gapless=rules.get_gapless.output.auto,
+        genome=rules.filter_sort_ref.output["genome"],
+    output:
+        odiff.final("gaps_slop15kb"),
+    conda:
+        "../envs/bedtools.yml"
+    shell:
+        """
+        complementBed -i {input.gapless} -g {input.genome} | \
+        slopBed -i stdin -b 15000 -g {input.genome} | \
+        mergeBed -i stdin | \
+        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
+        bgzip -c > {output}
+        """
+
+
+################################################################################
+# CDS/VDJ/MHC/KIR
 
 
 use rule download_gaps as download_cds with:
@@ -155,29 +191,11 @@ use rule _invert_autosomal_regions as invert_cds with:
         func.final("notinrefseq_cds"),
 
 
-rule all_cds:
-    input:
-        rules.merge_cds.output,
-        rules.invert_cds.output,
-    localrule: True
-
-
-rule get_gaps:
-    input:
-        gapless=rules.get_gapless.output.auto,
-        genome=rules.filter_sort_ref.output["genome"],
-    output:
-        odiff.final("gaps_slop15kb"),
-    conda:
-        "../envs/bedtools.yml"
-    shell:
-        """
-        complementBed -i {input.gapless} -g {input.genome} | \
-        slopBed -i stdin -b 15000 -g {input.genome} | \
-        mergeBed -i stdin | \
-        intersectBed -a stdin -b {input.gapless} -sorted -g {input.genome} | \
-        bgzip -c > {output}
-        """
+# rule all_cds:
+#     input:
+#         rules.merge_cds.output,
+#         rules.invert_cds.output,
+#     localrule: True
 
 
 rule remove_vdj_gaps:
@@ -213,6 +231,96 @@ use rule remove_vdj_gaps as remove_kir_gaps with:
         gapless=rules.get_gapless.output.auto,
     output:
         odiff.final("KIR"),
+
+
+################################################################################
+# other
+
+
+use rule download_gaps as download_other with:
+    output:
+        config.ref_src_dir
+        / "{build_key}"
+        / "other"
+        / "{other_level_key}_{other_strat_key}.bed.gz",
+    log:
+        config.ref_src_dir
+        / "{build_key}"
+        / "other"
+        / "{other_level_key}_{other_strat_key}.log",
+    params:
+        src=lambda w: config.buildkey_to_bed_src(
+            lambda bd: bd_to_other(w.other_level_key, w.other_strat_key, bd),
+            w.ref_src_key,
+            w.build_key,
+        ),
+    wildcard_constraints:
+        **other_constraints,
+    localrule: True
+
+
+checkpoint normalize_other:
+    input:
+        lambda w: expand(
+            rules.download_other.output,
+            allow_missing=True,
+            ref_src_key=config.buildkey_to_bed_refsrckeys_smk(
+                lambda bd: bd_to_other(w.other_level_key, w.other_strat_key, bd),
+                w.ref_key,
+                w.build_key,
+            ),
+        ),
+    output:
+        config.intermediate_build_hapless_dir
+        / "other"
+        / "{other_level_key}"
+        / "{other_strat_key}.json",
+    params:
+        # TODO this is sloppy
+        output_pattern=lambda w: expand(
+            config.intermediate_build_dir
+            / "other"
+            / w.other_level_key
+            / f"{w.other_strat_key}.bed.gz",
+            ref_final_key="%s",
+            build_key=w.build_key,
+        )[0],
+    resources:
+        mem_mb=lambda w: config.buildkey_to_malloc(
+            w.ref_key, w.build_key, lambda m: m.normalizeOther
+        ),
+    conda:
+        "../envs/bedtools.yml"
+    wildcard_constraints:
+        **other_constraints,
+    script:
+        "../scripts/python/bedtools/other/normalize_other.py"
+
+
+rule remove_gaps_other:
+    input:
+        bed=lambda w: read_checkpoint(
+            "normalize_other",
+            w,
+            ["other_level_key", "other_strat_key"],
+        ),
+        genome=rules.filter_sort_ref.output["genome"],
+        gapless=rules.get_gapless.output.auto,
+    output:
+        config.build_final_strat_path("{other_level_key}", "{other_strat_key}"),
+    conda:
+        "../envs/bedtools.yml"
+    wildcard_constraints:
+        **other_constraints,
+    shell:
+        """
+        intersectBed -a {input.bed} -b {input.gapless} -sorted -g {input.genome} | \
+        bgzip -c > {output}
+        """
+
+
+################################################################################
+# readmes
 
 
 rule functional_readme:
@@ -251,3 +359,31 @@ rule otherdifficult_readme:
         "../envs/templates.yml"
     script:
         "../scripts/python/templates/format_readme/format_otherdifficult.py"
+
+
+rule misc_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/misc_description.j2",
+        methods="workflow/templates/misc_methods.j2",
+        bedtools_env="workflow/envs/bedtools.yml",
+        _sources=lambda w: all_misc(
+            w["other_level_key"],
+            w["ref_final_key"],
+            w["build_key"],
+        ).all_sources,
+    params:
+        paths=lambda w: all_misc(
+            w["other_level_key"],
+            w["ref_final_key"],
+            w["build_key"],
+        ),
+    output:
+        # TODO name not DRY
+        config.build_final_strat_path(
+            "{other_level_key}", "{other_level_key}_README.md"
+        ),
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_misc.py"

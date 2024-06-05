@@ -20,7 +20,7 @@ ALL_TARGETS = [
     all_telomeres,
     all_union,
     all_xy,
-]
+] + [lambda rk, bk: all_misc(lk, rk, bk) for lk in config.other_level_keys]
 
 
 def all_strat_targets(wildcards):

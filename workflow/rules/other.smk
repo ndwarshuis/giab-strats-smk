@@ -9,7 +9,7 @@ from common.config import bd_to_other, BUILTIN_OTHER
 # and will give an ambiguous file exception without a constraint.
 
 other_constraints = {
-    "other_level_key": f"({'|'.join(config.other_levels)})",
+    "other_level_key": f"({'|'.join(config.all_other_levels)})",
     "other_strat_key": f"(?!({'|'.join(BUILTIN_OTHER)}))[A-Za-z0-9-._]+",
 }
 

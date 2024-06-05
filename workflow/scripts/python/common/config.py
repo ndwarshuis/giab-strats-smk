@@ -1846,7 +1846,7 @@ class OtherDifficultSources:
     vdj: Path1or2 | None
     kir: Path1or2 | None
     mhc: Path1or2 | None
-    other: dict[OtherStratKey, Path1or2]
+    other: dict[OtherLevelKey, dict[OtherStratKey, Path1or2]]
 
     # NOTE return empty lists here to avoid failure when calling in rules
     @property
@@ -1873,10 +1873,17 @@ class OtherDifficultSources:
     def other_sources(self) -> list[Path]:
         return [
             i
-            for p in self.other.values()
-            if p is not None
-            for i in single_or_double_to_list(p)
+            for x in self.other.values()
+            for y in x.values()
+            for i in single_or_double_to_list(y)
         ]
+
+    # TODO this could just fail if we wanted
+    def other_source(self, lk: OtherLevelKey, sk: OtherStratKey) -> list[Path]:
+        try:
+            return single_or_double_to_list(self.other[lk][sk])
+        except KeyError:
+            return []
 
 
 @dataclass(frozen=True)
@@ -1937,6 +1944,22 @@ class OtherDifficultPaths(_HasSources, _HasFinalBeds):
             ]
             if p is not None
         ]
+
+
+@dataclass(frozen=True)
+class MiscPaths(_HasSources, _HasFinalBeds):
+    paths: dict[OtherStratKey, GapsPaths]
+    desc: OtherLevelDescription
+
+    @property
+    def all_sources(self) -> list[Path]:
+        return [
+            p for x in self.paths.values() for p in single_or_double_to_list(x.source)
+        ]
+
+    @property
+    def all_final(self) -> list[Path]:
+        return [x.output for x in self.paths.values()]
 
 
 @dataclass(frozen=True)
@@ -2096,6 +2119,8 @@ VDJ_CHRS = {ChrIndex(i) for i in [2, 7, 14, 22]}
 # strats in "OtherDifficult" that are built-in and should not be included
 # manually using the "other_strats" directive in "build"
 BUILTIN_OTHER = {"VDJ", "KIR", "MHC", "gaps_slop15kb"}
+
+OTHERDIFF_KEY = OtherLevelKey("OtherDifficult")
 
 
 ################################################################################
@@ -3311,6 +3336,11 @@ class Build(GenericModel, Generic[AnyBedT, AnyVcfT]):
         return os
 
 
+class OtherLevelDescription(BaseModel):
+    key: OtherLevelKey
+    desc: str
+
+
 class CDSParams(BaseModel):
     # Defaults for a for a "normal" gff file with Refseq and CDS for source and
     # type columns respectively
@@ -3778,11 +3808,20 @@ class Documentation(BaseModel):
 class GiabStrats(BaseModel):
     """Top level stratification object."""
 
-    other_levels: list[OtherLevelKey] = [
-        OtherLevelKey("Ancestry"),
-        OtherLevelKey("FunctionalTechnicallyDifficult"),
-        OtherLevelKey("GenomeSpecific"),
-        OtherLevelKey("OtherDifficult"),
+    # TODO make these descriptions actually work
+    other_levels: list[OtherLevelDescription] = [
+        OtherLevelDescription(
+            key=OtherLevelKey("Ancestry"),
+            desc="stuff for ancestry",
+        ),
+        OtherLevelDescription(
+            key=OtherLevelKey("FunctionalTechnicallyDifficult"),
+            desc="stuff that is technical and functional and difficult",
+        ),
+        OtherLevelDescription(
+            key=OtherLevelKey("GenomeSpecific"),
+            desc="Stuff that is specific to a particular genome",
+        ),
     ]
     paths: Paths = Paths()
     tools: Tools = Tools()
@@ -3833,12 +3872,18 @@ class GiabStrats(BaseModel):
         values: dict[str, Any],
     ) -> HapStrat:
         try:
-            levels = cast(list[OtherLevelKey], values["other_levels"])
+            levels: list[OtherLevelDescription] = values["other_levels"]
+            assert OTHERDIFF_KEY not in [
+                x.key for x in levels
+            ], f"{OTHERDIFF_KEY} cannot be in other_levels"
+
+            _levels = [OTHERDIFF_KEY, *[x.key for x in levels]]
+
             bad = [
                 f"level='{lk}'; build='{bk}'"
                 for bk, b in v.builds.items()
                 for lk in b.other_strats
-                if lk not in levels
+                if lk not in _levels
             ]
             if len(bad) > 0:
                 assert (
@@ -3894,6 +3939,16 @@ class GiabStrats(BaseModel):
     # the config as it passes into an rmd script)
     def items(self) -> Any:
         return {}.items()
+
+    # attributes
+
+    @property
+    def other_level_keys(self) -> list[OtherLevelKey]:
+        return [x.key for x in self.other_levels]
+
+    @property
+    def all_other_levels(self) -> list[OtherLevelKey]:
+        return [*self.other_level_keys, OTHERDIFF_KEY]
 
     # file paths
 
@@ -4157,14 +4212,14 @@ class GiabStrats(BaseModel):
         )
         return (m.init_mapper, m.final_mapper)
 
-    def buildkey_to_other_keys(
-        self, rk: RefKeyFullS, bk: BuildKey
-    ) -> list[tuple[OtherLevelKey, OtherStratKey]]:
-        """Lookup a given build and return a list of keys corresponding to the
-        external bed files we wish to include in the final package.
-        """
-        bd = self.to_build_data(strip_full_refkey(rk), bk)
-        return [(lk, sk) for lk, s in bd.build.other_strats.items() for sk in s]
+    # def buildkey_to_other_keys(
+    #     self, rk: RefKeyFullS, bk: BuildKey
+    # ) -> list[tuple[OtherLevelKey, OtherStratKey]]:
+    #     """Lookup a given build and return a list of keys corresponding to the
+    #     external bed files we wish to include in the final package.
+    #     """
+    #     bd = self.to_build_data(strip_full_refkey(rk), bk)
+    #     return [(lk, sk) for lk, s in bd.build.other_strats.items() for sk in s]
 
     def refsrckey_to_ref_src(self, rsk: RefKeyFullS) -> RefSrc:
         """Lookup a given reference and return its source object (haplotype
@@ -5059,13 +5114,13 @@ class GiabStrats(BaseModel):
     def _test_if_final_path(
         self,
         p: Any,
-        c: CoreLevel,
+        c: str,
         rk: RefKeyFullS,
         bk: BuildKey,
         sub: bool = False,
     ) -> None:
         if isinstance(p, Path):
-            comp = self.final_build_dir / c.value
+            comp = self.final_build_dir / c
             _comp = (
                 sub_wildcards_path(comp, {"ref_final_key": rk, "build_key": bk})
                 if sub
@@ -5079,7 +5134,7 @@ class GiabStrats(BaseModel):
     def _test_if_final_paths(
         self,
         p: Any,
-        c: CoreLevel,
+        c: str,
         rk: RefKeyFullS,
         bk: BuildKey,
         sub: bool = False,
@@ -5093,7 +5148,7 @@ class GiabStrats(BaseModel):
     def _test_if_final_mutual_path(
         self,
         p: Any,
-        c: CoreLevel,
+        c: str,
         rk: RefKeyFullS,
         bk: BuildKey,
         sub: bool = False,
@@ -5160,14 +5215,15 @@ class GiabStrats(BaseModel):
         all_repeats: MutualPathPair,
         readme: Path,
     ) -> LowComplexityPaths | None:
-        self._test_if_final_paths(perfect, CoreLevel.LOWCOMPLEXITY, rk, bk)
-        self._test_if_final_paths(imperfect, CoreLevel.LOWCOMPLEXITY, rk, bk)
-        self._test_if_final_mutual_path(homopolymers, CoreLevel.LOWCOMPLEXITY, rk, bk)
-        self._test_if_final_mutual_path(sats, CoreLevel.LOWCOMPLEXITY, rk, bk)
-        self._test_if_final_paths(filtered_trs, CoreLevel.LOWCOMPLEXITY, rk, bk)
-        self._test_if_final_mutual_path(all_trs, CoreLevel.LOWCOMPLEXITY, rk, bk)
-        self._test_if_final_mutual_path(all_repeats, CoreLevel.LOWCOMPLEXITY, rk, bk)
-        self._test_if_final_path(readme, CoreLevel.LOWCOMPLEXITY, rk, bk)
+        test_params = (CoreLevel.LOWCOMPLEXITY.value, rk, bk)
+        self._test_if_final_paths(perfect, *test_params)
+        self._test_if_final_paths(imperfect, *test_params)
+        self._test_if_final_mutual_path(homopolymers, *test_params)
+        self._test_if_final_mutual_path(sats, *test_params)
+        self._test_if_final_paths(filtered_trs, *test_params)
+        self._test_if_final_mutual_path(all_trs, *test_params)
+        self._test_if_final_mutual_path(all_repeats, *test_params)
+        self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5220,23 +5276,11 @@ class GiabStrats(BaseModel):
         kir: Path,
         mhc: Path,
         vdj: Path,
-        other: dict[OtherStratKey, Path],
+        other: Path,
     ) -> OtherDifficultSources:
-        def sub_rsk_other(p: Path, k: OtherStratKey) -> Path1or2 | None:
-            self._test_if_source_path(p, rk)
-            # TODO don't hardcode
-            rsks = self.buildkey_to_bed_refsrckeys(
-                lambda bd: bd_to_other(OtherLevelKey("OtherDifficult"), k, bd), rk, bk
-            )
-            if rsks is None:
-                return None
-            else:
-                return map_single_or_double(
-                    lambda r: sub_wildcards_path(
-                        p, {"ref_src_key": r, "build_key": bk}
-                    ),
-                    rsks,
-                )
+        self._test_if_source_path(other, rk)
+
+        bd = self.to_build_data(rk, bk)
 
         return OtherDifficultSources(
             gaps=self._sub_rsk(gaps, si_to_gaps, rk, bk),
@@ -5244,8 +5288,31 @@ class GiabStrats(BaseModel):
             mhc=self._sub_rsk(mhc, si_to_mhc, rk, bk),
             kir=self._sub_rsk(kir, si_to_kir, rk, bk),
             vdj=self._sub_rsk(vdj, si_to_vdj, rk, bk),
+            # TODO this is super lame, we know that the source is non-nil
+            # because it is right in the dictionary, so looking it up using this
+            # expensive function should not be necessary. The reason this is
+            # here is because the bed source in the dictionary is not guaranteed
+            # to have a "src" attribute, and the lambda function type guarantees
+            # this itself (which also makes me think the lambda type isn't
+            # correct). And the main reason we can't define a "src" attribute is
+            # because it returns either a Single[X] or a Double[X] which in turn
+            # requires defining a generic typevar in the "bed" property for a
+            # bed file...which isn't possible in mypy yet.
             other={
-                k: o for k, p in other.items() if (o := sub_rsk_other(p, k)) is not None
+                lk: {
+                    sk: map_single_or_double(
+                        lambda r: sub_wildcard_path(other, "ref_src_key", r),
+                        rsks,
+                    )
+                    for sk, _ in o.items()
+                    if (
+                        rsks := self.buildkey_to_bed_refsrckeys(
+                            lambda bd: bd_to_other(lk, sk, bd), rk, bk
+                        )
+                    )
+                    is not None
+                }
+                for lk, o in bd.build.other_strats.items()
             },
         )
 
@@ -5257,8 +5324,9 @@ class GiabStrats(BaseModel):
         cds: MutualPathPair,
         readme: Path,
     ) -> FunctionalPaths | None:
-        self._test_if_final_mutual_path(cds, CoreLevel.FUNCTIONAL, rk, bk)
-        self._test_if_final_path(readme, CoreLevel.FUNCTIONAL, rk, bk)
+        test_params = (CoreLevel.FUNCTIONAL.value, rk, bk)
+        self._test_if_final_mutual_path(cds, *test_params)
+        self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5283,16 +5351,16 @@ class GiabStrats(BaseModel):
         kir: Path,
         mhc: Path,
         vdj: Path,
-        other: dict[OtherStratKey, Path],
+        other: Path,
         readme: Path,
     ) -> OtherDifficultPaths:
-        self._test_if_final_path(gaps, CoreLevel.OTHER_DIFFICULT, rk, bk)
-        self._test_if_final_path(kir, CoreLevel.OTHER_DIFFICULT, rk, bk)
-        self._test_if_final_path(mhc, CoreLevel.OTHER_DIFFICULT, rk, bk)
-        self._test_if_final_path(vdj, CoreLevel.OTHER_DIFFICULT, rk, bk)
-        for p in other.values():
-            self._test_if_final_path(p, CoreLevel.OTHER_DIFFICULT, rk, bk)
-        self._test_if_final_path(readme, CoreLevel.OTHER_DIFFICULT, rk, bk)
+        test_params = (CoreLevel.OTHER_DIFFICULT.value, rk, bk)
+        self._test_if_final_path(gaps, *test_params)
+        self._test_if_final_path(kir, *test_params)
+        self._test_if_final_path(mhc, *test_params)
+        self._test_if_final_path(vdj, *test_params)
+        self._test_if_final_path(other, *test_params)
+        self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5318,11 +5386,17 @@ class GiabStrats(BaseModel):
                 source_is_refseq=source_is_refseq,
             )
 
-        def other_path(k: OtherStratKey, v: Path) -> GapsPaths | None:
-            try:
-                return GapsPaths(source=src.other[k], output=v)
-            except KeyError:
-                return None
+        other_diff = src.other[OTHERDIFF_KEY] if OTHERDIFF_KEY in src.other else {}
+        other_paths = {
+            k: GapsPaths(
+                source=v,
+                output=sub_wildcards_path(
+                    other,
+                    {"other_level_key": OTHERDIFF_KEY, "other_strat_key": k},
+                ),
+            )
+            for k, v in other_diff.items()
+        }
 
         return OtherDifficultPaths(
             readme=readme,
@@ -5334,8 +5408,44 @@ class GiabStrats(BaseModel):
             kir=immuno_paths(bd.want_kir, src.kir, kir),
             mhc=immuno_paths(bd.want_mhc, src.mhc, mhc),
             vdj=immuno_paths(bd.want_vdj, src.vdj, vdj),
-            other={
-                k: r for k, p in other.items() if (r := other_path(k, p)) is not None
+            other=other_paths,
+        )
+
+    def all_misc(
+        self,
+        rk: RefKeyFullS,
+        bk: BuildKey,
+        lk: OtherLevelKey,
+        src: OtherDifficultSources,
+        other: Path,
+        readme: Path,
+    ) -> MiscPaths | None:
+        test_params = (lk, rk, bk)
+        self._test_if_final_path(other, *test_params)
+        self._test_if_final_path(readme, *test_params)
+
+        _other = src.other[lk] if lk in src.other else {}
+
+        if len(_other) == 0:
+            return None
+
+        desc = next((x for x in self.other_levels if x.key == lk), None)
+
+        if desc is None:
+            raise DesignError()
+
+        return MiscPaths(
+            readme=readme,
+            desc=desc,
+            paths={
+                sk: GapsPaths(
+                    source=s,
+                    output=sub_wildcards_path(
+                        other,
+                        {"other_level_key": lk, "other_strat_key": sk},
+                    ),
+                )
+                for sk, s in _other.items()
             },
         )
 
@@ -5354,9 +5464,10 @@ class GiabStrats(BaseModel):
         all_difficult: MutualPathPair,
         readme: Path,
     ) -> UnionPaths | None:
-        self._test_if_final_mutual_path(segdup_lowmap_output, CoreLevel.UNION, rk, bk)
-        self._test_if_final_mutual_path(all_difficult, CoreLevel.UNION, rk, bk)
-        self._test_if_final_path(readme, CoreLevel.UNION, rk, bk)
+        test_params = (CoreLevel.UNION.value, rk, bk)
+        self._test_if_final_mutual_path(segdup_lowmap_output, *test_params)
+        self._test_if_final_mutual_path(all_difficult, *test_params)
+        self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5422,9 +5533,10 @@ class GiabStrats(BaseModel):
     ) -> GCPaths:
         # sub wildcards here during test since these paths will come from a
         # checkpoint which will automatically fill in the refkey/buildkey
-        self._test_if_final_paths(ranges, CoreLevel.GC, rk, bk, sub=True)
-        self._test_if_final_paths(extremes, CoreLevel.GC, rk, bk, sub=True)
-        self._test_if_final_path(readme, CoreLevel.GC, rk, bk)
+        test_params = (CoreLevel.GC.value, rk, bk)
+        self._test_if_final_paths(ranges, *test_params, sub=True)
+        self._test_if_final_paths(extremes, *test_params, sub=True)
+        self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5448,11 +5560,12 @@ class GiabStrats(BaseModel):
         single: list[Path],
         readme: Path,
     ) -> LowmapPaths:
-        self._test_if_final_mutual_path(union, CoreLevel.MAPPABILITY, rk, bk)
+        test_params = (CoreLevel.MAPPABILITY.value, rk, bk)
+        self._test_if_final_mutual_path(union, *test_params)
         # sub wildcards here during test since these paths will come from a
         # checkpoint which will automatically fill in the refkey/buildkey
-        self._test_if_final_paths(single, CoreLevel.MAPPABILITY, rk, bk, sub=True)
-        self._test_if_final_path(readme, CoreLevel.MAPPABILITY, rk, bk)
+        self._test_if_final_paths(single, *test_params, sub=True)
+        self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5484,9 +5597,10 @@ class GiabStrats(BaseModel):
         long_segdups: MutualPathPair,
         readme: Path,
     ) -> SegdupPaths | None:
-        self._test_if_final_mutual_path(segdups, CoreLevel.SEGDUPS, rk, bk)
-        self._test_if_final_mutual_path(long_segdups, CoreLevel.SEGDUPS, rk, bk)
-        self._test_if_final_path(readme, CoreLevel.SEGDUPS, rk, bk)
+        test_params = (CoreLevel.SEGDUPS.value, rk, bk)
+        self._test_if_final_mutual_path(segdups, *test_params)
+        self._test_if_final_mutual_path(long_segdups, *test_params)
+        self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5511,11 +5625,12 @@ class GiabStrats(BaseModel):
         SNVorSV_homs: list[Path],
         readme: Path,
     ) -> DiploidPaths | None:
-        self._test_if_final_paths(hets, CoreLevel.DIPLOID, rk, bk)
-        self._test_if_final_paths(SNVorSV_hets, CoreLevel.DIPLOID, rk, bk)
-        self._test_if_final_paths(homs, CoreLevel.DIPLOID, rk, bk)
-        self._test_if_final_paths(SNVorSV_homs, CoreLevel.DIPLOID, rk, bk)
-        self._test_if_final_path(readme, CoreLevel.DIPLOID, rk, bk)
+        test_params = (CoreLevel.DIPLOID.value, rk, bk)
+        self._test_if_final_paths(hets, *test_params)
+        self._test_if_final_paths(SNVorSV_hets, *test_params)
+        self._test_if_final_paths(homs, *test_params)
+        self._test_if_final_paths(SNVorSV_homs, *test_params)
+        self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5539,8 +5654,9 @@ class GiabStrats(BaseModel):
         telomeres: Path,
         readme: Path,
     ) -> TelomerePaths | None:
-        self._test_if_final_path(telomeres, CoreLevel.TELOMERES, rk, bk)
-        self._test_if_final_path(readme, CoreLevel.TELOMERES, rk, bk)
+        test_params = (CoreLevel.TELOMERES.value, rk, bk)
+        self._test_if_final_path(telomeres, *test_params)
+        self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
 
@@ -5562,11 +5678,12 @@ class GiabStrats(BaseModel):
         auto: Path,
         readme: Path,
     ) -> SexPaths:
-        self._test_if_final_path(xtr, CoreLevel.XY, rk, bk)
-        self._test_if_final_path(ampliconic, CoreLevel.XY, rk, bk)
-        self._test_if_final_mutual_path(par, CoreLevel.XY, rk, bk)
-        self._test_if_final_path(auto, CoreLevel.XY, rk, bk)
-        self._test_if_final_path(readme, CoreLevel.XY, rk, bk)
+        test_params = (CoreLevel.XY.value, rk, bk)
+        self._test_if_final_path(xtr, *test_params)
+        self._test_if_final_path(ampliconic, *test_params)
+        self._test_if_final_mutual_path(par, *test_params)
+        self._test_if_final_path(auto, *test_params)
+        self._test_if_final_path(readme, *test_params)
 
         _features_src = sub_wildcard_path(
             features_src,
