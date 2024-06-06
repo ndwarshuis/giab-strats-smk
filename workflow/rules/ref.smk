@@ -113,7 +113,7 @@ rule download_gaps:
     output:
         ref.src.reference.data / "gap.bed.gz",
     params:
-        src=lambda w: config.refsrckey_to_bed_src(si_to_gaps, w.ref_src_key),
+        src=lambda w: to_bed_src(si_to_gaps, w),
     localrule: True
     log:
         ref.src.reference.log / "download_gaps.log",
