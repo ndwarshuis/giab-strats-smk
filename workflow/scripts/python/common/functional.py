@@ -89,7 +89,7 @@ class DesignError(Exception):
     pass
 
 
-def raise_inline(msg: str) -> NoReturn:
+def raise_inline(msg: str | None = None) -> NoReturn:
     """Raise a design error.
 
     Useful for when I'm in a lambda and want to scream like a typical metalcore
