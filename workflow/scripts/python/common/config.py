@@ -4951,8 +4951,10 @@ class GiabStrats(BaseModel):
             return [dip_txt, src_txt, params_txt]
 
         def dip2to1(bf: Dip2BedFile) -> list[str]:
+            indent = level * "#"
+
             def fmt_src(h: Haplotype) -> list[str]:
-                header = f"#### {h.name} haplotype"
+                header = f"{indent} {h.name} haplotype"
                 src_txt = match_double_unsafe(
                     lambda p1, p2: format_src(
                         bf.bed.documentation.choose(h), h.choose(p1, p2), this
@@ -4972,7 +4974,7 @@ class GiabStrats(BaseModel):
             return [
                 dip_txt,
                 *src_paras,
-                f"{level*'#'} Both haplotypes",
+                f"{indent} Both haplotypes",
                 params_txt,
             ]
 
