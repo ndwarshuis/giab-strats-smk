@@ -2932,8 +2932,6 @@ Dip2BedFile = BedFile[Dip2BedSrc]
 
 AnyBedT = TypeVar("AnyBedT", HapBedSrc, Dip1BedSrc | Dip2BedSrc)
 
-AnyBedFileT = BedFile[AnyBedT]
-
 # vcf files may only be remote or local, and unlike bed files, there is no
 # option to use a dip1 bed file for a dip2 reference and vice versa
 HapVcfSrc = HapChrFileSrc[BedFileSrc]
