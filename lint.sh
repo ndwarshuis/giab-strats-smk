@@ -38,7 +38,6 @@ _test_env () {
         _conda_activate "$1"
         if [[ "$mod" != *.yml ]]; then
             echo "Testing scripts for $1 module: $mod"
-            echo ""
 
             _run_test flake8 "$mod"
             _run_test _mypy "$mod"
@@ -61,11 +60,12 @@ fi
 _conda_activate bedtools
 
 echo "Testing common module"
-echo ""
 
 # test the common dir since flake8 doesn't follow imports
 _run_test flake8 "$python_root/common"
-_run_test mypy "$python_root/common"
+_run_test _mypy "$python_root/common"
+
+echo ""
 
 _test_env bedtools
 _test_env templates
