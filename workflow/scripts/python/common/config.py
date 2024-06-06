@@ -5423,15 +5423,12 @@ class GiabStrats(BaseModel):
         other: Path,
         readme: Path,
     ) -> MiscPaths | None:
-        test_params = (lk, rk, bk)
-        self._test_if_final_path(
-            sub_wildcard_path(other, "other_level_key", lk),
-            *test_params,
-        )
-        self._test_if_final_path(
-            sub_wildcard_path(readme, "other_level_key", lk),
-            *test_params,
-        )
+        def test(p: Path) -> None:
+            _p = sub_wildcard_path(p, "other_level_key", lk)
+            self._test_if_final_path(_p, lk, rk, bk)
+
+        test(other)
+        test(readme)
 
         _other = src.other[lk] if lk in src.other else {}
 
