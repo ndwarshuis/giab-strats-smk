@@ -24,13 +24,12 @@ followed by `mergeBed`.
 {% if other_srcs|length > 0 -%}
 ### Other
 
-These bed files were taken as is from their denoted sources.
+These bed files were taken as-is from their denoted sources.
 {% for other_name, other_src in other_srcs.items() %}
 #### {{ other_name }}
 
 {{ other_src }}
 {% endfor %}
-
 {% endif -%}
 ## Software
 {% for dep, version in deps.items() %}
