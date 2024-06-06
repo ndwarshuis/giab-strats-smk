@@ -1,7 +1,5 @@
-{% for name, x in desc.items() %}
-## {{ name }}
+{% for other_file, other_desc in desc.items() %}
+{{ other_desc }}
 
-{{ x[0] }}
-
-`{{ x[1] }}`
+`{{ other_file }}`
 {% endfor %}

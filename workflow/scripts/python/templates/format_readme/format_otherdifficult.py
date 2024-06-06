@@ -1,12 +1,7 @@
 import jinja2 as j2
 from typing import Any
 import common.config as cfg
-from common.functional import (
-    fmap_maybe,
-    DesignError,
-    uncons_maybe,
-    fmap_maybe_def,
-)
+from common.functional import fmap_maybe, DesignError, uncons_maybe
 import template_utils as tu
 
 
@@ -42,22 +37,6 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
-    def format_other(k: cfg.OtherStratKey) -> str:
-        d = sconf.with_build_data_full(
-            rfk,
-            bk,
-            lambda bd: fmap_maybe(
-                lambda x: x.description, cfg.bd_to_other(cfg.OTHERDIFF_KEY, k, bd)
-            ),
-            lambda bd: fmap_maybe(
-                lambda x: x.description, cfg.bd_to_other(cfg.OTHERDIFF_KEY, k, bd)
-            ),
-            lambda _, bd: fmap_maybe(
-                lambda x: x.description, cfg.bd_to_other(cfg.OTHERDIFF_KEY, k, bd)
-            ),
-        )
-        return fmap_maybe_def("No description", lambda x: tu.sub_rk(rfk, x), d)
-
     def fmt_maybe(p: cfg.GapsPaths | None) -> str | None:
         return fmap_maybe(lambda z: tu.sub_rk(rfk, z.output.name), p)
 
@@ -67,7 +46,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             vdj_file=fmt_maybe(paths.vdj),
             kir_file=fmt_maybe(paths.kir),
             mhc_file=fmt_maybe(paths.mhc),
-            other_files={p: format_other(k) for k, p in paths.other.items()},
+            other_files=tu.fmt_other_descriptions(
+                sconf, rfk, bk, cfg.OTHERDIFF_KEY, paths.other
+            ),
         )
 
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
@@ -129,27 +110,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         for s, n, f in not_refseq
     }
 
-    other_srcs = {
-        sk: sconf.with_build_data_and_bed_doc(
-            rfk,
-            bk,
-            cfg.map_single_or_double(
-                lambda x: cfg.sub_wildcards_path(
-                    x,
-                    {
-                        "build_key": bk,
-                        "other_level_key": cfg.OTHERDIFF_KEY,
-                        "other_strat_key": sk,
-                    },
-                ),
-                p.source,
-            ),
-            lambda bd: cfg.bd_to_other(cfg.OTHERDIFF_KEY, sk, bd),
-            None,
-            5,
-        )
-        for sk, p in paths.other.items()
-    }
+    other_srcs = tu.fmt_other_srcs(sconf, rfk, bk, cfg.OTHERDIFF_KEY, paths.other)
 
     def render_methods(t: j2.Template) -> str:
         return t.render(

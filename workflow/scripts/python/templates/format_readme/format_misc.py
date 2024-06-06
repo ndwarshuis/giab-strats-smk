@@ -18,41 +18,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     lk = paths.desc.key
 
-    # TODO not DRY
-    def format_other(k: cfg.OtherStratKey) -> str:
-        d = sconf.with_build_data_full(
-            rfk,
-            bk,
-            lambda bd: fmap_maybe(lambda x: x.description, cfg.bd_to_other(lk, k, bd)),
-            lambda bd: fmap_maybe(lambda x: x.description, cfg.bd_to_other(lk, k, bd)),
-            lambda _, bd: fmap_maybe(
-                lambda x: x.description, cfg.bd_to_other(lk, k, bd)
-            ),
-        )
-        return fmap_maybe_def("No description", lambda x: tu.sub_rk(rfk, x), d)
-
-    desc = {k: (format_other(k), v.output) for k, v in paths.paths.items()}
-    src = {
-        sk: sconf.with_build_data_and_bed_doc(
-            rfk,
-            bk,
-            cfg.map_single_or_double(
-                lambda x: cfg.sub_wildcards_path(
-                    x,
-                    {
-                        "build_key": bk,
-                        "other_level_key": lk,
-                        "other_strat_key": sk,
-                    },
-                ),
-                p.source,
-            ),
-            lambda bd: cfg.bd_to_other(lk, sk, bd),
-            None,
-            5,
-        )
-        for sk, p in paths.paths.items()
-    }
+    desc = tu.fmt_other_descriptions(sconf, rfk, bk, lk, paths.paths)
+    src = tu.fmt_other_srcs(sconf, rfk, bk, lk, paths.paths)
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
     bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})

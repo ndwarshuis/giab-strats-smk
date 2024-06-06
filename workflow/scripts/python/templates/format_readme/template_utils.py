@@ -2,7 +2,12 @@ import yaml
 import jinja2 as j2
 from typing import Any, Callable
 from pathlib import Path
-from common.functional import DesignError, filter_dict_strict
+from common.functional import (
+    DesignError,
+    filter_dict_strict,
+    fmap_maybe,
+    fmap_maybe_def,
+)
 import common.config as cfg
 
 
@@ -51,3 +56,59 @@ def render_readme(
 
 def sub_rk(rk: cfg.RefKeyFullS, n: str) -> str:
     return cfg.sub_wildcard(n, "ref_final_key", rk)
+
+
+def fmt_other_srcs(
+    sconf: cfg.GiabStrats,
+    rk: cfg.RefKeyFullS,
+    bk: cfg.BuildKey,
+    lk: cfg.OtherLevelKey,
+    paths: dict[cfg.OtherStratKey, cfg.GapsPaths],
+) -> dict[cfg.OtherStratKey, str]:
+    # NOTE sub these three keys because unlike other sources, these are
+    # build specific and are also denoted by the other strat/level keys. Other
+    # sources are denoted by just the ref_src_key (which should already be
+    # subbed).
+    return {
+        sk: sconf.with_build_data_and_bed_doc(
+            rk,
+            bk,
+            cfg.map_single_or_double(
+                lambda x: cfg.sub_wildcards_path(
+                    x,
+                    {
+                        "build_key": bk,
+                        "other_level_key": lk,
+                        "other_strat_key": sk,
+                    },
+                ),
+                p.source,
+            ),
+            lambda bd: cfg.bd_to_other(lk, sk, bd),
+            None,
+            5,
+        )
+        for sk, p in paths.items()
+    }
+
+
+def fmt_other_descriptions(
+    sconf: cfg.GiabStrats,
+    rk: cfg.RefKeyFullS,
+    bk: cfg.BuildKey,
+    lk: cfg.OtherLevelKey,
+    paths: dict[cfg.OtherStratKey, cfg.GapsPaths],
+) -> dict[Path, str]:
+    def go(sk: cfg.OtherStratKey) -> str:
+        d = sconf.with_build_data_full(
+            rk,
+            bk,
+            lambda bd: fmap_maybe(lambda x: x.description, cfg.bd_to_other(lk, sk, bd)),
+            lambda bd: fmap_maybe(lambda x: x.description, cfg.bd_to_other(lk, sk, bd)),
+            lambda _, bd: fmap_maybe(
+                lambda x: x.description, cfg.bd_to_other(lk, sk, bd)
+            ),
+        )
+        return fmap_maybe_def("No description", lambda x: sub_rk(rk, x), d)
+
+    return {p.output: go(k) for k, p in paths.items()}
