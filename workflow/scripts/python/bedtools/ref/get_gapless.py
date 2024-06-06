@@ -34,8 +34,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, Any] = smk.wildcards
 
     def go(
-        x: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyVcfT]
-    ) -> cfg.BedFile[cfg.AnyBedT] | None:
+        x: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyVcfT, cfg.AnyBedTxtT]
+    ) -> cfg.BedFile[cfg.AnyBedT] | cfg.AnyBedTxtT | None:
         return x.refdata.strat_inputs.gap
 
     # If we have gap input, make the gapless file, otherwise just symlink to the

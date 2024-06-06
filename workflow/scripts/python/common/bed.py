@@ -5,12 +5,10 @@ import contextlib
 import pandas as pd
 import subprocess as sp
 from dataclasses import dataclass
-from typing import NewType, IO, Generator
+from typing import NewType, IO, Generator, NamedTuple
 from pathlib import Path
 from common.functional import not_none_unsafe, noop, DesignError
 from common.io import spawn_stream, bgzip_file
-
-# from Bio import bgzf  # type: ignore
 import csv
 
 # A complete chromosome name like "chr1" or "chr21_PATERNAL"
@@ -37,6 +35,12 @@ SplitMapper = dict[str, bool]
 BedColumns = tuple[int, int, int]
 
 
+class IndexedBedLine(NamedTuple):
+    chr: InternalChrIndex
+    start: int
+    end: int
+
+
 @dataclass(frozen=True)
 class BedLine:
     """A struct-like representation of one line in a bed file.
@@ -57,6 +61,17 @@ class BedLine:
 
 
 BedLines = list[BedLine]
+
+
+# TODO not totally DRY, not I have two different sort functions
+def indexed_bedlines_to_df(
+    xs: list[IndexedBedLine],
+    to_map: FinalMapper,
+) -> pd.DataFrame:
+    _xs = sorted(xs)
+    return pd.DataFrame(
+        [[to_map[x.chr], x.start, x.end] for x in _xs if x.chr in to_map]
+    )
 
 
 def make_split_mapper(im: InitMapper, fm: FinalMapper) -> SplitMapper:

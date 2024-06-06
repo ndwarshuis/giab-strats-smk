@@ -67,7 +67,11 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         return t.render(
             deps=bedtools_deps,
             src_txt=src_txt,
-            processing_txt=format_cds_params(cds_src.cds_params),
+            processing_txt=(
+                format_cds_params(cds_src.cds_params)
+                if isinstance(cds_src, cfg.BedFile)
+                else None
+            ),
         )
 
     txt = tu.render_readme(

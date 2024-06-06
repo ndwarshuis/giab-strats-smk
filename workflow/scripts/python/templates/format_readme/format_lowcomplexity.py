@@ -3,7 +3,7 @@ import jinja2 as j2
 from typing import Any
 from urllib.parse import unquote
 import common.config as cfg
-from common.functional import DesignError, fmap_maybe
+from common.functional import DesignError, fmap_maybe, fmap_maybe_def
 import template_utils as tu
 
 
@@ -23,10 +23,10 @@ def format_sources(
     lc = bd.refdata.strat_inputs.low_complexity
 
     # fmap_maybe doesn't work here for some reason... :(
-    if lc.rmsk is None:
-        rmsk_col = None
-    else:
-        rmsk_col = lc.rmsk.class_col + 1
+    # if lc.rmsk is None:
+    #     rmsk_col = None
+    # else:
+    #     rmsk_col = lc.rmsk.class_col + 1
 
     overlap_txt = "Overlapping regions were then merged with `mergeBed`."
     if ps.used_censat:
@@ -34,51 +34,76 @@ def format_sources(
             raise DesignError()
 
         sat_src_txt = go(cfg.bd_to_satellites, ps.sat_src)
-        sat_other_txt = " ".join(
-            [
-                "This bed file was filtered for for values in column",
-                f"column {lc.satellites.sat_col + 1} which started with `ct`.",
-                overlap_txt,
-            ]
+        sat_other_txt = (
+            " ".join(
+                [
+                    "This bed file was filtered for for values in column",
+                    f"column {lc.satellites.sat_col + 1} which started with `ct`.",
+                    overlap_txt,
+                ]
+            )
+            if isinstance(lc.satellites, cfg.SatFile)
+            else None
         )
 
     else:
-        if rmsk_col is None:
+        if lc.rmsk is None:
             raise DesignError()
 
         sat_src_txt = go(cfg.bd_to_rmsk, ps.sat_src)
-        sat_other_txt = " ".join(
-            [
-                "This bed file was then filtered for the `Satellite` class in",
-                f"column {rmsk_col}.",
-                overlap_txt,
-            ]
+        sat_other_txt = (
+            " ".join(
+                [
+                    "This bed file was then filtered for the `Satellite` class in",
+                    f"column {lc.rmsk.class_col + 1}.",
+                    overlap_txt,
+                ]
+            )
+            if isinstance(lc.rmsk, cfg.RMSKFile)
+            else None
         )
 
-    sat_txt = "\n\n".join([sat_src_txt, cfg.readme_fill(sat_other_txt)])
+    empty: list[str] = []
+
+    sat_txt = "\n\n".join(
+        [
+            sat_src_txt,
+            *fmap_maybe_def(empty, lambda x: [cfg.readme_fill(x)], sat_other_txt),
+        ]
+    )
 
     if ps.all_repeats is None:
         return (sat_txt, None, None)
     else:
         trf_txt = go(cfg.bd_to_simreps, ps.all_repeats.trf_src)
-        if rmsk_col is None:
+        if lc.rmsk is None:
             raise DesignError()
         if ps.used_censat:
             rmsk_src_txt = go(cfg.bd_to_rmsk, ps.all_repeats.rmsk_src)
-            rmsk_other_txt = cfg.readme_fill(
-                "This bed file was then filtered for `Low_complexity` "
-                f"and `Simple_Repeat` classes in column {rmsk_col}."
+            rmsk_other_txt = (
+                cfg.readme_fill(
+                    "This bed file was then filtered for `Low_complexity` "
+                    f"and `Simple_Repeat` classes in column {lc.rmsk.class_col + 1}."
+                )
+                if isinstance(lc.rmsk, cfg.RMSKFile)
+                else None
             )
             return (
                 sat_txt,
-                "\n\n".join([rmsk_src_txt, rmsk_other_txt]),
+                "\n\n".join(
+                    [x for x in [rmsk_src_txt, rmsk_other_txt] if x is not None]
+                ),
                 trf_txt,
             )
         else:
-            rmsk_txt = cfg.readme_fill(
-                "The same repeat masker source from above was used here, "
-                "except that `Low_complexity` and `Simple_Repeat` classes were "
-                f"selected via column {rmsk_col}."
+            rmsk_txt = (
+                cfg.readme_fill(
+                    "The same repeat masker source from above was used here, "
+                    "except that `Low_complexity` and `Simple_Repeat` classes were "
+                    f"selected via column {lc.rmsk.class_col + 1}."
+                )
+                if isinstance(lc.rmsk, cfg.RMSKFile)
+                else None
             )
             return (sat_txt, rmsk_txt, trf_txt)
 

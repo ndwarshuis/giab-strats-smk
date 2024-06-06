@@ -1,7 +1,7 @@
 import jinja2 as j2
 from typing import Any
 import common.config as cfg
-from common.functional import DesignError, fmap_maybe_def, fmap_maybe
+from common.functional import DesignError
 import template_utils as tu
 
 

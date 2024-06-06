@@ -39,7 +39,6 @@ def main(smk: Any) -> None:
     # polymorphic enough to understand 'Functional's
     if fnc is None:
         raise DesignError()
-    fps = fnc.cds_params
 
     # functions to convert the GFF dataframe to whatever we feel like
 
@@ -54,6 +53,14 @@ def main(smk: Any) -> None:
         # 3: attributes
         # 4: source, or type if source is not given
         # 5: type (if given)
+
+        # TODO dirty hack to get this to fail error if we try to call for a
+        # manually-specific CDS bed file (which is not a GFF and thus cannot be
+        # filtered)
+        if not isinstance(fnc, cfg.BedFile):
+            raise DesignError()
+        fps = fnc.cds_params
+
         source_mask = fmap_maybe(lambda x: df[4].str.match(x[0]), fps.source_match)
         type_col = 4 + (0 if source_mask is None else 1)
         type_mask = fmap_maybe(lambda x: df[type_col].str.match(x[0]), fps.type_match)
@@ -85,16 +92,20 @@ def main(smk: Any) -> None:
 
     # functions to read the GFF dataframe
 
-    def hap(i: Path, bd: cfg.HapBuildData, bf: cfg.HapBedFile) -> list[GFFOut]:
+    def hap(i: Path, bd: cfg.HapBuildData, bf: cfg.HapBedFileOrTxt) -> list[GFFOut]:
         df = cfg.read_filter_sort_hap_bed(bd, bf, i)
         return [GFFOut(df, bd.refdata.ref.src.key(rk))]
 
-    def dip1to1(i: Path, bd: cfg.Dip1BuildData, bf: cfg.Dip1BedFile) -> list[GFFOut]:
+    def dip1to1(
+        i: Path, bd: cfg.Dip1BuildData, bf: cfg.Dip1BedFileOrTxt
+    ) -> list[GFFOut]:
         df = cfg.read_filter_sort_dip1to1_bed(bd, bf, i)
         rfk = bd.refdata.ref.src.key(rk)
         return [GFFOut(df, rfk)]
 
-    def dip1to2(i: Path, bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFile) -> list[GFFOut]:
+    def dip1to2(
+        i: Path, bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFileOrTxt
+    ) -> list[GFFOut]:
         dfs = cfg.read_filter_sort_dip1to2_bed(bd, bf, i)
         rks = bd.refdata.ref.src.keys(rk)
         return [GFFOut(d, k) for d, k in zip(dfs, rks.as_tuple)]
@@ -102,7 +113,7 @@ def main(smk: Any) -> None:
     def dip2to1(
         i: tuple[Path, Path],
         bd: cfg.Dip1BuildData,
-        bf: cfg.Dip2BedFile,
+        bf: cfg.Dip2BedFileOrTxt,
     ) -> list[GFFOut]:
         df = cfg.read_filter_sort_dip2to1_bed(bd, bf, i)
         rfk = bd.refdata.ref.src.key(rk)
@@ -112,7 +123,7 @@ def main(smk: Any) -> None:
         i: Path,
         hap: cfg.Haplotype,
         bd: cfg.Dip2BuildData,
-        bf: cfg.Dip2BedFile,
+        bf: cfg.Dip2BedFileOrTxt,
     ) -> GFFOut:
         df = cfg.read_filter_sort_dip2to2_bed(bd, bf, i, hap)
         return GFFOut(df, cfg.RefKeyFull(rk, hap))
