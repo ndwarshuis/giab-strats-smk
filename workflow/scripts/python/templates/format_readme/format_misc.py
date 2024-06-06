@@ -36,7 +36,13 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         k: sconf.with_build_data_and_bed_doc(
             rfk,
             bk,
-            p.source,
+            cfg.map_single_or_double(
+                lambda x: cfg.sub_wildcards_path(
+                    x,
+                    {"build_key": bk, "other_level_key": lk},
+                ),
+                p.source,
+            ),
             lambda bd: cfg.bd_to_other(lk, k, bd),
             None,
             5,

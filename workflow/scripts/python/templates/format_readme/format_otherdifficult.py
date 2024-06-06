@@ -9,9 +9,6 @@ from common.functional import (
 )
 import template_utils as tu
 
-# TODO booooo put this in the main config somewhere
-OTHERKEY = cfg.OtherLevelKey("OtherDifficult")
-
 
 # TODO implementme
 def kir_para() -> str:
@@ -50,13 +47,13 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             rfk,
             bk,
             lambda bd: fmap_maybe(
-                lambda x: x.description, cfg.bd_to_other(OTHERKEY, k, bd)
+                lambda x: x.description, cfg.bd_to_other(cfg.OTHERDIFF_KEY, k, bd)
             ),
             lambda bd: fmap_maybe(
-                lambda x: x.description, cfg.bd_to_other(OTHERKEY, k, bd)
+                lambda x: x.description, cfg.bd_to_other(cfg.OTHERDIFF_KEY, k, bd)
             ),
             lambda _, bd: fmap_maybe(
-                lambda x: x.description, cfg.bd_to_other(OTHERKEY, k, bd)
+                lambda x: x.description, cfg.bd_to_other(cfg.OTHERDIFF_KEY, k, bd)
             ),
         )
         return fmap_maybe_def("No description", lambda x: tu.sub_rk(rfk, x), d)
@@ -136,8 +133,14 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         k: sconf.with_build_data_and_bed_doc(
             rfk,
             bk,
-            p.source,
-            lambda bd: cfg.bd_to_other(OTHERKEY, k, bd),
+            cfg.map_single_or_double(
+                lambda x: cfg.sub_wildcards_path(
+                    x,
+                    {"build_key": bk, "other_level_key": cfg.OTHERDIFF_KEY},
+                ),
+                p.source,
+            ),
+            lambda bd: cfg.bd_to_other(cfg.OTHERDIFF_KEY, k, bd),
             None,
             5,
         )
