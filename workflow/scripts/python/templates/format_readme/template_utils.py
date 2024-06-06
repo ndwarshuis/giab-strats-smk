@@ -6,7 +6,7 @@ from common.functional import (
     DesignError,
     filter_dict_strict,
     fmap_maybe,
-    fmap_maybe_def,
+    from_maybe,
 )
 import common.config as cfg
 
@@ -98,7 +98,7 @@ def fmt_other_descriptions(
     bk: cfg.BuildKey,
     lk: cfg.OtherLevelKey,
     paths: dict[cfg.OtherStratKey, cfg.GapsPaths],
-) -> dict[Path, str]:
+) -> dict[str, str]:
     def go(sk: cfg.OtherStratKey) -> str:
         d = sconf.with_build_data_full(
             rk,
@@ -109,6 +109,6 @@ def fmt_other_descriptions(
                 lambda x: x.description, cfg.bd_to_other(lk, sk, bd)
             ),
         )
-        return fmap_maybe_def("No description", lambda x: sub_rk(rk, x), d)
+        return from_maybe("No description", d)
 
-    return {p.output: go(k) for k, p in paths.items()}
+    return {sub_rk(rk, p.output.name): go(k) for k, p in paths.items()}

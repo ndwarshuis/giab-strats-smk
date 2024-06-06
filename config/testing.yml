@@ -247,14 +247,14 @@ haploid_stratifications:
                 hap:
                   url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
               remove_gaps: true
-              description: contigs less than 500,000 bp
+              description: This represents contigs less than 500,000 bp.
             test:
               bed:
                 hap:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
-              description: if you see this it worked
+              description: If you see this it worked.
 
         # Benchmark files for this reference (if desired). Each key will be fed
         # into corresponding inputs for hap.py using the generated stratifications
