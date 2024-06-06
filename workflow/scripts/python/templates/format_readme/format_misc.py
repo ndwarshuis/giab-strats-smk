@@ -33,21 +33,25 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     desc = {k: (format_other(k), v.output) for k, v in paths.paths.items()}
     src = {
-        k: sconf.with_build_data_and_bed_doc(
+        sk: sconf.with_build_data_and_bed_doc(
             rfk,
             bk,
             cfg.map_single_or_double(
                 lambda x: cfg.sub_wildcards_path(
                     x,
-                    {"build_key": bk, "other_level_key": lk},
+                    {
+                        "build_key": bk,
+                        "other_level_key": lk,
+                        "other_strat_key": sk,
+                    },
                 ),
                 p.source,
             ),
-            lambda bd: cfg.bd_to_other(lk, k, bd),
+            lambda bd: cfg.bd_to_other(lk, sk, bd),
             None,
             5,
         )
-        for k, p in paths.paths.items()
+        for sk, p in paths.paths.items()
     }
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")

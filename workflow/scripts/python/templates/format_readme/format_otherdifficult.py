@@ -130,21 +130,25 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     }
 
     other_srcs = {
-        k: sconf.with_build_data_and_bed_doc(
+        sk: sconf.with_build_data_and_bed_doc(
             rfk,
             bk,
             cfg.map_single_or_double(
                 lambda x: cfg.sub_wildcards_path(
                     x,
-                    {"build_key": bk, "other_level_key": cfg.OTHERDIFF_KEY},
+                    {
+                        "build_key": bk,
+                        "other_level_key": cfg.OTHERDIFF_KEY,
+                        "other_strat_key": sk,
+                    },
                 ),
                 p.source,
             ),
-            lambda bd: cfg.bd_to_other(cfg.OTHERDIFF_KEY, k, bd),
+            lambda bd: cfg.bd_to_other(cfg.OTHERDIFF_KEY, sk, bd),
             None,
             5,
         )
-        for k, p in paths.other.items()
+        for sk, p in paths.other.items()
     }
 
     def render_methods(t: j2.Template) -> str:
