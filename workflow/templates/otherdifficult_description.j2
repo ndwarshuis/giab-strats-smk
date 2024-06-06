@@ -36,7 +36,7 @@ region.
 {% if other_files|length > 0 -%}
 ### Other
 
-{% for other_file, other_desc in other_files %}
+{% for other_file, other_desc in other_files.items() %}
 {{ other_desc }}
 
 `{{ other_file }}`
