@@ -99,7 +99,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         render_description,
         render_methods,
         "the sex chromosomes",
-        cfg.CoreLevel.XY,
+        cfg.CoreLevel.XY.value,
         sconf.refkey_haplotypes(rfk),
     )
 

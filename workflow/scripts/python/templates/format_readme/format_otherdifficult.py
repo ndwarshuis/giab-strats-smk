@@ -158,7 +158,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         render_description,
         render_methods,
         "miscellaneously difficult regions",
-        cfg.CoreLevel.OTHER_DIFFICULT,
+        cfg.CoreLevel.OTHER_DIFFICULT.value,
         sconf.refkey_haplotypes(rfk),
     )
 

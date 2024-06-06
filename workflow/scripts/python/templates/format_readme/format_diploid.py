@@ -46,7 +46,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         render_description,
         render_methods,
         "regions specific to diploid references",
-        cfg.CoreLevel.DIPLOID,
+        cfg.CoreLevel.DIPLOID.value,
         sconf.refkey_haplotypes(rfk),
     )
 

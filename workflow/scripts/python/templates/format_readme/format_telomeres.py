@@ -29,7 +29,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         render_description,
         render_methods,
         "telomeric regions",
-        cfg.CoreLevel.TELOMERES,
+        cfg.CoreLevel.TELOMERES.value,
         sconf.refkey_haplotypes(rfk),
     )
 

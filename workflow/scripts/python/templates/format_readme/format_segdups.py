@@ -49,7 +49,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         render_description,
         render_methods,
         "segmental duplications",
-        cfg.CoreLevel.SEGDUPS,
+        cfg.CoreLevel.SEGDUPS.value,
         sconf.refkey_haplotypes(rfk),
     )
 

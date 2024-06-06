@@ -160,7 +160,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         render_description,
         render_methods,
         "homopolymers and tandem repeats",
-        cfg.CoreLevel.LOWCOMPLEXITY,
+        cfg.CoreLevel.LOWCOMPLEXITY.value,
         sconf.refkey_haplotypes(rfk),
     )
 

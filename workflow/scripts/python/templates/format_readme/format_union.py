@@ -99,7 +99,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         render_description,
         render_methods,
         "combinations of other difficult stratifications",
-        cfg.CoreLevel.UNION,
+        cfg.CoreLevel.UNION.value,
         sconf.refkey_haplotypes(rfk),
     )
 
