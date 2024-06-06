@@ -7,8 +7,8 @@
 
 Regions were extended in either direction by 15000 base pairs using `slopBed`
 followed by `mergeBed`.
-{% endif -%}
 
+{% endif -%}
 {% if refseq_src is not none -%}
 ### Refseq
 
@@ -25,14 +25,13 @@ followed by `mergeBed`.
 ### Other
 
 These bed files were taken as is from their denoted sources.
-
 {% for other_name, other_src in other_srcs.items() %}
 #### {{ other_name }}
 
 {{ other_src }}
 {% endfor %}
-{% endif -%}
 
+{% endif -%}
 ## Software
 {% for dep, version in deps.items() %}
 - {{ dep }}: version {{ version }}

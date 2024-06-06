@@ -1130,12 +1130,8 @@ def format_local_src(src: LocalSrcDoc, p: Path, this: str | None) -> str:
     return " ".join([x for x in [local_txt, md5_txt, src.comment] if x is not None])
 
 
-def format_txt_src(src: TxtSrcDoc, this: str | None) -> str:
-    txt = (
-        f"{format_this(this)} had coordinates which were specified manually"
-        "in the pipeline's configuration"
-    )
-    return " ".join([x for x in [txt, src.comment] if x is not None])
+def format_txt_src(src: TxtSrcDoc) -> str:
+    return src.comment
 
 
 def format_src(src: SrcDoc, p: Path, this: str | None) -> str:
@@ -1144,7 +1140,7 @@ def format_src(src: SrcDoc, p: Path, this: str | None) -> str:
     elif isinstance(src, LocalSrcDoc):
         return format_local_src(src, p, this)
     elif isinstance(src, TxtSrcDoc):
-        return format_txt_src(src, this)
+        return format_txt_src(src)
     else:
         assert_never(src)
 
@@ -2689,7 +2685,7 @@ class HapChrTxtSrc(_BaseSrcDocumentable1, _HapChrSrc[bed.BedLines]):
 
 class Dip1ChrTxtSrc(_BaseSrcDocumentable1, _Dip1ChrSrc[bed.BedLines]):
     dip: DipBedTxtSrc
-    comment: str = "This bed file was specified manually in the yaml config"
+    comment: str = "This bed file was specified manually in the yaml config."
 
     @property
     def documentation(self) -> Single[SrcDoc]:
@@ -2749,7 +2745,7 @@ class FileSrc_(HashedSrc_):
     """Base class for local src files."""
 
     filepath: FilePath
-    comment: str = "This file was local on the filesystem when the pipeline was run"
+    comment: str = "This file was local on the filesystem when the pipeline was run."
 
     @property
     def documentation(self) -> SrcDoc:
