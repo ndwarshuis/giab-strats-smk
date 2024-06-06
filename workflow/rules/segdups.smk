@@ -34,7 +34,7 @@ use rule download_gaps as download_superdups with:
     log:
         segdup.src.log / "superdups.log",
     params:
-        src=lambda w: config.refsrckey_to_bed_src(si_to_superdups, w.ref_src_key),
+        src=lambda w: to_bed_src(si_to_superdups, w),
     localrule: True
 
 
