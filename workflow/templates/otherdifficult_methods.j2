@@ -26,7 +26,7 @@ followed by `mergeBed`.
 
 These bed files were taken as is from their denoted sources.
 
-{% for other_name, other_src in other_srcs %}
+{% for other_name, other_src in other_srcs.items() %}
 #### {{ other_name }}
 
 {{ other_src }}
