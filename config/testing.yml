@@ -247,12 +247,14 @@ haploid_stratifications:
                 hap:
                   url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
               remove_gaps: true
+              description: contigs less than 500,000 bp
             test:
               bed:
                 hap:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
+              description: if you see this it worked
 
         # Benchmark files for this reference (if desired). Each key will be fed
         # into corresponding inputs for hap.py using the generated stratifications
@@ -496,6 +498,7 @@ haploid_stratifications:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
+              description: if you see this it works
 
       test-xy:
         chr_filter: [23, 24]
@@ -613,6 +616,7 @@ haploid_stratifications:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
+              description: if you see this it works
 
       test-xy:
         chr_filter: [23, 24]
@@ -662,6 +666,7 @@ diploid1_stratifications:
                     - {chr: 2, hap: 1, start: 12, end: 60}
                     - {chr: 21, hap: 0, start: 10, end: 50}
                     - {chr: 21, hap: 1, start: 15, end: 55}
+              description: if you see this it works
             test_dip:
               bed:
                 pat:
@@ -672,6 +677,7 @@ diploid1_stratifications:
                   lines:
                     - {chr: 2, start: 12, end: 60}
                     - {chr: 21, start: 15, end: 55}
+              description: if you see this it works
       test-xy:
         chr_filter: [23, 24]
         include:
@@ -799,6 +805,7 @@ diploid2_stratifications:
                     - {chr: 2, hap: 1, start: 12, end: 60}
                     - {chr: 21, hap: 0, start: 10, end: 50}
                     - {chr: 21, hap: 1, start: 15, end: 55}
+              description: if you see this it works
             test_dip:
               bed:
                 pat:
@@ -809,6 +816,7 @@ diploid2_stratifications:
                   lines:
                     - {chr: 2, start: 12, end: 60}
                     - {chr: 21, start: 15, end: 55}
+              description: if you see this it works
 
       test-map:
         chr_filter: [21]

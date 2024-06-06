@@ -5359,7 +5359,10 @@ class GiabStrats(BaseModel):
         self._test_if_final_path(kir, *test_params)
         self._test_if_final_path(mhc, *test_params)
         self._test_if_final_path(vdj, *test_params)
-        self._test_if_final_path(other, *test_params)
+        self._test_if_final_path(
+            sub_wildcard_path(other, "other_level_key", OTHERDIFF_KEY),
+            *test_params,
+        )
         self._test_if_final_path(readme, *test_params)
 
         bd = self.to_build_data_full(rk, bk)
@@ -5421,8 +5424,14 @@ class GiabStrats(BaseModel):
         readme: Path,
     ) -> MiscPaths | None:
         test_params = (lk, rk, bk)
-        self._test_if_final_path(other, *test_params)
-        self._test_if_final_path(readme, *test_params)
+        self._test_if_final_path(
+            sub_wildcard_path(other, "other_level_key", lk),
+            *test_params,
+        )
+        self._test_if_final_path(
+            sub_wildcard_path(readme, "other_level_key", lk),
+            *test_params,
+        )
 
         _other = src.other[lk] if lk in src.other else {}
 

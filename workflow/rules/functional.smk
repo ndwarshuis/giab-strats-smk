@@ -4,8 +4,10 @@ from common.config import (
     si_to_mhc,
     si_to_kir,
     si_to_vdj,
+    bd_to_other,
     strip_full_refkey,
     MutualPathPair,
+    BUILTIN_OTHER,
 )
 
 # NOTE this contains rules that generate stratifications in Functional,
@@ -235,6 +237,18 @@ use rule remove_vdj_gaps as remove_kir_gaps with:
 
 ################################################################################
 # other
+
+# make sure the wildcards here can match everything except the "built-in" other-
+# difficult beds (listed here)
+#
+# NOTE: this is necessary because while I have a validator in the config to
+# prevent built-in bed files to be added, snakemake doesn't know about these
+# and will give an ambiguous file exception without a constraint.
+
+other_constraints = {
+    "other_level_key": f"({'|'.join(config.all_other_levels)})",
+    "other_strat_key": f"(?!({'|'.join(BUILTIN_OTHER)}))[A-Za-z0-9-._]+",
+}
 
 
 use rule download_gaps as download_other with:
