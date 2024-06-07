@@ -255,6 +255,7 @@ haploid_stratifications:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
+                  provenance: I come in peice.
               description: If you see this it worked.
 
         # Benchmark files for this reference (if desired). Each key will be fed

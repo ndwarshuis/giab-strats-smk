@@ -2761,7 +2761,7 @@ class BedTxtSrc(GenericModel, Generic[BedTxtLineT], _SrcDocumentable):
     """
 
     lines: list[BedTxtLineT]
-    provenance: str = "This bed file was specified manually in the yaml config"
+    provenance: str = "This bed file was specified manually in the yaml config."
 
 
 HapBedTxtSrc = BedTxtSrc[HapBedTxtLine]
