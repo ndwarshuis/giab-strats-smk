@@ -4375,7 +4375,6 @@ class GiabStrats(BaseModel):
         # TODO this "update" function is not DRY
         # return self.refkey_to_bed_refsrckeys(lambda rd: f(rd.to_build_data(bk)), rk)
         return self.to_ref_data(rk).get_refkeys(
-            # lambda rd: fmap_maybe(lambda x: x.bed.src, f(rd.to_build_data(bk)))
             lambda rd: (
                 None
                 if (bf := f(rd.to_build_data(bk))) is None
@@ -5544,17 +5543,15 @@ class GiabStrats(BaseModel):
             vdj=self._sub_rsk(vdj, si_to_vdj, rk),
             other={
                 lk: {
-                    sk: map_single_or_double(
-                        lambda r: sub_wildcard_path(other, "ref_src_key", r),
-                        rsks,
-                    )
-                    for sk, _ in o.items()
-                    if (
-                        rsks := self.buildkey_to_bed_refsrckeys(
-                            lambda bd: bd_to_other_bed(lk, sk, bd), rk, bk
+                    sk: (
+                        map_single_or_double(
+                            lambda r: sub_wildcard_path(other, "ref_src_key", r),
+                            v.data.bed.src.to_str_refkeys(rk),
                         )
+                        if isinstance(v.data, BedFile)
+                        else IsYamlBed()
                     )
-                    is not None
+                    for sk, v in o.items()
                 }
                 for lk, o in bd.build.other_strats.items()
             },
