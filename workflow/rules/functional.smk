@@ -33,6 +33,10 @@ def all_otherdifficult_sources(ref_key, build_key):
     )
 
 
+def all_otherdifficult_sources_wc(wildcards):
+    return all_otherdifficult_sources(wildcards["ref_key"], wildcards["build_key"])
+
+
 def all_functional(ref_final_key, build_key):
     return config.all_functional(
         ref_final_key,
@@ -138,7 +142,7 @@ use rule download_gaps as download_kir with:
 
 
 def functional_inputs(wildcards):
-    src = all_otherdifficult_sources(wildcards["ref_key"], wildcards["build_key"])
+    src = all_otherdifficult_sources_wc(wildcards)
     return {
         "cds": src.refseq_sources,
         "mhc": src.mhc_sources,
@@ -275,15 +279,18 @@ use rule download_gaps as download_other with:
 
 checkpoint normalize_other:
     input:
-        lambda w: expand(
-            rules.download_other.output,
-            allow_missing=True,
-            ref_src_key=config.buildkey_to_bed_refsrckeys_smk(
-                lambda bd: bd_to_other(w.other_level_key, w.other_strat_key, bd),
-                w.ref_key,
-                w.build_key,
-            ),
+        lambda w: all_otherdifficult_sources_wc(wildcards).other_source(
+            w["other_level_key"], w["other_strat_key"]
         ),
+        # lambda w: expand(
+        #     rules.download_other.output,
+        #     allow_missing=True,
+        #     ref_src_key=config.buildkey_to_bed_refsrckeys_smk(
+        #         lambda bd: bd_to_other(w.other_level_key, w.other_strat_key, bd),
+        #         w.ref_key,
+        #         w.build_key,
+        #     ),
+        # ),
     output:
         config.intermediate_build_hapless_dir
         / "other"

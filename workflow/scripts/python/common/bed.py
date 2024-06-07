@@ -74,6 +74,12 @@ def indexed_bedlines_to_df(
     )
 
 
+def write_indexed_bedlines(
+    p: Path, xs: list[IndexedBedLine], to_map: FinalMapper
+) -> None:
+    write_bed(p, indexed_bedlines_to_df(xs, to_map))
+
+
 def make_split_mapper(im: InitMapper, fm: FinalMapper) -> SplitMapper:
     return {n: i in fm for n, i in im.items()}
 

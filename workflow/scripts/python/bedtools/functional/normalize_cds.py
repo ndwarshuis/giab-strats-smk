@@ -4,7 +4,13 @@ from pathlib import Path
 from typing import Any, assert_never, NamedTuple, Callable
 import common.config as cfg
 from common.bed import write_bed
-from common.functional import DesignError, fmap_maybe, match12_unsafe
+from common.functional import (
+    DesignError,
+    fmap_maybe,
+    match12_unsafe,
+    match1_unsafe,
+    match2_unsafe,
+)
 
 GFF2Bed = Callable[[pd.DataFrame], pd.DataFrame]
 
@@ -90,43 +96,18 @@ def main(smk: Any) -> None:
     def filter_vdj(df: pd.DataFrame) -> pd.DataFrame:
         return df[df[3].str.match(VDJ_PAT)]
 
-    # functions to read the GFF dataframe
+    def to_io_group(name: str, f: GFF2Bed, allow_empty: bool) -> IOGroup:
+        return IOGroup(
+            inputs=cfg.smk_to_inputs_name(smk, name, allow_empty),
+            output=cfg.smk_to_output_name(smk, name),
+            pattern=cfg.smk_to_param_str(smk, name),
+            gff2bed=f,
+        )
 
-    def hap(i: Path, bd: cfg.HapBuildData, bf: cfg.HapBedFileOrTxt) -> list[GFFOut]:
-        df = cfg.read_filter_sort_hap_bed(bd, bf, i)
-        return [GFFOut(df, bd.refdata.ref.src.key(rk))]
-
-    def dip1to1(
-        i: Path, bd: cfg.Dip1BuildData, bf: cfg.Dip1BedFileOrTxt
-    ) -> list[GFFOut]:
-        df = cfg.read_filter_sort_dip1to1_bed(bd, bf, i)
-        rfk = bd.refdata.ref.src.key(rk)
-        return [GFFOut(df, rfk)]
-
-    def dip1to2(
-        i: Path, bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFileOrTxt
-    ) -> list[GFFOut]:
-        dfs = cfg.read_filter_sort_dip1to2_bed(bd, bf, i)
-        rks = bd.refdata.ref.src.keys(rk)
-        return [GFFOut(d, k) for d, k in zip(dfs, rks.as_tuple)]
-
-    def dip2to1(
-        i: tuple[Path, Path],
-        bd: cfg.Dip1BuildData,
-        bf: cfg.Dip2BedFileOrTxt,
-    ) -> list[GFFOut]:
-        df = cfg.read_filter_sort_dip2to1_bed(bd, bf, i)
-        rfk = bd.refdata.ref.src.key(rk)
-        return [GFFOut(df, rfk)]
-
-    def dip2to2(
-        i: Path,
-        hap: cfg.Haplotype,
-        bd: cfg.Dip2BuildData,
-        bf: cfg.Dip2BedFileOrTxt,
-    ) -> GFFOut:
-        df = cfg.read_filter_sort_dip2to2_bed(bd, bf, i, hap)
-        return GFFOut(df, cfg.RefKeyFull(rk, hap))
+    cds = to_io_group("cds", filter_cds, False)
+    mhc = to_io_group("mhc", filter_mhc, True)
+    kir = to_io_group("kir", filter_kir, True)
+    vdj = to_io_group("vdj", filter_vdj, True)
 
     # other functions
 
@@ -151,6 +132,16 @@ def main(smk: Any) -> None:
 
         write_bedpaths(g.output, bedpaths)
 
+    def write_region_inner(test: bool, g: IOGroup, bd2bed: cfg.BuildDataToBed) -> None:
+        if test:
+            bedpaths = cfg.filter_sort_bed_main_inner(
+                sconf, rk, bk, g.inputs, g.output, g.pattern, bd2bed
+            )
+        else:
+            bedpaths = []
+
+        write_bedpaths(g.output, bedpaths)
+
     def write_region(
         res: list[GFFOut],
         test: bool,
@@ -160,50 +151,120 @@ def main(smk: Any) -> None:
         if len(g.inputs) == 0:
             write_from_gff(res, test, g)
         else:
-            if test:
-                bedpaths = cfg.filter_sort_bed_main_inner(
-                    sconf, rk, bk, g.inputs, g.output, g.pattern, bd2bed
+            write_region_inner(test, g, bd2bed)
+
+    def write_gff_all(gff: list[GFFOut]) -> None:
+        write_from_gff(gff, bd.want_cds, cds)
+        write_region(gff, bd.want_mhc, mhc, cfg.bd_to_mhc)
+        write_region(gff, bd.want_kir, kir, cfg.bd_to_kir)
+        write_region(gff, bd.want_vdj, vdj, cfg.bd_to_vdj)
+
+    def write_no_gff_all() -> None:
+        write_region_inner(bd.want_cds, cds, cfg.bd_to_cds)
+        write_region_inner(bd.want_mhc, mhc, cfg.bd_to_mhc)
+        write_region_inner(bd.want_kir, kir, cfg.bd_to_kir)
+        write_region_inner(bd.want_vdj, vdj, cfg.bd_to_vdj)
+
+    # functions to read the GFF dataframe
+
+    def hap(bd: cfg.HapBuildData, bf: cfg.HapBedFileOrTxt) -> None:
+        if isinstance(bf, cfg.BedFile):
+            gff = match1_unsafe(
+                cds.inputs,
+                lambda i: [
+                    GFFOut(
+                        cfg.read_filter_sort_hap_bed(bd, bf, i),
+                        bd.refdata.ref.src.key(rk),
+                    )
+                ],
+            )
+            write_gff_all(gff)
+        else:
+            write_no_gff_all()
+
+    def dip1to1(bd: cfg.Dip1BuildData, bf: cfg.Dip1BedFileOrTxt) -> None:
+        if isinstance(bf, cfg.BedFile):
+            gff = match1_unsafe(
+                cds.inputs,
+                lambda i: [
+                    GFFOut(
+                        cfg.read_filter_sort_dip1to1_bed(bd, bf, i),
+                        bd.refdata.ref.src.key(rk),
+                    )
+                ],
+            )
+            write_gff_all(gff)
+        else:
+            write_no_gff_all()
+
+    def dip1to2(bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFileOrTxt) -> None:
+        if isinstance(bf, cfg.BedFile):
+            gff = match1_unsafe(
+                cds.inputs,
+                lambda i: [
+                    GFFOut(d, k)
+                    for d, k in zip(
+                        cfg.read_filter_sort_dip1to2_bed(bd, bf, i),
+                        bd.refdata.ref.src.keys(rk).as_tuple,
+                    )
+                ],
+            )
+            write_gff_all(gff)
+        else:
+            write_no_gff_all()
+
+    def dip2to1(
+        bd: cfg.Dip1BuildData,
+        bf: cfg.Dip2BedFileOrTxt,
+    ) -> None:
+        if isinstance(bf, cfg.BedFile):
+            gff = match2_unsafe(
+                cds.inputs,
+                lambda i0, i1: [
+                    GFFOut(
+                        cfg.read_filter_sort_dip2to1_bed(bd, bf, (i0, i1)),
+                        bd.refdata.ref.src.key(rk),
+                    )
+                ],
+            )
+            write_gff_all(gff)
+        else:
+            write_no_gff_all()
+
+    def dip2to2(bd: cfg.Dip2BuildData, bf: cfg.Dip2BedFileOrTxt) -> None:
+        if isinstance(bf, cfg.BedFile):
+
+            def go(
+                i: Path,
+                bd: cfg.Dip2BuildData,
+                bf: cfg.Dip2BedFile,
+                hap: cfg.Haplotype,
+            ) -> GFFOut:
+                return GFFOut(
+                    cfg.read_filter_sort_dip2to2_bed(bd, bf, i, hap),
+                    cfg.RefKeyFull(rk, hap),
                 )
-            else:
-                bedpaths = []
 
-            write_bedpaths(g.output, bedpaths)
+            match2_unsafe(
+                cds.inputs,
+                lambda i0, i1: (
+                    go(i0, bd, bf, cfg.Haplotype.PAT),
+                    go(i1, bd, bf, cfg.Haplotype.MAT),
+                ),
+            )
+        else:
+            write_no_gff_all()
 
-    def to_io_group(name: str, f: GFF2Bed, allow_empty: bool) -> IOGroup:
-        return IOGroup(
-            inputs=cfg.smk_to_inputs_name(smk, name, allow_empty),
-            output=cfg.smk_to_output_name(smk, name),
-            pattern=cfg.smk_to_param_str(smk, name),
-            gff2bed=f,
-        )
-
-    # now actually do things...
-
-    cds = to_io_group("cds", filter_cds, False)
-    mhc = to_io_group("mhc", filter_mhc, True)
-    kir = to_io_group("kir", filter_kir, True)
-    vdj = to_io_group("vdj", filter_vdj, True)
-
-    # first, read the GFF from the CDS source path
-    gff = sconf.with_build_data_and_bed_i(
+    sconf.with_build_data_and_bed(
         rk,
         bk,
-        cds.inputs,
         lambda bd: cfg.bd_to_si(cfg.si_to_cds, bd),
         hap,
         dip1to1,
         dip1to2,
         dip2to1,
-        lambda i, bf, bd: list(cfg.wrap_dip_2to2_i_f(dip2to2, i, bf, bd)),
+        dip2to2,
     )
-
-    # second, write the CDS bed file (assuming we want it)
-    write_from_gff(gff, bd.want_cds, cds)
-
-    # third, convert the GFF to MHC/KIR/VDJ bed files (assuming we want them)
-    write_region(gff, bd.want_mhc, mhc, cfg.bd_to_mhc)
-    write_region(gff, bd.want_kir, kir, cfg.bd_to_kir)
-    write_region(gff, bd.want_vdj, vdj, cfg.bd_to_vdj)
 
 
 main(snakemake)  # type: ignore
