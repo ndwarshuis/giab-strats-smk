@@ -245,20 +245,21 @@ def main(smk: Any) -> None:
                     cfg.RefKeyFull(rk, hap),
                 )
 
-            match2_unsafe(
+            gff = match2_unsafe(
                 cds.inputs,
                 lambda i0, i1: (
                     go(i0, bd, bf, cfg.Haplotype.PAT),
                     go(i1, bd, bf, cfg.Haplotype.MAT),
                 ),
             )
+            write_gff_all([*gff])
         else:
             write_no_gff_all()
 
     sconf.with_build_data_and_bed(
         rk,
         bk,
-        lambda bd: cfg.bd_to_si(cfg.si_to_cds, bd),
+        cfg.bd_to_cds,
         hap,
         dip1to1,
         dip1to2,
