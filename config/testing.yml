@@ -243,18 +243,17 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             contigs_lt500kb:
-              bed:
+              bed: 
                 hap:
                   url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
               remove_gaps: true
               description: This represents contigs less than 500,000 bp.
             test:
-              bed:
-                hap:
-                  lines:
-                    - {chr: 2, start: 10, end: 50}
-                    - {chr: 21, start: 10, end: 50}
-              description: If you see this it worked.
+              hap:
+                lines:
+                  - {chr: 2, start: 10, end: 50}
+                  - {chr: 21, start: 10, end: 50}
+                comment: If you see this it worked.
 
         # Benchmark files for this reference (if desired). Each key will be fed
         # into corresponding inputs for hap.py using the generated stratifications
@@ -493,12 +492,11 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             test:
-              bed:
-                hap:
-                  lines:
-                    - {chr: 2, start: 10, end: 50}
-                    - {chr: 21, start: 10, end: 50}
-              description: if you see this it works
+              hap:
+                lines:
+                  - {chr: 2, start: 10, end: 50}
+                  - {chr: 21, start: 10, end: 50}
+                comment: if you see this it works
 
       test-xy:
         chr_filter: [23, 24]
@@ -611,12 +609,11 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             test:
-              bed:
-                hap:
-                  lines:
-                    - {chr: 2, start: 10, end: 50}
-                    - {chr: 21, start: 10, end: 50}
-              description: if you see this it works
+              hap:
+                lines:
+                  - {chr: 2, start: 10, end: 50}
+                  - {chr: 21, start: 10, end: 50}
+                comment: if you see this it works
 
       test-xy:
         chr_filter: [23, 24]
@@ -659,25 +656,24 @@ diploid1_stratifications:
         other_strats:
           OtherDifficult:
             test_hap:
-              bed:
-                dip:
-                  lines:
-                    - {chr: 2, hap: 0, start: 10, end: 50}
-                    - {chr: 2, hap: 1, start: 12, end: 60}
-                    - {chr: 21, hap: 0, start: 10, end: 50}
-                    - {chr: 21, hap: 1, start: 15, end: 55}
-              description: if you see this it works
+              dip:
+                lines:
+                  - {chr: 2, hap: 0, start: 10, end: 50}
+                  - {chr: 2, hap: 1, start: 12, end: 60}
+                  - {chr: 21, hap: 0, start: 10, end: 50}
+                  - {chr: 21, hap: 1, start: 15, end: 55}
+                comment: if you see this it works
             test_dip:
-              bed:
-                pat:
-                  lines:
-                    - {chr: 2, start: 10, end: 50}
-                    - {chr: 21, start: 10, end: 50}
-                mat:
-                  lines:
-                    - {chr: 2, start: 12, end: 60}
-                    - {chr: 21, start: 15, end: 55}
-              description: if you see this it works
+              pat:
+                lines:
+                  - {chr: 2, start: 10, end: 50}
+                  - {chr: 21, start: 10, end: 50}
+                comment: if you see this it works for paternal
+              mat:
+                lines:
+                  - {chr: 2, start: 12, end: 60}
+                  - {chr: 21, start: 15, end: 55}
+                comment: if you see this it works for maternal
       test-xy:
         chr_filter: [23, 24]
         include:
@@ -746,41 +742,38 @@ diploid2_stratifications:
             source_match: ["Liftoff", 1]
         
         vdj:
-          bed:
-            # NOTE: both IGK loci are rearranged and inactivated so this
-            # regions actually starts at IGKDEL
-            pat:
-              lines:
-                - { chr: 2,  start: 88868025,  end: 90383961  } # IGK
-                - { chr: 7,  start: 38373030,  end: 38494618  } # TRB
-                - { chr: 7,  start: 142831129, end: 143396922 } # TRG
-                - { chr: 14, start: 21320867,  end: 22186894  } # TRA/D
-                - { chr: 14, start: 105296422, end: 105793950 } # IGH
-                - { chr: 22, start: 20560550,  end: 21469622  } # IGL
-            mat:
-              lines:
-                - { chr: 2,  start: 88855564,  end: 90457523  } # IGK
-                - { chr: 7,  start: 38345242,  end: 38476019  } # TRB
-                - { chr: 7,  start: 143849922, end: 144425196 } # TRG
-                - { chr: 14, start: 23572454,  end: 24503857  } # TRA/D
-                - { chr: 14, start: 107586020, end: 108649327 } # IGH
-                - { chr: 22, start: 24652428,  end: 25418531  } # IGL
+          # NOTE: both IGK loci are rearranged and inactivated so this
+          # regions actually starts at IGKDEL
+          pat:
+            lines:
+              - { chr: 2,  start: 88868025,  end: 90383961  } # IGK
+              - { chr: 7,  start: 38373030,  end: 38494618  } # TRB
+              - { chr: 7,  start: 142831129, end: 143396922 } # TRG
+              - { chr: 14, start: 21320867,  end: 22186894  } # TRA/D
+              - { chr: 14, start: 105296422, end: 105793950 } # IGH
+              - { chr: 22, start: 20560550,  end: 21469622  } # IGL
+          mat:
+            lines:
+              - { chr: 2,  start: 88855564,  end: 90457523  } # IGK
+              - { chr: 7,  start: 38345242,  end: 38476019  } # TRB
+              - { chr: 7,  start: 143849922, end: 144425196 } # TRG
+              - { chr: 14, start: 23572454,  end: 24503857  } # TRA/D
+              - { chr: 14, start: 107586020, end: 108649327 } # IGH
+              - { chr: 22, start: 24652428,  end: 25418531  } # IGL
 
         # lifted off from hg38 stratification above
         kir:
-          bed:
-            dip:
-              lines:
-                - { chr: 19, hap: 0, start: 57430456, end: 57612879 }
-                - { chr: 19, hap: 1, start: 57338741, end: 57569585 }
+          dip:
+            lines:
+              - { chr: 19, hap: 0, start: 57430456, end: 57612879 }
+              - { chr: 19, hap: 1, start: 57338741, end: 57569585 }
 
         # lifted off from hg38 stratification above
         mhc:
-          bed:
-            dip:
-              lines:
-                - { chr: 6, hap: 0, start: 28466613, end: 33509399 }
-                - { chr: 6, hap: 1, start: 28463469, end: 33412256 }
+          dip:
+            lines:
+              - { chr: 6, hap: 0, start: 28466613, end: 33509399 }
+              - { chr: 6, hap: 1, start: 28463469, end: 33412256 }
 
       mappability:
         unplaced_chr_patterns: ["^chr(MT|EBV)$"]
@@ -798,25 +791,24 @@ diploid2_stratifications:
         other_strats:
           OtherDifficult:
             test_hap:
-              bed:
-                dip:
-                  lines:
-                    - {chr: 2, hap: 0, start: 10, end: 50}
-                    - {chr: 2, hap: 1, start: 12, end: 60}
-                    - {chr: 21, hap: 0, start: 10, end: 50}
-                    - {chr: 21, hap: 1, start: 15, end: 55}
-              description: if you see this it works
+              dip:
+                lines:
+                  - {chr: 2, hap: 0, start: 10, end: 50}
+                  - {chr: 2, hap: 1, start: 12, end: 60}
+                  - {chr: 21, hap: 0, start: 10, end: 50}
+                  - {chr: 21, hap: 1, start: 15, end: 55}
+                comment: if you see this it works
             test_dip:
-              bed:
-                pat:
-                  lines:
-                    - {chr: 2, start: 10, end: 50}
-                    - {chr: 21, start: 10, end: 50}
-                mat:
-                  lines:
-                    - {chr: 2, start: 12, end: 60}
-                    - {chr: 21, start: 15, end: 55}
-              description: if you see this it works
+              pat:
+                lines:
+                  - {chr: 2, start: 10, end: 50}
+                  - {chr: 21, start: 10, end: 50}
+                comment: if you see this it works for pat
+              mat:
+                lines:
+                  - {chr: 2, start: 12, end: 60}
+                  - {chr: 21, start: 15, end: 55}
+                comment: if you see this it works for mat
 
       test-map:
         chr_filter: [21]

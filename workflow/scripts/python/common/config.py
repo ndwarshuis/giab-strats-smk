@@ -692,7 +692,7 @@ def bd_to_other(
     lk: OtherLevelKey,
     sk: OtherStratKey,
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> OtherBedFile[AnyBedT] | None:
+) -> OtherBedFile[AnyBedT] | AnyBedTxtT | None:
     return x.build.other_strats[lk][sk]
 
 
@@ -2933,7 +2933,7 @@ RefSrcT = TypeVar("RefSrcT", HapRefSrc, Dip1RefSrc, Dip2RefSrc)
 # bed-like files may be remote, local, or specified manually in the config
 BedFileSrc = BedLocalSrc | BedHttpSrc
 
-AnyBedSrc = BedLocalSrc | BedHttpSrc | bed.BedLines
+AnyBedSrc = BedLocalSrc | BedHttpSrc
 
 HapBedSrc = HapChrFileSrc[BedFileSrc]
 DipBedSrc = Dip1ChrFileSrc[BedFileSrc] | Dip2ChrFileSrc[BedFileSrc]
@@ -3327,11 +3327,13 @@ class Malloc(BaseModel):
 OtherDict = dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT]]]
 
 
-class Build(GenericModel, Generic[AnyBedT, AnyVcfT]):
+class Build(GenericModel, Generic[AnyBedT, AnyVcfT, AnyBedTxtT]):
     chr_filter: set[ChrIndex]
     comparison: BuildCompare | None = None
     bench: Bench[AnyBedT, AnyVcfT] | None = None
-    other_strats: dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT]]] = {}
+    other_strats: dict[
+        OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT] | AnyBedTxtT]
+    ] = {}
     # TODO if I really want I could validate this such that the user would be
     # politely alerted in case they specify any diploid params for a haploid
     # config.
@@ -3454,7 +3456,7 @@ class RefData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
     refkey: RefKey
     ref: RefSrcT
     strat_inputs: StratInputs[AnyBedT, AnyBedTxtT]
-    builds: dict[BuildKey, Build[AnyBedT, AnyVcfT]]
+    builds: dict[BuildKey, Build[AnyBedT, AnyVcfT, AnyBedTxtT]]
 
     @property
     def ref_refkeys(self) -> RefKeyFull1or2:
@@ -3568,7 +3570,7 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
 
     refdata: RefData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]
     buildkey: BuildKey
-    build: Build[AnyBedT, AnyVcfT]
+    build: Build[AnyBedT, AnyVcfT, AnyBedTxtT]
 
     @property
     def build_chrs(self) -> BuildChrs:
@@ -3800,7 +3802,7 @@ class Stratification(GenericModel, Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT
 
     ref: RefSrcT
     strat_inputs: StratInputs[AnyBedT, AnyBedTxtT]
-    builds: dict[BuildKey, Build[AnyBedT, AnyVcfT]]
+    builds: dict[BuildKey, Build[AnyBedT, AnyVcfT, AnyBedTxtT]]
 
 
 HapBuildData = BuildData_[HapRefSrc, HapBedSrc, HapVcfSrc, HapChrTxtSrc]
@@ -4280,11 +4282,8 @@ class GiabStrats(BaseModel):
         src = with_ref_data(
             self.to_ref_data(rk_), lambda rd: f(rd), lambda rd: f(rd), lambda rd: f(rd)
         )
-        return (
-            from_single_or_double(src, hap)
-            if src is not None and isinstance(src, BedFile)
-            else raise_inline()
-        )
+        # TODO this should check for a single/double anybedsrc
+        return from_single_or_double(src, hap) if src is not None else raise_inline()
 
     def refsrckey_to_bed_src(self, f: StratInputToBed, rk: RefKeyFullS) -> AnyBedSrc:
         """Lookup a haplotype-specific bed file source with the given function."""
@@ -5120,61 +5119,85 @@ class GiabStrats(BaseModel):
     @property
     def all_refkey_gap(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_gaps(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_gaps(bd)
+            )
         )
 
     @property
     def all_refkey_rmsk(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_rmsk(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_rmsk(bd)
+            )
         )
 
     @property
     def all_refkey_simreps(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_simreps(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None,
+                bd_to_simreps(bd),
+            )
         )
 
     @property
     def all_refkey_censat(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_satellites(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None,
+                bd_to_satellites(bd),
+            )
         )
 
     @property
     def all_refkey_segdups(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_superdups(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None,
+                bd_to_superdups(bd),
+            )
         )
 
     @property
     def all_buildkey_bench(self) -> list[tuple[RefKeyFullS, BuildKey]]:
         return self._all_bed_build_and_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_bench_vcf(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None,
+                bd_to_bench_vcf(bd),
+            )
         )
 
     @property
     def all_refkey_cds(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_cds(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_cds(bd)
+            )
         )
 
     @property
     def all_refkey_mhc(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_mhc(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_mhc(bd)
+            )
         )
 
     @property
     def all_refkey_kir(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_kir(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_kir(bd)
+            )
         )
 
     @property
     def all_refkey_vdj(self) -> list[RefKeyFullS]:
         return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(lambda x: x.bed.src, bd_to_vdj(bd))
+            lambda bd: fmap_maybe(
+                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_vdj(bd)
+            )
         )
 
     # source and output functions
@@ -5248,7 +5271,7 @@ class GiabStrats(BaseModel):
                 rsks,
             )
             if (rsks := self.refkey_to_bed_refsrckeys(f, rk)) is not None
-            else raise_inline()
+            else None
         )
 
     def all_low_complexity_sources(
@@ -5947,7 +5970,7 @@ class RefDataToBed(Protocol):
 
 
 class RefDataToSrc(Protocol):
-    A = TypeVar("A", Single[AnyBedSrc | bed.BedLines], Double[AnyBedSrc | bed.BedLines])
+    A = TypeVar("A", Single[AnyBedSrc], Double[AnyBedSrc])
 
     def __call__(
         self, __x: RefData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]
