@@ -268,7 +268,7 @@ use rule download_gaps as download_other with:
         / "{other_level_key}_{other_strat_key}.log",
     params:
         src=lambda w: config.buildkey_to_bed_src(
-            lambda bd: bd_to_other(w.other_level_key, w.other_strat_key, bd),
+            lambda bd: bd_to_other_bed(w.other_level_key, w.other_strat_key, bd),
             w.ref_src_key,
             w.build_key,
         ),
