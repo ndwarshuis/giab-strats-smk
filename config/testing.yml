@@ -243,16 +243,18 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             contigs_lt500kb:
-              bed: 
-                hap:
-                  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
+              data:
+                bed: 
+                  hap:
+                    url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
               remove_gaps: true
               description: This represents contigs less than 500,000 bp.
             test:
-              hap:
-                lines:
-                  - {chr: 2, start: 10, end: 50}
-                  - {chr: 21, start: 10, end: 50}
+              data:
+                hap:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
               description: If you see this it worked.
 
         # Benchmark files for this reference (if desired). Each key will be fed
@@ -492,10 +494,11 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             test:
-              hap:
-                lines:
-                  - {chr: 2, start: 10, end: 50}
-                  - {chr: 21, start: 10, end: 50}
+              data:
+                hap:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
               description: if you see this it works
 
       test-xy:
@@ -609,10 +612,11 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             test:
-              hap:
-                lines:
-                  - {chr: 2, start: 10, end: 50}
-                  - {chr: 21, start: 10, end: 50}
+              data:
+                hap:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
               description: if you see this it works
 
       test-xy:
@@ -656,22 +660,24 @@ diploid1_stratifications:
         other_strats:
           OtherDifficult:
             test_hap:
-              dip:
-                lines:
-                  - {chr: 2, hap: 0, start: 10, end: 50}
-                  - {chr: 2, hap: 1, start: 12, end: 60}
-                  - {chr: 21, hap: 0, start: 10, end: 50}
-                  - {chr: 21, hap: 1, start: 15, end: 55}
+              data:
+                dip:
+                  lines:
+                    - {chr: 2, hap: 0, start: 10, end: 50}
+                    - {chr: 2, hap: 1, start: 12, end: 60}
+                    - {chr: 21, hap: 0, start: 10, end: 50}
+                    - {chr: 21, hap: 1, start: 15, end: 55}
               description: if you see this it works
             test_dip:
-              pat:
-                lines:
-                  - {chr: 2, start: 10, end: 50}
-                  - {chr: 21, start: 10, end: 50}
-              mat:
-                lines:
-                  - {chr: 2, start: 12, end: 60}
-                  - {chr: 21, start: 15, end: 55}
+              data:
+                pat:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
+                mat:
+                  lines:
+                    - {chr: 2, start: 12, end: 60}
+                    - {chr: 21, start: 15, end: 55}
               description: if you see this it works for mat and pat
       test-xy:
         chr_filter: [23, 24]
@@ -790,22 +796,24 @@ diploid2_stratifications:
         other_strats:
           OtherDifficult:
             test_hap:
-              dip:
-                lines:
-                  - {chr: 2, hap: 0, start: 10, end: 50}
-                  - {chr: 2, hap: 1, start: 12, end: 60}
-                  - {chr: 21, hap: 0, start: 10, end: 50}
-                  - {chr: 21, hap: 1, start: 15, end: 55}
+              data:
+                dip:
+                  lines:
+                    - {chr: 2, hap: 0, start: 10, end: 50}
+                    - {chr: 2, hap: 1, start: 12, end: 60}
+                    - {chr: 21, hap: 0, start: 10, end: 50}
+                    - {chr: 21, hap: 1, start: 15, end: 55}
               description: if you see this it works
             test_dip:
-              pat:
-                lines:
-                  - {chr: 2, start: 10, end: 50}
-                  - {chr: 21, start: 10, end: 50}
-              mat:
-                lines:
-                  - {chr: 2, start: 12, end: 60}
-                  - {chr: 21, start: 15, end: 55}
+              data:
+                pat:
+                  lines:
+                    - {chr: 2, start: 10, end: 50}
+                    - {chr: 21, start: 10, end: 50}
+                mat:
+                  lines:
+                    - {chr: 2, start: 12, end: 60}
+                    - {chr: 21, start: 15, end: 55}
               description: if you see this it works for pat and mat
 
       test-map:

@@ -13,10 +13,9 @@ from functools import partial
 lc = config.to_bed_dirs(CoreLevel.LOWCOMPLEXITY)
 
 
-def all_low_complexity_sources(ref_key, build_key):
+def all_low_complexity_sources(ref_key):
     return config.all_low_complexity_sources(
         ref_key,
-        build_key,
         Path(rules.download_rmsk.output[0]),
         Path(rules.download_censat.output[0]),
         Path(rules.download_simreps.output[0]),
@@ -24,17 +23,14 @@ def all_low_complexity_sources(ref_key, build_key):
 
 
 def all_low_complexity_sources_wc(wildcards):
-    return all_low_complexity_sources(
-        wildcards["ref_key"],
-        wildcards["build_key"],
-    )
+    return all_low_complexity_sources(wildcards["ref_key"])
 
 
 def all_low_complexity(ref_final_key, build_key):
     return config.all_low_complexity(
         ref_final_key,
         build_key,
-        all_low_complexity_sources(strip_full_refkey(ref_final_key), build_key),
+        all_low_complexity_sources(strip_full_refkey(ref_final_key)),
         [Path(p) for p in rules._all_perfect_uniform_repeats.input],
         [Path(p) for p in rules._all_imperfect_uniform_repeats.input],
         MutualPathPair(

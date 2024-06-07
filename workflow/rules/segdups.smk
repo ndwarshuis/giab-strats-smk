@@ -3,10 +3,9 @@ from common.config import CoreLevel, si_to_superdups, strip_full_refkey, MutualP
 segdup = config.to_bed_dirs(CoreLevel.SEGDUPS)
 
 
-def all_segdups_sources(ref_key, build_key):
+def all_segdups_sources(ref_key):
     return config.all_segdups_sources(
         ref_key,
-        build_key,
         Path(rules.download_superdups.output[0]),
     )
 
@@ -15,7 +14,7 @@ def all_segdups(ref_final_key, build_key):
     return config.all_segdups(
         ref_final_key,
         build_key,
-        all_segdups_sources(strip_full_refkey(ref_final_key), build_key),
+        all_segdups_sources(strip_full_refkey(ref_final_key)),
         MutualPathPair(
             Path(rules.merge_superdups.output[0]),
             Path(rules.notin_superdups.output[0]),
@@ -40,7 +39,7 @@ use rule download_gaps as download_superdups with:
 
 checkpoint normalize_superdups:
     input:
-        lambda w: all_segdups_sources(w["ref_key"], w["build_key"]).all_sources,
+        lambda w: all_segdups_sources(w["ref_key"]).all_sources,
     output:
         segdup.inter.filtersort.data / "segdups.json",
     params:
