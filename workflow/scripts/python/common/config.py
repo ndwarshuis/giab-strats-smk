@@ -2694,7 +2694,7 @@ class BedTxtSrc(GenericModel, Generic[BedTxtLineT], _SrcDocumentable):
     """
 
     lines: list[BedTxtLineT]
-    comment: str = "This bed file was specified manually in the yaml config"
+    description: str = "This bed file was specified manually in the yaml config"
 
     # @property
     # def documentation(self) -> SrcDoc:
@@ -2713,10 +2713,11 @@ DipBedTxtSrc = BedTxtSrc[DipBedTxtLine]
 
 class HapChrTxtSrc(_BaseSrcDocumentable1):
     hap: HapBedTxtSrc
+    description: str | None = "This bed file was specified manually in the yaml config."
 
-    @property
-    def documentation(self) -> Single[SrcDoc]:
-        return Single(elem=self.hap.documentation)
+    # @property
+    # def description(self) -> Single[SrcDoc]:
+    #     return Single(elem=self.hap.documentation)
 
     def lines(self, h: Haplotype) -> Single[list[bed.IndexedBedLine]]:
         return Single(elem=[x.line(h) for x in self.hap.lines])
@@ -2724,11 +2725,12 @@ class HapChrTxtSrc(_BaseSrcDocumentable1):
 
 class Dip1ChrTxtSrc(_BaseSrcDocumentable1):
     dip: DipBedTxtSrc
-    comment: str = "This bed file was specified manually in the yaml config."
+    description: str | None = "This bed file was specified manually in the yaml config."
+    # comment: str = "This bed file was specified manually in the yaml config."
 
-    @property
-    def documentation(self) -> Single[SrcDoc]:
-        return Single(elem=self.dip.documentation)
+    # @property
+    # def description(self) -> Single[SrcDoc]:
+    #     return Single(elem=self.dip.documentation)
 
     @property
     def lines(self) -> Single[list[bed.IndexedBedLine]]:
@@ -2738,13 +2740,16 @@ class Dip1ChrTxtSrc(_BaseSrcDocumentable1):
 class Dip2ChrTxtSrc(_BaseSrcDocumentable2):
     pat: HapBedTxtSrc
     mat: HapBedTxtSrc
+    description: str | None = (
+        "Both haps of this bed file were specified manually in the yaml config."
+    )
 
-    @property
-    def documentation(self) -> Double[SrcDoc]:
-        return Double(
-            pat=self.pat.documentation,
-            mat=self.mat.documentation,
-        )
+    # @property
+    # def description(self) -> Double[SrcDoc]:
+    #     return Double(
+    #         pat=self.pat.documentation,
+    #         mat=self.mat.documentation,
+    #     )
 
     @property
     def lines(self) -> Double[list[bed.IndexedBedLine]]:
@@ -4973,7 +4978,7 @@ class GiabStrats(BaseModel):
                 params_txt = format_bed_params(bf.params)
                 return [src_txt, params_txt]
             else:
-                return [bf.hap.comment]
+                return [bf.hap.description]
 
         def dip1to1(bf: Dip1BedFileOrTxt) -> list[str]:
             if isinstance(bf, BedFile):
@@ -4984,7 +4989,7 @@ class GiabStrats(BaseModel):
                 params_txt = format_bed_params(bf.params)
                 return [dip_txt, src_txt, params_txt]
             else:
-                return [bf.dip.comment]
+                return [bf.dip.description]
 
         def dip1to2(bf: Dip1BedFileOrTxt, hap: Haplotype) -> list[str]:
             dip_txt = " ".join(
@@ -5001,7 +5006,7 @@ class GiabStrats(BaseModel):
                 params_txt = format_bed_params(bf.params)
                 return [dip_txt, src_txt, params_txt]
             else:
-                return [dip_txt, bf.dip.comment]
+                return [dip_txt, bf.dip.description]
 
         def dip2to1(bf: Dip2BedFileOrTxt) -> list[str]:
             indent = level * "#"
@@ -5039,9 +5044,9 @@ class GiabStrats(BaseModel):
                 return [
                     dip_txt,
                     hap_header(Haplotype.PAT),
-                    bf.pat.comment,
+                    bf.pat.description,
                     hap_header(Haplotype.MAT),
-                    bf.mat.comment,
+                    bf.pat.description,
                 ]
 
         def dip2to2(bf: Dip2BedFileOrTxt, hap: Haplotype) -> list[str]:
@@ -5061,7 +5066,7 @@ class GiabStrats(BaseModel):
                 params_txt = format_bed_params(bf.params)
                 return [dip_txt, src_txt, params_txt]
             else:
-                return [dip_txt, hap.choose(bf.pat, bf.mat).comment]
+                return [dip_txt, hap.choose(bf.pat, bf.mat).description]
 
         paragraphs = self.with_build_data_and_bed_full(
             rk,

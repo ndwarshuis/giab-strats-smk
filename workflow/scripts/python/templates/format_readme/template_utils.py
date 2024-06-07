@@ -2,12 +2,7 @@ import yaml
 import jinja2 as j2
 from typing import Any, Callable
 from pathlib import Path
-from common.functional import (
-    DesignError,
-    filter_dict_strict,
-    fmap_maybe,
-    from_maybe,
-)
+from common.functional import DesignError, filter_dict_strict, from_maybe
 import common.config as cfg
 
 
@@ -103,10 +98,20 @@ def fmt_other_descriptions(
         d = sconf.with_build_data_full(
             rk,
             bk,
-            lambda bd: fmap_maybe(lambda x: x.description, cfg.bd_to_other(lk, sk, bd)),
-            lambda bd: fmap_maybe(lambda x: x.description, cfg.bd_to_other(lk, sk, bd)),
-            lambda _, bd: fmap_maybe(
-                lambda x: x.description, cfg.bd_to_other(lk, sk, bd)
+            lambda bd: (
+                b.description
+                if (b := cfg.bd_to_other(lk, sk, bd)) is not None
+                else None
+            ),
+            lambda bd: (
+                b.description
+                if (b := cfg.bd_to_other(lk, sk, bd)) is not None
+                else None
+            ),
+            lambda _, bd: (
+                b.description
+                if (b := cfg.bd_to_other(lk, sk, bd)) is not None
+                else None
             ),
         )
         return from_maybe("No description", d)

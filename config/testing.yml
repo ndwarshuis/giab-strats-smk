@@ -253,7 +253,7 @@ haploid_stratifications:
                 lines:
                   - {chr: 2, start: 10, end: 50}
                   - {chr: 21, start: 10, end: 50}
-                comment: If you see this it worked.
+              description: If you see this it worked.
 
         # Benchmark files for this reference (if desired). Each key will be fed
         # into corresponding inputs for hap.py using the generated stratifications
@@ -496,7 +496,7 @@ haploid_stratifications:
                 lines:
                   - {chr: 2, start: 10, end: 50}
                   - {chr: 21, start: 10, end: 50}
-                comment: if you see this it works
+              description: if you see this it works
 
       test-xy:
         chr_filter: [23, 24]
@@ -613,7 +613,7 @@ haploid_stratifications:
                 lines:
                   - {chr: 2, start: 10, end: 50}
                   - {chr: 21, start: 10, end: 50}
-                comment: if you see this it works
+              description: if you see this it works
 
       test-xy:
         chr_filter: [23, 24]
@@ -662,18 +662,17 @@ diploid1_stratifications:
                   - {chr: 2, hap: 1, start: 12, end: 60}
                   - {chr: 21, hap: 0, start: 10, end: 50}
                   - {chr: 21, hap: 1, start: 15, end: 55}
-                comment: if you see this it works
+              description: if you see this it works
             test_dip:
               pat:
                 lines:
                   - {chr: 2, start: 10, end: 50}
                   - {chr: 21, start: 10, end: 50}
-                comment: if you see this it works for paternal
               mat:
                 lines:
                   - {chr: 2, start: 12, end: 60}
                   - {chr: 21, start: 15, end: 55}
-                comment: if you see this it works for maternal
+              description: if you see this it works for mat and pat
       test-xy:
         chr_filter: [23, 24]
         include:
@@ -797,18 +796,17 @@ diploid2_stratifications:
                   - {chr: 2, hap: 1, start: 12, end: 60}
                   - {chr: 21, hap: 0, start: 10, end: 50}
                   - {chr: 21, hap: 1, start: 15, end: 55}
-                comment: if you see this it works
+              description: if you see this it works
             test_dip:
               pat:
                 lines:
                   - {chr: 2, start: 10, end: 50}
                   - {chr: 21, start: 10, end: 50}
-                comment: if you see this it works for pat
               mat:
                 lines:
                   - {chr: 2, start: 12, end: 60}
                   - {chr: 21, start: 15, end: 55}
-                comment: if you see this it works for mat
+              description: if you see this it works for pat and mat
 
       test-map:
         chr_filter: [21]
