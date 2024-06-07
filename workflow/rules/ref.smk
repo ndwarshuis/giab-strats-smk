@@ -181,7 +181,7 @@ use rule download_gaps as download_bench_vcf with:
     output:
         ref.src.benchmark.data / "bench.vcf.gz",
     params:
-        src=lambda w: config.buildkey_to_bed_src(
+        src=lambda w: config.buildkey_to_vcf_src(
             bd_to_bench_vcf,
             w.ref_src_key,
             w.build_key,

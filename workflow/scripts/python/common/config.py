@@ -4418,7 +4418,7 @@ class GiabStrats(BaseModel):
         src = with_build_data(bd, lambda bd: f(bd), lambda bd: f(bd), lambda bd: f(bd))
         if src is None:
             raise DesignError()
-        return from_single_or_double(src.bed.src, hap)
+        return from_single_or_double(src.vcf.src, hap)
 
     def refkey_to_normalization_path(self, rk: RefKeyFullS, s: IO[bytes]) -> Path:
         """Return a list of paths for a given normalization checkpoint.
