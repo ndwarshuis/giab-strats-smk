@@ -692,8 +692,16 @@ def bd_to_other(
     lk: OtherLevelKey,
     sk: OtherStratKey,
     x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> OtherBedFile[AnyBedT] | AnyBedTxtT | None:
+) -> OtherBedFile[AnyBedT, AnyBedTxtT]:
     return x.build.other_strats[lk][sk]
+
+
+def bd_to_other_bed(
+    lk: OtherLevelKey,
+    sk: OtherStratKey,
+    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
+) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    return x.build.other_strats[lk][sk].data
 
 
 def bd_to_bench_bed(
@@ -1632,8 +1640,8 @@ class UniformRepeatPaths:
 
 @dataclass(frozen=True)
 class RepeatsPaths(_HasSources):
-    trf_src: Path1or2
-    rmsk_src: Path1or2
+    trf_src: Path1or2orYaml
+    rmsk_src: Path1or2orYaml
 
     filtered_trs: list[Path]  # ASSUME this is non-empty
     all_trs: MutualPathPair
@@ -1650,7 +1658,7 @@ class RepeatsPaths(_HasSources):
 
 @dataclass(frozen=True)
 class SatellitesPaths:
-    sat_src: Path1or2
+    sat_src: Path1or2orYaml
 
     sats: MutualPathPair
 
@@ -1675,10 +1683,10 @@ class LowComplexityPaths(_HasSources, _HasFinalBeds):
         return fmap_maybe_def(
             [],
             lambda s: fmap_maybe_def(
-                single_or_double_to_list(s.sat_src),
-                lambda r: single_or_double_to_list(r.trf_src)
-                + single_or_double_to_list(s.sat_src)
-                + (single_or_double_to_list(r.rmsk_src) if s.used_censat else []),
+                path1or2orStr_to_paths(s.sat_src),
+                lambda r: path1or2orStr_to_paths(r.trf_src)
+                + path1or2orStr_to_paths(s.sat_src)
+                + (path1or2orStr_to_paths(r.rmsk_src) if s.used_censat else []),
                 s.all_repeats,
             ),
             self.satellites,
@@ -1848,67 +1856,85 @@ class SexPaths(_HasSources, _HasFinalBeds):
 
 @dataclass(frozen=True)
 class LowComplexitySources:
-    trf: Path1or2 | None
-    sat: Path1or2 | None
-    rmsk: Path1or2 | None
+    trf: Path1or2orYaml | None
+    sat: Path1or2orYaml | None
+    rmsk: Path1or2orYaml | None
 
     @property
     def trf_sources(self) -> list[Path]:
         if self.trf is None:
             raise DesignError()
         else:
-            return single_or_double_to_list(self.trf)
+            return path1or2orStr_to_paths(self.trf)
 
     @property
     def sat_sources(self) -> list[Path]:
         if self.sat is None:
             raise DesignError()
         else:
-            return single_or_double_to_list(self.sat)
+            return path1or2orStr_to_paths(self.sat)
 
     @property
     def rmsk_sources(self) -> list[Path]:
         if self.rmsk is None:
             raise DesignError()
         else:
-            return single_or_double_to_list(self.rmsk)
+            return path1or2orStr_to_paths(self.rmsk)
 
 
 Path1or2 = SingleOrDouble[Path]
+
+
+class IsYamlBed:
+    """Dummy class to denote that the src is specified in yaml."""
+
+    pass
+
+
+Path1or2orYaml = SingleOrDouble[Path] | IsYamlBed
 
 RefKeyFull1or2 = SingleOrDouble[RefKeyFull]
 RefKeyFullS1or2 = SingleOrDouble[RefKeyFullS]
 
 
+def path1or2orStr_to_paths(x: Path1or2orYaml | None) -> list[Path]:
+    if x is None:
+        return []
+    elif isinstance(x, IsYamlBed):
+        return []
+    else:
+        return single_or_double_to_list(x)
+
+
 @dataclass(frozen=True)
 class OtherDifficultSources:
-    gaps: Path1or2 | None
-    refseq: Path1or2 | None
-    vdj: Path1or2 | None
-    kir: Path1or2 | None
-    mhc: Path1or2 | None
-    other: dict[OtherLevelKey, dict[OtherStratKey, Path1or2]]
+    gaps: Path1or2orYaml | None
+    refseq: Path1or2orYaml | None
+    vdj: Path1or2orYaml | None
+    kir: Path1or2orYaml | None
+    mhc: Path1or2orYaml | None
+    other: dict[OtherLevelKey, dict[OtherStratKey, Path1or2orYaml]]
 
     # NOTE return empty lists here to avoid failure when calling in rules
     @property
     def gaps_sources(self) -> list[Path]:
-        return [] if self.gaps is None else single_or_double_to_list(self.gaps)
+        return path1or2orStr_to_paths(self.gaps)
 
     @property
     def refseq_sources(self) -> list[Path]:
-        return [] if self.refseq is None else single_or_double_to_list(self.refseq)
+        return path1or2orStr_to_paths(self.refseq)
 
     @property
     def vdj_sources(self) -> list[Path]:
-        return [] if self.vdj is None else single_or_double_to_list(self.vdj)
+        return path1or2orStr_to_paths(self.vdj)
 
     @property
     def kir_sources(self) -> list[Path]:
-        return [] if self.kir is None else single_or_double_to_list(self.kir)
+        return path1or2orStr_to_paths(self.kir)
 
     @property
     def mhc_sources(self) -> list[Path]:
-        return [] if self.mhc is None else single_or_double_to_list(self.mhc)
+        return path1or2orStr_to_paths(self.mhc)
 
     @property
     def other_sources(self) -> list[Path]:
@@ -1916,25 +1942,25 @@ class OtherDifficultSources:
             i
             for x in self.other.values()
             for y in x.values()
-            for i in single_or_double_to_list(y)
+            for i in path1or2orStr_to_paths(y)
         ]
 
     # TODO this could just fail if we wanted
     def other_source(self, lk: OtherLevelKey, sk: OtherStratKey) -> list[Path]:
         try:
-            return single_or_double_to_list(self.other[lk][sk])
+            return path1or2orStr_to_paths(self.other[lk][sk])
         except KeyError:
             return []
 
 
 @dataclass(frozen=True)
 class FunctionalPaths(_HasSources, _HasFinalBeds):
-    cds_source: Path1or2
+    cds_source: Path1or2orYaml
     cds_output: MutualPathPair | None
 
     @property
     def all_sources(self) -> list[Path]:
-        return single_or_double_to_list(self.cds_source)
+        return path1or2orStr_to_paths(self.cds_source)
 
     @property
     def all_final(self) -> list[Path]:
@@ -1944,13 +1970,13 @@ class FunctionalPaths(_HasSources, _HasFinalBeds):
 # TODO rename
 @dataclass(frozen=True)
 class GapsPaths:
-    source: Path1or2
+    source: Path1or2orYaml
     output: Path
 
 
 @dataclass(frozen=True)
 class ImmunoPaths(GapsPaths):
-    source: Path1or2
+    source: Path1or2orYaml
     output: Path
     source_is_refseq: bool
 
@@ -1969,7 +1995,7 @@ class OtherDifficultPaths(_HasSources, _HasFinalBeds):
             p
             for x in [self.gaps, self.vdj, self.mhc, self.kir]
             if x is not None
-            for p in single_or_double_to_list(x.source)
+            for p in path1or2orStr_to_paths(x.source)
         ]
 
     @property
@@ -1995,7 +2021,7 @@ class MiscPaths(_HasSources, _HasFinalBeds):
     @property
     def all_sources(self) -> list[Path]:
         return [
-            p for x in self.paths.values() for p in single_or_double_to_list(x.source)
+            p for x in self.paths.values() for p in path1or2orStr_to_paths(x.source)
         ]
 
     @property
@@ -2038,24 +2064,24 @@ class TelomerePaths(_HasFinalBeds):
 
 @dataclass(frozen=True)
 class SegdupSources(_HasSources):
-    superdup: Path1or2 | None
+    superdup: Path1or2orYaml | None
 
     @property
     def all_sources(self) -> list[Path]:
         return (
-            single_or_double_to_list(self.superdup) if self.superdup is not None else []
+            path1or2orStr_to_paths(self.superdup) if self.superdup is not None else []
         )
 
 
 @dataclass(frozen=True)
 class SegdupPaths(_HasSources, _HasFinalBeds):
-    superdups: Path1or2
+    superdups: Path1or2orYaml
     all_segdups: MutualPathPair
     long_segdups: MutualPathPair
 
     @property
     def all_sources(self) -> list[Path]:
-        return single_or_double_to_list(self.superdups)
+        return path1or2orStr_to_paths(self.superdups)
 
     @property
     def all_final(self) -> list[Path]:
@@ -2694,62 +2720,31 @@ class BedTxtSrc(GenericModel, Generic[BedTxtLineT], _SrcDocumentable):
     """
 
     lines: list[BedTxtLineT]
-    description: str = "This bed file was specified manually in the yaml config"
-
-    # @property
-    # def documentation(self) -> SrcDoc:
-    #     return TxtSrcDoc(self.comment)
-
-    # @validator("lines")
-    # def same_length(cls, lines: list[HapBedTxtLine]) -> list[HapBedTxtLine]:
-    #     xs = set(len(x.more) for x in lines)
-    #     assert len(xs) == 1, "All in 'more' field must have same length"
-    #     return lines
+    provenance: str = "This bed file was specified manually in the yaml config"
 
 
 HapBedTxtSrc = BedTxtSrc[HapBedTxtLine]
 DipBedTxtSrc = BedTxtSrc[DipBedTxtLine]
 
 
-class HapChrTxtSrc(_BaseSrcDocumentable1):
+class HapChrTxtSrc(BaseModel):
     hap: HapBedTxtSrc
-    description: str | None = "This bed file was specified manually in the yaml config."
-
-    # @property
-    # def description(self) -> Single[SrcDoc]:
-    #     return Single(elem=self.hap.documentation)
 
     def lines(self, h: Haplotype) -> Single[list[bed.IndexedBedLine]]:
         return Single(elem=[x.line(h) for x in self.hap.lines])
 
 
-class Dip1ChrTxtSrc(_BaseSrcDocumentable1):
+class Dip1ChrTxtSrc(BaseModel):
     dip: DipBedTxtSrc
-    description: str | None = "This bed file was specified manually in the yaml config."
-    # comment: str = "This bed file was specified manually in the yaml config."
-
-    # @property
-    # def description(self) -> Single[SrcDoc]:
-    #     return Single(elem=self.dip.documentation)
 
     @property
     def lines(self) -> Single[list[bed.IndexedBedLine]]:
         return Single(elem=[x.line for x in self.dip.lines])
 
 
-class Dip2ChrTxtSrc(_BaseSrcDocumentable2):
+class Dip2ChrTxtSrc(BaseModel):
     pat: HapBedTxtSrc
     mat: HapBedTxtSrc
-    description: str | None = (
-        "Both haps of this bed file were specified manually in the yaml config."
-    )
-
-    # @property
-    # def description(self) -> Double[SrcDoc]:
-    #     return Double(
-    #         pat=self.pat.documentation,
-    #         mat=self.mat.documentation,
-    #     )
 
     @property
     def lines(self) -> Double[list[bed.IndexedBedLine]]:
@@ -2898,7 +2893,6 @@ class BedFile(GenericModel, Generic[Q]):
 
     bed: Q
     params: BedFileParams = BedFileParams()
-    description: str | None = None
 
     def read(self, path: Path) -> pd.DataFrame:
         """Read bed file with params from Path."""
@@ -3253,7 +3247,7 @@ class Include(BaseModel):
     hets: set[int] = {5, 10, 25, 50, 100}
 
 
-class OtherBedFile(BedFile[AnyBedT], Generic[AnyBedT]):
+class OtherBedFile(GenericModel, Generic[AnyBedT, AnyBedTxtT]):
     """A bed file that is imported with minimal processing and included as-is
     in a given stratification package. Useful for one-off bed files made in a
     somewhat hacky (but documented) manner that I don't feel like enshrining
@@ -3264,7 +3258,9 @@ class OtherBedFile(BedFile[AnyBedT], Generic[AnyBedT]):
     correctness during the validation stage.
     """
 
+    description: str
     remove_gaps: bool = False
+    data: BedFile[AnyBedT] | AnyBedTxtT
 
 
 class Bench(GenericModel, Generic[AnyBedT, AnyVcfT]):
@@ -3329,7 +3325,7 @@ class Malloc(BaseModel):
     runHappy: int = 48000
 
 
-OtherDict = dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT]]]
+OtherDict = dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT, AnyBedTxtT]]]
 
 
 class Build(GenericModel, Generic[AnyBedT, AnyVcfT, AnyBedTxtT]):
@@ -3337,7 +3333,7 @@ class Build(GenericModel, Generic[AnyBedT, AnyVcfT, AnyBedTxtT]):
     comparison: BuildCompare | None = None
     bench: Bench[AnyBedT, AnyVcfT] | None = None
     other_strats: dict[
-        OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT] | AnyBedTxtT]
+        OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT, AnyBedTxtT]]
     ] = {}
     # TODO if I really want I could validate this such that the user would be
     # politely alerted in case they specify any diploid params for a haploid
@@ -3351,8 +3347,9 @@ class Build(GenericModel, Generic[AnyBedT, AnyVcfT, AnyBedTxtT]):
 
     @validator("other_strats")
     def valid_other(
-        cls, os: dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT]]]
-    ) -> dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT]]]:
+        cls,
+        os: dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT, AnyBedTxtT]]],
+    ) -> dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT, AnyBedTxtT]]]:
         for k, v in os.items():
             if k == CoreLevel.OTHER_DIFFICULT:
                 bs = v.keys() & BUILTIN_OTHER
@@ -4951,12 +4948,12 @@ class GiabStrats(BaseModel):
             ),
         )
 
-    # TODO implement txt paths
+    # TODO this really should be called "source_doc" or something
     def with_build_data_and_bed_doc(
         self,
         rk: RefKeyFullS,
         bk: BuildKey,
-        inputs: Path1or2,
+        inputs: Path1or2orYaml,
         get_bed_f: BuildDataToBed,
         this: str | None,
         level: int,
@@ -4972,16 +4969,20 @@ class GiabStrats(BaseModel):
 
         def hap(bf: HapBedFileOrTxt) -> list[str]:
             if isinstance(bf, BedFile):
+                if isinstance(inputs, IsYamlBed):
+                    raise DesignError()
                 src_txt = match_single_unsafe(
                     lambda p: format_src(bf.bed.documentation.elem, p, this), inputs
                 )
                 params_txt = format_bed_params(bf.params)
                 return [src_txt, params_txt]
             else:
-                return [bf.hap.description]
+                return [bf.hap.provenance]
 
         def dip1to1(bf: Dip1BedFileOrTxt) -> list[str]:
             if isinstance(bf, BedFile):
+                if isinstance(inputs, IsYamlBed):
+                    raise DesignError()
                 dip_txt = "This source contained both haplotypes for this reference."
                 src_txt = match_single_unsafe(
                     lambda p: format_src(bf.bed.documentation.elem, p, this), inputs
@@ -4989,7 +4990,7 @@ class GiabStrats(BaseModel):
                 params_txt = format_bed_params(bf.params)
                 return [dip_txt, src_txt, params_txt]
             else:
-                return [bf.dip.description]
+                return [bf.dip.provenance]
 
         def dip1to2(bf: Dip1BedFileOrTxt, hap: Haplotype) -> list[str]:
             dip_txt = " ".join(
@@ -5000,13 +5001,15 @@ class GiabStrats(BaseModel):
                 ]
             )
             if isinstance(bf, BedFile):
+                if isinstance(inputs, IsYamlBed):
+                    raise DesignError()
                 src_txt = match_single_unsafe(
                     lambda p: format_src(bf.bed.documentation.elem, p, this), inputs
                 )
                 params_txt = format_bed_params(bf.params)
                 return [dip_txt, src_txt, params_txt]
             else:
-                return [dip_txt, bf.dip.description]
+                return [dip_txt, bf.dip.provenance]
 
         def dip2to1(bf: Dip2BedFileOrTxt) -> list[str]:
             indent = level * "#"
@@ -5022,6 +5025,8 @@ class GiabStrats(BaseModel):
                 return f"{indent} {t} haplotype"
 
             if isinstance(bf, BedFile):
+                if isinstance(inputs, IsYamlBed):
+                    raise DesignError()
 
                 def fmt_src(h: Haplotype) -> list[str]:
                     src_txt = match_double_unsafe(
@@ -5044,9 +5049,9 @@ class GiabStrats(BaseModel):
                 return [
                     dip_txt,
                     hap_header(Haplotype.PAT),
-                    bf.pat.description,
+                    bf.pat.provenance,
                     hap_header(Haplotype.MAT),
-                    bf.pat.description,
+                    bf.pat.provenance,
                 ]
 
         def dip2to2(bf: Dip2BedFileOrTxt, hap: Haplotype) -> list[str]:
@@ -5057,6 +5062,8 @@ class GiabStrats(BaseModel):
                 ]
             )
             if isinstance(bf, BedFile):
+                if isinstance(inputs, IsYamlBed):
+                    raise DesignError()
                 src_txt = match_double_unsafe(
                     lambda p1, p2: format_src(
                         bf.bed.documentation.choose(hap), hap.choose(p1, p2), this
@@ -5066,7 +5073,7 @@ class GiabStrats(BaseModel):
                 params_txt = format_bed_params(bf.params)
                 return [dip_txt, src_txt, params_txt]
             else:
-                return [dip_txt, hap.choose(bf.pat, bf.mat).description]
+                return [dip_txt, hap.choose(bf.pat, bf.mat).provenance]
 
         paragraphs = self.with_build_data_and_bed_full(
             rk,
@@ -5267,30 +5274,39 @@ class GiabStrats(BaseModel):
         p: Path,
         f: StratInputToBed,
         rk: RefKey,
-        bk: BuildKey,
-    ) -> Path1or2 | None:
+    ) -> Path1or2orYaml | None:
         self._test_if_source_path(p, rk)
-        return (
-            map_single_or_double(
-                lambda s: sub_wildcards_path(p, {"ref_src_key": s, "build_key": bk}),
-                rsks,
-            )
-            if (rsks := self.refkey_to_bed_refsrckeys(f, rk)) is not None
-            else None
+        src = self.with_ref_data(
+            rk,
+            lambda rd: f(rd.strat_inputs),
+            lambda rd: f(rd.strat_inputs),
+            lambda rd: f(rd.strat_inputs),
         )
+        if isinstance(src, BedFile):
+            return (
+                map_single_or_double(
+                    lambda s: sub_wildcards_path(p, {"ref_src_key": s}),
+                    rsks,
+                )
+                if (rsks := self.refkey_to_bed_refsrckeys(f, rk)) is not None
+                else None
+            )
+        elif src is None:
+            return None
+        else:
+            return IsYamlBed()
 
     def all_low_complexity_sources(
         self,
         rk: RefKey,
-        bk: BuildKey,
         rmsk: Path,
         censat: Path,
         trf: Path,
     ) -> LowComplexitySources:
         return LowComplexitySources(
-            rmsk=self._sub_rsk(rmsk, si_to_rmsk, rk, bk),
-            sat=self._sub_rsk(censat, si_to_satellites, rk, bk),
-            trf=self._sub_rsk(trf, si_to_simreps, rk, bk),
+            rmsk=self._sub_rsk(rmsk, si_to_rmsk, rk),
+            sat=self._sub_rsk(censat, si_to_satellites, rk),
+            trf=self._sub_rsk(trf, si_to_simreps, rk),
         )
 
     def all_low_complexity(
@@ -5333,7 +5349,7 @@ class GiabStrats(BaseModel):
         )
 
         # include tandem repeats and merged output if we have rmsk/censat and simreps
-        tm: tuple[Path1or2, Path1or2] | None = maybe2((src.trf, src.rmsk))
+        tm: tuple[Path1or2orYaml, Path1or2orYaml] | None = maybe2((src.trf, src.rmsk))
         if tm is None:
             repeats = None
         else:
@@ -5346,7 +5362,7 @@ class GiabStrats(BaseModel):
             )
 
         # include satellites only if we have rmsk or censat
-        s: Path1or2 | None = from_maybe(src.rmsk, src.sat)
+        s: Path1or2orYaml | None = from_maybe(src.rmsk, src.sat)
         if s is None:
             satpaths = None
         else:
@@ -5379,21 +5395,11 @@ class GiabStrats(BaseModel):
         bd = self.to_build_data(rk, bk)
 
         return OtherDifficultSources(
-            gaps=self._sub_rsk(gaps, si_to_gaps, rk, bk),
-            refseq=self._sub_rsk(refseq, si_to_cds, rk, bk),
-            mhc=self._sub_rsk(mhc, si_to_mhc, rk, bk),
-            kir=self._sub_rsk(kir, si_to_kir, rk, bk),
-            vdj=self._sub_rsk(vdj, si_to_vdj, rk, bk),
-            # TODO this is super lame, we know that the source is non-nil
-            # because it is right in the dictionary, so looking it up using this
-            # expensive function should not be necessary. The reason this is
-            # here is because the bed source in the dictionary is not guaranteed
-            # to have a "src" attribute, and the lambda function type guarantees
-            # this itself (which also makes me think the lambda type isn't
-            # correct). And the main reason we can't define a "src" attribute is
-            # because it returns either a Single[X] or a Double[X] which in turn
-            # requires defining a generic typevar in the "bed" property for a
-            # bed file...which isn't possible in mypy yet.
+            gaps=self._sub_rsk(gaps, si_to_gaps, rk),
+            refseq=self._sub_rsk(refseq, si_to_cds, rk),
+            mhc=self._sub_rsk(mhc, si_to_mhc, rk),
+            kir=self._sub_rsk(kir, si_to_kir, rk),
+            vdj=self._sub_rsk(vdj, si_to_vdj, rk),
             other={
                 lk: {
                     sk: map_single_or_double(
@@ -5403,7 +5409,7 @@ class GiabStrats(BaseModel):
                     for sk, _ in o.items()
                     if (
                         rsks := self.buildkey_to_bed_refsrckeys(
-                            lambda bd: bd_to_other(lk, sk, bd), rk, bk
+                            lambda bd: bd_to_other_bed(lk, sk, bd), rk, bk
                         )
                     )
                     is not None
@@ -5465,7 +5471,7 @@ class GiabStrats(BaseModel):
 
         def immuno_paths(
             test: bool,
-            immuno_src: Path1or2 | None,
+            immuno_src: Path1or2orYaml | None,
             output: Path,
         ) -> ImmunoPaths | None:
             if not test:
@@ -5681,13 +5687,8 @@ class GiabStrats(BaseModel):
             params=[*bd.build.include.mappability],
         )
 
-    def all_segdups_sources(
-        self,
-        rk: RefKeyFullS,
-        bk: BuildKey,
-        superdups: Path,
-    ) -> SegdupSources:
-        sd = self._sub_rsk(superdups, si_to_superdups, strip_full_refkey(rk), bk)
+    def all_segdups_sources(self, rk: RefKeyFullS, superdups: Path) -> SegdupSources:
+        sd = self._sub_rsk(superdups, si_to_superdups, strip_full_refkey(rk))
         return SegdupSources(superdup=sd)
 
     def all_segdups(

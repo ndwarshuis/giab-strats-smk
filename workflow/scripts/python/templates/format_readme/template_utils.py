@@ -68,18 +68,22 @@ def fmt_other_srcs(
         sk: sconf.with_build_data_and_bed_doc(
             rk,
             bk,
-            cfg.map_single_or_double(
-                lambda x: cfg.sub_wildcards_path(
-                    x,
-                    {
-                        "build_key": bk,
-                        "other_level_key": lk,
-                        "other_strat_key": sk,
-                    },
-                ),
-                p.source,
+            (
+                cfg.map_single_or_double(
+                    lambda x: cfg.sub_wildcards_path(
+                        x,
+                        {
+                            "build_key": bk,
+                            "other_level_key": lk,
+                            "other_strat_key": sk,
+                        },
+                    ),
+                    p.source,
+                )
+                if not isinstance(p.source, cfg.IsYamlBed)
+                else cfg.IsYamlBed()  # poor man's bind instance :/
             ),
-            lambda bd: cfg.bd_to_other(lk, sk, bd),
+            lambda bd: cfg.bd_to_other_bed(lk, sk, bd),
             None,
             5,
         )
