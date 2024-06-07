@@ -4,7 +4,7 @@ from common.config import (
     si_to_mhc,
     si_to_kir,
     si_to_vdj,
-    bd_to_other,
+    bd_to_other_bed,
     strip_full_refkey,
     MutualPathPair,
     BUILTIN_OTHER,
