@@ -3000,6 +3000,7 @@ Dip1VcfSrc = Dip1ChrFileSrc[BedFileSrc]
 Dip2VcfSrc = Dip2ChrFileSrc[BedFileSrc]
 
 AnyVcfT = TypeVar("AnyVcfT", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
+AnyVcf = HapVcfSrc | Dip1VcfSrc | Dip2VcfSrc
 
 
 class VCFFile(GenericModel, Generic[Q]):
@@ -4410,7 +4411,7 @@ class GiabStrats(BaseModel):
 
     def buildkey_to_vcf_src(
         self, f: BuildDataToVCF, rk: RefKeyFullS, bk: BuildKey
-    ) -> BedFileSrc:
+    ) -> AnyBedSrc:
         """Like 'buildkey_to_bed_src' but for benchmark VCF sources."""
         # TODO not DRY
         rk_, hap = parse_full_refkey(rk)
@@ -4418,7 +4419,7 @@ class GiabStrats(BaseModel):
         src = with_build_data(bd, lambda bd: f(bd), lambda bd: f(bd), lambda bd: f(bd))
         if src is None:
             raise DesignError()
-        return from_single_or_double(src.vcf.src, hap)
+        return from_single_or_double(src.src, hap)
 
     def refkey_to_normalization_path(self, rk: RefKeyFullS, s: IO[bytes]) -> Path:
         """Return a list of paths for a given normalization checkpoint.
@@ -6154,9 +6155,7 @@ class BuildDataToBed(Protocol):
 class BuildDataToVCF(Protocol):
     A = TypeVar("A", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
 
-    def __call__(
-        self, __x: BuildData_[RefSrcT, AnyBedT, A, AnyBedTxtT]
-    ) -> BedFile[A] | None:
+    def __call__(self, __x: BuildData_[RefSrcT, AnyBedT, A, AnyBedTxtT]) -> A | None:
         pass
 
 
