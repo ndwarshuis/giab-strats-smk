@@ -279,7 +279,7 @@ use rule download_gaps as download_other with:
 
 checkpoint normalize_other:
     input:
-        lambda w: all_otherdifficult_sources_wc(wildcards).other_source(
+        lambda w: all_otherdifficult_sources_wc(w).other_source(
             w["other_level_key"], w["other_strat_key"]
         ),
         # lambda w: expand(
