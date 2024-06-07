@@ -4419,7 +4419,7 @@ class GiabStrats(BaseModel):
         src = with_build_data(bd, lambda bd: f(bd), lambda bd: f(bd), lambda bd: f(bd))
         if src is None:
             raise DesignError()
-        return from_single_or_double(src.src, hap)
+        return from_single_or_double(src.vcf.src, hap)
 
     def refkey_to_normalization_path(self, rk: RefKeyFullS, s: IO[bytes]) -> Path:
         """Return a list of paths for a given normalization checkpoint.
@@ -6155,7 +6155,9 @@ class BuildDataToBed(Protocol):
 class BuildDataToVCF(Protocol):
     A = TypeVar("A", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
 
-    def __call__(self, __x: BuildData_[RefSrcT, AnyBedT, A, AnyBedTxtT]) -> A | None:
+    def __call__(
+        self, __x: BuildData_[RefSrcT, AnyBedT, A, AnyBedTxtT]
+    ) -> VCFFile[A] | None:
         pass
 
 
