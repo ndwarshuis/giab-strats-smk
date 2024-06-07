@@ -5138,7 +5138,7 @@ class GiabStrats(BaseModel):
                 [
                     "This source contained both haplotypes for this reference,",
                     f"and only the {hap.name} haplotype was used to generate",
-                    "these bed files.",
+                    "this bed file.",
                 ]
             )
             if isinstance(bf, BedFile):
@@ -5199,7 +5199,7 @@ class GiabStrats(BaseModel):
             dip_txt = " ".join(
                 [
                     f"This source contained only the {hap.name} haplotype for",
-                    "this reference, which was used to generate these bed files.",
+                    "this reference, which was used to generate this bed file.",
                 ]
             )
             if isinstance(bf, BedFile):
