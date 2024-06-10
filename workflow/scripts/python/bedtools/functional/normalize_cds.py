@@ -167,7 +167,7 @@ def main(smk: Any) -> None:
 
     # functions to read the GFF dataframe
 
-    def hap(bd: cfg.HapBuildData, bf: cfg.HapBedFileOrTxt) -> None:
+    def hap(bd: cfg.HapBuildData, bf: cfg.HapBedFileOrCoords) -> None:
         if isinstance(bf, cfg.BedFile):
             gff = match1_unsafe(
                 cds.inputs,
@@ -182,7 +182,7 @@ def main(smk: Any) -> None:
         else:
             write_no_gff_all()
 
-    def dip1to1(bd: cfg.Dip1BuildData, bf: cfg.Dip1BedFileOrTxt) -> None:
+    def dip1to1(bd: cfg.Dip1BuildData, bf: cfg.Dip1BedFileOrCoords) -> None:
         if isinstance(bf, cfg.BedFile):
             gff = match1_unsafe(
                 cds.inputs,
@@ -197,14 +197,14 @@ def main(smk: Any) -> None:
         else:
             write_no_gff_all()
 
-    def dip1to2(bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFileOrTxt) -> None:
+    def dip1to2(bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFileOrCoords) -> None:
         if isinstance(bf, cfg.BedFile):
             gff = match1_unsafe(
                 cds.inputs,
                 lambda i: [
                     GFFOut(d, k)
                     for d, k in zip(
-                        cfg.read_filter_sort_dip1to2_bed(bd, bf, i),
+                        cfg.read_filter_sort_dip1to2_bed(bd, bf, i).as_tuple,
                         bd.refdata.ref.src.keys(rk).as_tuple,
                     )
                 ],
@@ -215,7 +215,7 @@ def main(smk: Any) -> None:
 
     def dip2to1(
         bd: cfg.Dip1BuildData,
-        bf: cfg.Dip2BedFileOrTxt,
+        bf: cfg.Dip2BedFileOrCoords,
     ) -> None:
         if isinstance(bf, cfg.BedFile):
             gff = match2_unsafe(
@@ -231,7 +231,7 @@ def main(smk: Any) -> None:
         else:
             write_no_gff_all()
 
-    def dip2to2(bd: cfg.Dip2BuildData, bf: cfg.Dip2BedFileOrTxt) -> None:
+    def dip2to2(bd: cfg.Dip2BuildData, bf: cfg.Dip2BedFileOrCoords) -> None:
         if isinstance(bf, cfg.BedFile):
 
             def go(

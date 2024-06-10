@@ -288,10 +288,10 @@ def prefix_to_refkey_config(s: str) -> tuple[bool, bool]:
 
 
 def wrap_dip_2to2_i_f(
-    f: Callable[[X, Haplotype, Dip2BuildData, Dip2BedFileOrTxt], Y],
+    f: Callable[[X, Haplotype, Dip2BuildData, Dip2BedFileOrCoords], Y],
     i: tuple[X, X],
     bd: Dip2BuildData,
-    bf: Dip2BedFileOrTxt,
+    bf: Dip2BedFileOrCoords,
 ) -> tuple[Y, Y]:
     return (f(i[0], Haplotype.PAT, bd, bf), f(i[1], Haplotype.MAT, bd, bf))
 
@@ -315,26 +315,26 @@ def wrap_dip_2to2_io_f(
 # TODO mypy for some reason doesn't understand how to narrow a
 # Something[Union[X, Y]] to a Something[X] using 'isinstance'
 def is_dip1_bed(
-    x: BedFile[Dip1ChrFileSrc[S] | Dip2ChrFileSrc[S]] | DipChrTxtSrc,
-) -> TypeGuard[BedFile[Dip1ChrFileSrc[S]] | Dip1ChrTxtSrc]:
-    return isinstance(x, Dip1ChrTxtSrc) or (
-        isinstance(x, BedFile) and isinstance(x.bed, Dip1ChrFileSrc)
+    x: BedFile[Dip1Src[S] | Dip2Src[S]] | DipBedCoords,
+) -> TypeGuard[BedFile[Dip1Src[S]] | Dip1BedCoords]:
+    return isinstance(x, Dip1BedCoords) or (
+        isinstance(x, BedFile) and isinstance(x.bed, Dip1Src)
     )
 
 
 def is_dip2_bed(
-    x: BedFile[Dip1ChrFileSrc[S] | Dip2ChrFileSrc[S]] | DipChrTxtSrc,
-) -> TypeGuard[BedFile[Dip2ChrFileSrc[S]] | Dip2ChrTxtSrc]:
-    return isinstance(x, Dip2ChrTxtSrc) or (
-        isinstance(x, BedFile) and isinstance(x.bed, Dip2ChrFileSrc)
+    x: BedFile[Dip1Src[S] | Dip2Src[S]] | DipBedCoords,
+) -> TypeGuard[BedFile[Dip2Src[S]] | Dip2BedCoords]:
+    return isinstance(x, Dip2BedCoords) or (
+        isinstance(x, BedFile) and isinstance(x.bed, Dip2Src)
     )
 
 
 def wrap_dip_2to2_io_txt_f(
-    f: Callable[[Path, Haplotype, Dip2BuildData, Dip2ChrTxtSrc], Y],
+    f: Callable[[Path, Haplotype, Dip2BuildData, Dip2BedCoords], Y],
     o: tuple[Path, Path],
     bd: Dip2BuildData,
-    bf: Dip2ChrTxtSrc,
+    bf: Dip2BedCoords,
 ) -> tuple[Y, Y]:
     return (
         f(o[0], Haplotype.PAT, bd, bf),
@@ -346,9 +346,9 @@ def wrap_dip_2to2_io_txt_f(
 
 
 def with_dip_bedfile(
-    bf: BedFile[Dip1ChrFileSrc[S] | Dip2ChrFileSrc[S]] | DipChrTxtSrc,
-    dip1: Callable[[BedFile[Dip1ChrFileSrc[S]] | Dip1ChrTxtSrc], Y],
-    dip2: Callable[[BedFile[Dip2ChrFileSrc[S]] | Dip2ChrTxtSrc], Y],
+    bf: BedFile[Dip1Src[S] | Dip2Src[S]] | DipBedCoords,
+    dip1: Callable[[BedFile[Dip1Src[S]] | Dip1BedCoords], Y],
+    dip2: Callable[[BedFile[Dip2Src[S]] | Dip2BedCoords], Y],
 ) -> Y:
     if is_dip1_bed(bf):
         return dip1(bf)
@@ -422,11 +422,11 @@ def with_ref_data(
     dip1_f: Callable[[Dip1RefData], X],
     dip2_f: Callable[[Dip2RefData], X],
 ) -> X:
-    if isinstance(rd.ref, HapChrFileSrc):
+    if isinstance(rd.ref, HapSrc):
         return hap_f(rd)
-    elif isinstance(rd.ref, Dip1ChrFileSrc):
+    elif isinstance(rd.ref, Dip1Src):
         return dip1_f(rd)
-    elif isinstance(rd.ref, Dip2ChrFileSrc):
+    elif isinstance(rd.ref, Dip2Src):
         return dip2_f(rd)
     else:
         assert_never(rd)
@@ -438,14 +438,63 @@ def with_build_data(
     dip1_f: Callable[[Dip1BuildData], X],
     dip2_f: Callable[[Dip2BuildData], X],
 ) -> X:
-    if isinstance(bd.refdata.ref, HapChrFileSrc):
+    if isinstance(bd.refdata.ref, HapSrc):
         return hap_f(bd)
-    elif isinstance(bd.refdata.ref, Dip1ChrFileSrc):
+    elif isinstance(bd.refdata.ref, Dip1Src):
         return dip1_f(bd)
-    elif isinstance(bd.refdata.ref, Dip2ChrFileSrc):
+    elif isinstance(bd.refdata.ref, Dip2Src):
         return dip2_f(bd)
     else:
         assert_never(bd)
+
+
+def with_inputs_hap(
+    b: BedFile[HapSrc[S]] | HapBedCoords,
+    inputs: list[X],
+    src_f: Callable[[X, BedFile[HapSrc[S]]], Y],
+    coords_f: Callable[[HapBedCoords], Y],
+) -> Y:
+    if isinstance(b, BedFile):
+        return match1_unsafe(inputs, lambda i: src_f(i, b))
+    elif isinstance(b, HapBedCoords):
+        if len(inputs) > 0:
+            raise DesignError()
+        return coords_f(b)
+    else:
+        assert_never(b)
+
+
+def with_inputs_dip1(
+    b: Dip1BedFileOrCoords,
+    inputs: list[X],
+    src_f: Callable[[X, Dip1BedFile], Y],
+    coords_f: Callable[[Dip1BedCoords], Y],
+) -> Y:
+    if isinstance(b, BedFile):
+        return match1_unsafe(inputs, lambda i: src_f(i, b))
+    elif isinstance(b, Dip1BedCoords) or isinstance(b, Dip2BedCoords):
+        if len(inputs) > 0:
+            raise DesignError()
+        return coords_f(b)
+    else:
+        assert_never(b)
+
+
+# TODO change to double
+def with_inputs_dip2(
+    b: BedFile[Dip2Src[S]] | Dip2BedCoords,
+    inputs: list[X],
+    src_f: Callable[[tuple[X, X], BedFile[Dip2Src[S]]], Y],
+    coords_f: Callable[[Dip2BedCoords], Y],
+) -> Y:
+    if isinstance(b, BedFile):
+        return match2_unsafe(inputs, lambda i0, i1: src_f((i0, i1), b))
+    elif isinstance(b, Dip1BedCoords) or isinstance(b, Dip2BedCoords):
+        if len(inputs) > 0:
+            raise DesignError()
+        return coords_f(b)
+    else:
+        assert_never(b)
 
 
 # noop conversion getters
@@ -475,10 +524,10 @@ def dip2_noop_conversion(h: Haplotype, bd: Dip2BuildData) -> HapToHapChrConversi
 def to_ref_data_unsafe(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
     ],
     rk: RefKey,
-) -> RefData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]:
+) -> RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]:
     try:
         s = xs[rk]
         return RefData_(rk, s.ref, s.strat_inputs, s.builds)
@@ -489,16 +538,16 @@ def to_ref_data_unsafe(
 def all_ref_data(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
     ],
-) -> list[RefData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]]:
+) -> list[RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]]:
     return [to_ref_data_unsafe(xs, rk) for rk in xs]
 
 
 def all_ref_refsrckeys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
     ],
 ) -> list[RefKeyFullS]:
     return [
@@ -511,16 +560,16 @@ def all_ref_refsrckeys(
 def all_build_data(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
     ],
-) -> list[BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]]:
+) -> list[BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]]:
     return [r.to_build_data_unsafe(b) for r in all_ref_data(xs) for b in r.builds]
 
 
 def all_bed_build_and_refsrckeys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
     ],
     f: BuildDataToSrc,
 ) -> list[tuple[RefKeyFullS, BuildKey]]:
@@ -535,7 +584,7 @@ def all_bed_build_and_refsrckeys(
 def all_bed_refsrckeys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
     ],
     f: BuildDataToSrc,
 ) -> list[RefKeyFullS]:
@@ -545,7 +594,7 @@ def all_bed_refsrckeys(
 def all_build_keys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
     ],
 ) -> list[tuple[RefKey, BuildKey]]:
     return [(r.refdata.refkey, r.buildkey) for r in all_build_data(xs)]
@@ -554,7 +603,7 @@ def all_build_keys(
 def all_ref_build_keys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
     ],
 ) -> list[tuple[RefKeyFullS, BuildKey]]:
     return [
@@ -584,153 +633,153 @@ def prepare_output_path(path: Path) -> Path:
 
 def bd_to_si(
     f: StratInputToBed,
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return f(x.refdata.strat_inputs)
 
 
-def si_to_cds(x: StratInputs[AnyBedT, AnyBedTxtT]) -> CDS[AnyBedT] | AnyBedTxtT | None:
+def si_to_cds(x: StratInputs[BedSrcT, BedCoordsT]) -> CDS[BedSrcT] | BedCoordsT | None:
     return x.functional.cds
 
 
 def si_to_mhc(
-    x: StratInputs[AnyBedT, AnyBedTxtT]
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: StratInputs[BedSrcT, BedCoordsT]
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return x.functional.mhc
 
 
 def si_to_kir(
-    x: StratInputs[AnyBedT, AnyBedTxtT]
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: StratInputs[BedSrcT, BedCoordsT]
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return x.functional.kir
 
 
 def si_to_vdj(
-    x: StratInputs[AnyBedT, AnyBedTxtT]
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: StratInputs[BedSrcT, BedCoordsT]
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return x.functional.vdj
 
 
 def bd_to_cds(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> CDS[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> CDS[BedSrcT] | BedCoordsT | None:
     return si_to_cds(x.refdata.strat_inputs)
 
 
 def bd_to_mhc(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_mhc(x.refdata.strat_inputs)
 
 
 def bd_to_kir(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_kir(x.refdata.strat_inputs)
 
 
 def bd_to_vdj(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_vdj(x.refdata.strat_inputs)
 
 
 def si_to_simreps(
-    x: StratInputs[AnyBedT, AnyBedTxtT]
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: StratInputs[BedSrcT, BedCoordsT]
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return x.low_complexity.simreps
 
 
 # TODO take the boolean switch out of here
 def bd_to_simreps(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_simreps(x.refdata.strat_inputs) if x.want_low_complexity else None
 
 
 def si_to_rmsk(
-    x: StratInputs[AnyBedT, AnyBedTxtT]
-) -> RMSKFile[AnyBedT] | AnyBedTxtT | None:
+    x: StratInputs[BedSrcT, BedCoordsT]
+) -> RMSKFile[BedSrcT] | BedCoordsT | None:
     return x.low_complexity.rmsk
 
 
 # TODO take the boolean switch out of here
 def bd_to_rmsk(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> RMSKFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> RMSKFile[BedSrcT] | BedCoordsT | None:
     return si_to_rmsk(x.refdata.strat_inputs) if x.want_low_complexity else None
 
 
 def si_to_satellites(
-    x: StratInputs[AnyBedT, AnyBedTxtT]
-) -> SatFile[AnyBedT] | AnyBedTxtT | None:
+    x: StratInputs[BedSrcT, BedCoordsT]
+) -> SatFile[BedSrcT] | BedCoordsT | None:
     return x.low_complexity.satellites
 
 
 # TODO take the boolean switch out of here
 def bd_to_satellites(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> SatFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> SatFile[BedSrcT] | BedCoordsT | None:
     return si_to_satellites(x.refdata.strat_inputs) if x.want_low_complexity else None
 
 
 def si_to_superdups(
-    x: StratInputs[AnyBedT, AnyBedTxtT]
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: StratInputs[BedSrcT, BedCoordsT]
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return x.segdups.superdups
 
 
 # TODO take the boolean switch out of here
 def bd_to_superdups(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_superdups(x.refdata.strat_inputs) if x.have_and_want_segdups else None
 
 
 def si_to_gaps(
-    x: StratInputs[AnyBedT, AnyBedTxtT]
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: StratInputs[BedSrcT, BedCoordsT]
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return x.gap
 
 
 # TODO take the boolean switch out of here
 def bd_to_gaps(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_gaps(x.refdata.strat_inputs) if x.have_gaps else None
 
 
 def bd_to_other(
     lk: OtherLevelKey,
     sk: OtherStratKey,
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> OtherBedFile[AnyBedT, AnyBedTxtT]:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> OtherBedFile[BedSrcT, BedCoordsT]:
     return x.build.other_strats[lk][sk]
 
 
 def bd_to_other_bed(
     lk: OtherLevelKey,
     sk: OtherStratKey,
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> BedFile[AnyBedT] | AnyBedTxtT | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> BedFile[BedSrcT] | BedCoordsT | None:
     return x.build.other_strats[lk][sk].data
 
 
 def bd_to_bench_bed(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> BedFile[AnyBedT] | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> BedFile[BedSrcT] | None:
     return fmap_maybe(lambda y: y.bench_bed, x.build.bench)
 
 
 def bd_to_bench_vcf(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> VCFFile[AnyVcfT] | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> VCFFile[VcfSrcT] | None:
     return fmap_maybe(lambda y: y.bench_vcf, x.build.bench)
 
 
 def bd_to_query_vcf(
-    x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT],
-) -> VCFFile[AnyVcfT] | None:
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+) -> VCFFile[VcfSrcT] | None:
     return fmap_maybe(lambda y: y.query_vcf, x.build.bench)
 
 
@@ -977,7 +1026,7 @@ def read_filter_sort_dip1to2_bed(
     bd: Dip2BuildData,
     bf: Dip1BedFile,
     ipath: Path,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> Double[pd.DataFrame]:
     conv = bd.refdata.ref.dip_chr_conversion(bf.bed.chr_pattern, bd.build_chrs)
     imap, splitter = conv.init_mapper
     fmap = conv.final_mapper
@@ -990,7 +1039,7 @@ def read_filter_sort_dip1to2_bed(
 
     df = bf.read(ipath)
     df0, df1 = bed.split_bed(splitter, df)
-    return (go(df0, fmap.pat), go(df1, fmap.mat))
+    return Double(go(df0, fmap.pat), go(df1, fmap.mat))
 
 
 def read_write_filter_sort_dip1to2_bed(
@@ -1002,7 +1051,7 @@ def read_write_filter_sort_dip1to2_bed(
     g1: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x,
 ) -> None:
     """Read a haploid bed file, sort it, and write it in bgzip format."""
-    df0, df1 = read_filter_sort_dip1to2_bed(bd, bf, ipath)
+    df0, df1 = read_filter_sort_dip1to2_bed(bd, bf, ipath).as_tuple
     bed.write_bed(opath[0], g0(df0))
     bed.write_bed(opath[1], g1(df1))
 
@@ -1031,6 +1080,44 @@ def read_write_filter_sort_dip2to2_bed(
     bed.write_bed(opath, g(df))
 
 
+def build_hap_coords_df(bd: HapBuildData, bf: HapBedCoords) -> pd.DataFrame:
+    to_map = bd.refdata.ref.chr_pattern.final_mapper(bd.build_chrs, Haplotype.PAT)
+    return bed.indexed_bedlines_to_df(bf.lines(Haplotype.PAT).elem, to_map)
+
+
+def build_dip1to1_coords_df(bd: Dip1BuildData, bf: Dip1BedCoords) -> pd.DataFrame:
+    to_map = bd.refdata.ref.chr_pattern.final_mapper(bd.build_chrs)
+    return bed.indexed_bedlines_to_df(bf.lines.elem, to_map)
+
+
+def build_dip1to2_coords_df(
+    bd: Dip2BuildData, bf: Dip1BedCoords
+) -> Double[pd.DataFrame]:
+    lines = bf.lines.elem
+    pat = [x for x in lines if x.chr < 24]
+    mat = [x for x in lines if x.chr >= 24]
+    return bd.refdata.ref.chr_pattern.both(
+        lambda p, h: bed.indexed_bedlines_to_df(
+            h.choose(pat, mat),
+            p.final_mapper(bd.build_chrs, h),
+        )
+    )
+
+
+def build_dip2to1_coords_df(bd: Dip1BuildData, bf: Dip2BedCoords) -> pd.DataFrame:
+    to_map = bd.refdata.ref.chr_pattern.final_mapper(bd.build_chrs)
+    return bed.indexed_bedlines_to_df([*chain(*bf.lines.as_tuple)], to_map)
+
+
+def build_dip2to2_coords_df(
+    hap: Haplotype, bd: Dip2BuildData, bf: Dip2BedCoords
+) -> pd.DataFrame:
+    pattern = bd.refdata.ref.chr_pattern.choose(hap)
+    to_map = pattern.final_mapper(bd.build_chrs, hap)
+    lines = bf.lines.choose(hap)
+    return bed.indexed_bedlines_to_df(lines, to_map)
+
+
 def filter_sort_bed_main_inner(
     sconf: GiabStrats,
     rk: RefKey,
@@ -1045,45 +1132,30 @@ def filter_sort_bed_main_inner(
     # we don't need to download/read anything from disk
     if len(inputs) == 0:
 
-        def hap(o: Path, bd: HapBuildData, bf: HapChrTxtSrc) -> list[Path]:
-            to_map = bd.refdata.ref.chr_pattern.final_mapper(
-                bd.build_chrs, Haplotype.PAT
-            )
-            bed.write_indexed_bedlines(o, bf.lines(Haplotype.PAT).elem, to_map)
+        def hap(o: Path, bd: HapBuildData, bf: HapBedCoords) -> list[Path]:
+            bed.write_bed(o, build_hap_coords_df(bd, bf))
             return [o]
 
-        def dip1to1(o: Path, bd: Dip1BuildData, bf: Dip1ChrTxtSrc) -> list[Path]:
-            to_map = bd.refdata.ref.chr_pattern.final_mapper(bd.build_chrs)
-            bed.write_indexed_bedlines(o, bf.lines.elem, to_map)
+        def dip1to1(o: Path, bd: Dip1BuildData, bf: Dip1BedCoords) -> list[Path]:
+            bed.write_bed(o, build_dip1to1_coords_df(bd, bf))
             return [o]
 
         def dip1to2(
-            o: tuple[Path, Path], bd: Dip2BuildData, bf: Dip1ChrTxtSrc
+            o: tuple[Path, Path], bd: Dip2BuildData, bf: Dip1BedCoords
         ) -> list[Path]:
-            lines = bf.lines.elem
-            pat = [x for x in lines if x.chr < 24]
-            mat = [x for x in lines if x.chr >= 24]
-            bd.refdata.ref.chr_pattern.both(
-                lambda p, h: bed.write_indexed_bedlines(
-                    h.choose(*o),
-                    h.choose(pat, mat),
-                    p.final_mapper(bd.build_chrs, h),
-                )
-            )
+            df0, df1 = build_dip1to2_coords_df(bd, bf).as_tuple
+            bed.write_bed(o[0], df0)
+            bed.write_bed(o[1], df1)
             return [*o]
 
-        def dip2to1(o: Path, bd: Dip1BuildData, bf: Dip2ChrTxtSrc) -> list[Path]:
-            to_map = bd.refdata.ref.chr_pattern.final_mapper(bd.build_chrs)
-            bed.write_indexed_bedlines(o, [*chain(*bf.lines.as_tuple)], to_map)
+        def dip2to1(o: Path, bd: Dip1BuildData, bf: Dip2BedCoords) -> list[Path]:
+            bed.write_bed(o, build_dip2to1_coords_df(bd, bf))
             return [o]
 
         def dip2to2(
-            o: Path, hap: Haplotype, bd: Dip2BuildData, bf: Dip2ChrTxtSrc
+            o: Path, hap: Haplotype, bd: Dip2BuildData, bf: Dip2BedCoords
         ) -> list[Path]:
-            pattern = bd.refdata.ref.chr_pattern.choose(hap)
-            to_map = pattern.final_mapper(bd.build_chrs, hap)
-            lines = bf.lines.choose(hap)
-            bed.write_indexed_bedlines(o, lines, to_map)
+            bed.write_bed(o, build_dip2to2_coords_df(hap, bd, bf))
             return [o]
 
         return sconf.with_build_data_and_bed_o(
@@ -2261,7 +2333,7 @@ class GenericModel(GenericModel_):
         return created_class
 
 
-class _SrcDocumentable:
+class Documentable:
     """Means to provide documentation for a file source"""
 
     @property
@@ -2269,7 +2341,7 @@ class _SrcDocumentable:
         return NotImplemented
 
 
-class _SrcDocumentable1:
+class Documentable1:
     """Means to provide documentation for one source file"""
 
     @property
@@ -2277,7 +2349,7 @@ class _SrcDocumentable1:
         return NotImplemented
 
 
-class _SrcDocumentable2:
+class Documentable2:
     """Means to provide documentation for two source files"""
 
     @property
@@ -2285,31 +2357,29 @@ class _SrcDocumentable2:
         return NotImplemented
 
 
-class _BaseSrcDocumentable(BaseModel, _SrcDocumentable):
+class BaseDocumentable(BaseModel, Documentable):
+    """BaseModel class which has a source and is documented"""
+
     pass
 
 
-class _BaseSrcDocumentable1(BaseModel, _SrcDocumentable1):
+class GenericDocumentable1(GenericModel, Documentable1):
+    """BaseModel class which has one source file and is documented"""
+
     pass
 
 
-class _BaseSrcDocumentable2(BaseModel, _SrcDocumentable2):
+class GenericDocumentable2(GenericModel, Documentable2):
+    """BaseModel class which has two source files and is documented"""
+
     pass
 
 
-class _GenericSrcDocumentable1(GenericModel, _SrcDocumentable1):
-    pass
-
-
-class _GenericSrcDocumentable2(GenericModel, _SrcDocumentable2):
-    pass
-
-
-S = TypeVar("S", bound=_BaseSrcDocumentable)
+S = TypeVar("S", bound=BaseDocumentable)
 
 Q = TypeVar(
     "Q",
-    bound=_GenericSrcDocumentable1 | _GenericSrcDocumentable2,
+    bound=GenericDocumentable1 | GenericDocumentable2,
 )
 
 
@@ -2475,16 +2545,29 @@ class DipChrPattern(BaseModel, ChrPattern):
         )
 
 
-class _HapChrSrc(Generic[X]):
+class _Dip2ChrSrc(Generic[X]):
+    """Minimal interface for split (diploid2) source files.
+
+    Each source may or may not have each haplotype labeled; the identity of each
+    haplotype in either source file is determined based on the configuration key
+    under which it appears (pat or mat) and the chromosome names for each are
+    matched according to its corresponding entry in `chr_pattern`.
+    """
+
+    @property
+    def src(self) -> Double[X]:
+        return NotImplemented
+
+    @property
+    def chr_pattern(self) -> Double[HapChrPattern]:
+        return NotImplemented
+
+
+class HapSrc(GenericDocumentable1, Generic[S]):
     """Specification for a haploid source file."""
 
-    @property
-    def src(self) -> Single[X]:
-        return NotImplemented
-
-    @property
-    def chr_pattern(self) -> HapChrPattern:
-        return NotImplemented
+    chr_pattern_: HapChrPattern = Field(HapChrPattern(), alias="chr_pattern")
+    hap: S
 
     def chr_conversion(
         self, fromChr: HapChrPattern, cis: BuildChrs
@@ -2507,17 +2590,42 @@ class _HapChrSrc(Generic[X]):
     def hap_chrs(self, cis: BuildChrs) -> HapChrs:
         return self.chr_pattern.filter_indices(cis)
 
-
-class _Dip1ChrSrc(Generic[X]):
-    """Specification for a combined diploid source file."""
+    @property
+    def documentation(self) -> Single[SrcDoc]:
+        return Single(elem=self.hap.documentation)
 
     @property
-    def src(self) -> Single[X]:
-        return NotImplemented
+    def src(self) -> Single[S]:
+        return Single(elem=self.hap)
+
+    @property
+    def chr_pattern(self) -> HapChrPattern:
+        return self.chr_pattern_
+
+
+class Dip1Src(GenericDocumentable1, Generic[S]):
+    """Specification for a combined (diploid1) source file.
+
+    The 'src' is assumed to have all chromosomes for both haplotypes in one
+    file, which implies they are labeled so as to distinguish the haps. The
+    pattern will match both the chromosome number and the haplotype within the
+    chromosome name.
+    """
+
+    chr_pattern_: DipChrPattern = Field(DipChrPattern(), alias="chr_pattern")
+    dip: S
+
+    @property
+    def documentation(self) -> Single[SrcDoc]:
+        return Single(elem=self.dip.documentation)
+
+    @property
+    def src(self) -> Single[S]:
+        return Single(elem=self.dip)
 
     @property
     def chr_pattern(self) -> DipChrPattern:
-        return NotImplemented
+        return self.chr_pattern_
 
     def hap_chr_conversion(
         self,
@@ -2560,8 +2668,8 @@ class _Dip1ChrSrc(Generic[X]):
         )
 
 
-class _Dip2ChrSrc(Generic[X]):
-    """Specification for split diploid source files.
+class Dip2Src(GenericDocumentable2, Generic[S]):
+    """Specification for split (diploid2) source files.
 
     Each source may or may not have each haplotype labeled; the identity of each
     haplotype in either source file is determined based on the configuration key
@@ -2569,13 +2677,37 @@ class _Dip2ChrSrc(Generic[X]):
     matched according to its corresponding entry in `chr_pattern`.
     """
 
+    # TODO this could be cleaner (don't make one hap nested and the other flat)
+    chr_pattern_: Diploid[HapChrPattern] = Field(
+        Diploid(
+            pat=HapChrPattern(
+                template="chr%i_PATERNAL",
+                exclusions=[ChrIndex.CHRX],
+            ),
+            mat=HapChrPattern(
+                template="chr%i_MATERNAL",
+                exclusions=[ChrIndex.CHRY],
+            ),
+        ),
+        alias="chr_pattern",
+    )
+    pat: S
+    mat: S
+
     @property
-    def src(self) -> Double[X]:
-        return NotImplemented
+    def documentation(self) -> Double[SrcDoc]:
+        return Double(
+            pat=self.pat.documentation,
+            mat=self.mat.documentation,
+        )
+
+    @property
+    def src(self) -> Double[S]:
+        return Double(pat=self.pat, mat=self.mat)
 
     @property
     def chr_pattern(self) -> Double[HapChrPattern]:
-        return NotImplemented
+        return self.chr_pattern_.double
 
     def hap_chr_conversion(
         self,
@@ -2619,94 +2751,8 @@ class _Dip2ChrSrc(Generic[X]):
         return self.chr_pattern.choose(h).filter_indices(cis)
 
 
-class HapChrFileSrc(_GenericSrcDocumentable1, Generic[S], _HapChrSrc[S]):
-    """Specification for a haploid source file."""
-
-    chr_pattern_: HapChrPattern = Field(HapChrPattern(), alias="chr_pattern")
-    hap: S
-
-    @property
-    def documentation(self) -> Single[SrcDoc]:
-        return Single(elem=self.hap.documentation)
-
-    @property
-    def src(self) -> Single[S]:
-        return Single(elem=self.hap)
-
-    @property
-    def chr_pattern(self) -> HapChrPattern:
-        return self.chr_pattern_
-
-
-class Dip1ChrFileSrc(_GenericSrcDocumentable1, Generic[S], _Dip1ChrSrc[S]):
-    """Specification for a combined diploid source file.
-
-    The 'src' is assumed to have all chromosomes for both haplotypes in one
-    file, which implies they are labeled so as to distinguish the haps. The
-    pattern will match both the chromosome number and the haplotype within the
-    chromosome name.
-    """
-
-    chr_pattern_: DipChrPattern = Field(DipChrPattern(), alias="chr_pattern")
-    dip: S
-
-    @property
-    def documentation(self) -> Single[SrcDoc]:
-        return Single(elem=self.dip.documentation)
-
-    @property
-    def src(self) -> Single[S]:
-        return Single(elem=self.dip)
-
-    @property
-    def chr_pattern(self) -> DipChrPattern:
-        return self.chr_pattern_
-
-
-class Dip2ChrFileSrc(_GenericSrcDocumentable2, Generic[S], _Dip2ChrSrc[S]):
-    """Specification for split diploid source files.
-
-    Each source may or may not have each haplotype labeled; the identity of each
-    haplotype in either source file is determined based on the configuration key
-    under which it appears (hap1 or hap2) and the chromosome names for each are
-    matched according to its corresponding entry in `chr_pattern`.
-    """
-
-    # TODO this could be cleaner (don't make one hap nested and the other flat)
-    chr_pattern_: Diploid[HapChrPattern] = Field(
-        Diploid(
-            pat=HapChrPattern(
-                template="chr%i_PATERNAL",
-                exclusions=[ChrIndex.CHRX],
-            ),
-            mat=HapChrPattern(
-                template="chr%i_MATERNAL",
-                exclusions=[ChrIndex.CHRY],
-            ),
-        ),
-        alias="chr_pattern",
-    )
-    pat: S
-    mat: S
-
-    @property
-    def documentation(self) -> Double[SrcDoc]:
-        return Double(
-            pat=self.pat.documentation,
-            mat=self.mat.documentation,
-        )
-
-    @property
-    def src(self) -> Double[S]:
-        return Double(pat=self.pat, mat=self.mat)
-
-    @property
-    def chr_pattern(self) -> Double[HapChrPattern]:
-        return self.chr_pattern_.double
-
-
-class BedTxtLine(BaseModel):
-    """Represents one line in a bed file, encoded directly in the config.
+class BedCoord(BaseModel):
+    """Represents one line in a bed file, encoded directly in the yaml config.
 
     'chr', 'start', and 'end' represent the mandatory bed coordindates. 'more'
     is a list of additional columns should they be necessary. Note that when
@@ -2729,7 +2775,7 @@ class BedTxtLine(BaseModel):
         return end
 
 
-class HapBedTxtLine(BedTxtLine):
+class HapBedCoord(BedCoord):
     def line(self, h: Haplotype) -> bed.IndexedBedLine:
         return bed.IndexedBedLine(
             self.chr.to_internal_index(h),
@@ -2738,7 +2784,7 @@ class HapBedTxtLine(BedTxtLine):
         )
 
 
-class DipBedTxtLine(BedTxtLine):
+class DipBedCoord(BedCoord):
     hap: Haplotype
 
     @property
@@ -2750,42 +2796,44 @@ class DipBedTxtLine(BedTxtLine):
         )
 
 
-BedTxtLineT = TypeVar("BedTxtLineT", HapBedTxtLine, DipBedTxtLine)
+BedCoordT = TypeVar("BedCoordT", HapBedCoord, DipBedCoord)
 
 
-class BedTxtSrc(GenericModel, Generic[BedTxtLineT], _SrcDocumentable):
-    """Bed file encoded directly in the configuration file.
+class BedLines(GenericModel, Generic[BedCoordT], Documentable):
+    """Bed file encoded directly in the configuration file."""
 
-    'lines' does not need to be sorted, but each 'more' attribute must have the
-    same number of elements.
-    """
-
-    lines: list[BedTxtLineT]
+    lines: list[BedCoordT]
     provenance: str = "This bed file was specified manually in the yaml config."
 
 
-HapBedTxtSrc = BedTxtSrc[HapBedTxtLine]
-DipBedTxtSrc = BedTxtSrc[DipBedTxtLine]
+HapBedLines = BedLines[HapBedCoord]
+DipBedLines = BedLines[DipBedCoord]
 
 
-class HapChrTxtSrc(BaseModel):
-    hap: HapBedTxtSrc
+class HapBedCoords(BaseModel):
+    """Coordinates for haploid bed file."""
+
+    hap: HapBedLines
 
     def lines(self, h: Haplotype) -> Single[list[bed.IndexedBedLine]]:
         return Single(elem=[x.line(h) for x in self.hap.lines])
 
 
-class Dip1ChrTxtSrc(BaseModel):
-    dip: DipBedTxtSrc
+class Dip1BedCoords(BaseModel):
+    """Coordinates for combined diploid bed file."""
+
+    dip: DipBedLines
 
     @property
     def lines(self) -> Single[list[bed.IndexedBedLine]]:
         return Single(elem=[x.line for x in self.dip.lines])
 
 
-class Dip2ChrTxtSrc(BaseModel):
-    pat: HapBedTxtSrc
-    mat: HapBedTxtSrc
+class Dip2BedCoords(BaseModel):
+    """Coordinates for paternal and maternal bed files (seperate)."""
+
+    pat: HapBedLines
+    mat: HapBedLines
 
     @property
     def lines(self) -> Double[list[bed.IndexedBedLine]]:
@@ -2795,14 +2843,14 @@ class Dip2ChrTxtSrc(BaseModel):
         )
 
 
-class HashedSrc_(_BaseSrcDocumentable):
+class HashedSrc_(BaseDocumentable):
     """A source that may be hashed to verify its integrity"""
 
     md5: str | None = None
 
 
 class FileSrc_(HashedSrc_):
-    """Base class for local src files."""
+    """Source for a local file"""
 
     filepath: FilePath
     comment: str = "This file was local on the filesystem when the pipeline was run."
@@ -2813,7 +2861,7 @@ class FileSrc_(HashedSrc_):
 
 
 class BedLocalSrc(FileSrc_):
-    """Filepath for bedfile."""
+    """Source for a local bed file in gzip format"""
 
     @validator("filepath")
     def is_gzip(cls, v: FilePath) -> FilePath:
@@ -2822,7 +2870,7 @@ class BedLocalSrc(FileSrc_):
 
 
 class RefFileSrc(FileSrc_):
-    """Filepath for reference."""
+    """Source for a local fasta file in bgzip format"""
 
     @validator("filepath")
     def path_is_bgzip(cls, v: FilePath) -> FilePath:
@@ -2831,7 +2879,7 @@ class RefFileSrc(FileSrc_):
 
 
 class HttpSrc_(HashedSrc_):
-    """Base class for downloaded src files."""
+    """Source for a remote file to be downloaded via HTTP"""
 
     url: HttpUrl
     comment: str | None = None
@@ -2842,13 +2890,13 @@ class HttpSrc_(HashedSrc_):
 
 
 class BedHttpSrc(HttpSrc_):
-    """Url for bed file"""
+    """Source for a remote bed file to be downloaded via HTTP."""
 
     pass
 
 
 class RefHttpSrc(HttpSrc_):
-    """Url for reference"""
+    """Source for a remote fasta file to be downloaded via HTTP."""
 
     pass
 
@@ -2930,13 +2978,18 @@ class BedFileParams(BaseModel):
 
 
 class BedFile(GenericModel, Generic[Q]):
-    """Inport specs for a bed-like file."""
+    """Import specs for a bed-like file
+
+    Members:
+    bed - source for (means to obtain) the bed file
+    params - parameters to apply to bed file when downloading/formatting
+    """
 
     bed: Q
     params: BedFileParams = BedFileParams()
 
     def read(self, path: Path) -> pd.DataFrame:
-        """Read bed file with params from Path."""
+        """Read bed file with params from 'path'."""
         return self._read(path, [])
 
     def _read(
@@ -2945,7 +2998,7 @@ class BedFile(GenericModel, Generic[Q]):
         more: list[int] = [],
         comment: str | None = None,
     ) -> pd.DataFrame:
-        "Read bed file with params from Path, optionally with 'more' columns."
+        "Read bed file with params from 'path', optionally with 'more' columns."
         p = self.params
         return bed.read_bed(
             path,
@@ -2960,53 +3013,51 @@ class BedFile(GenericModel, Generic[Q]):
 
 # TODO clean this up with real polymorphism when mypy catches up with Haskell
 # 98, see https://github.com/python/typing/issues/548
-# TODO this union can't be aliased in python 3.10
 
 RefSrc = RefFileSrc | RefHttpSrc
 
-HapRefSrc = HapChrFileSrc[RefSrc]
-Dip1RefSrc = Dip1ChrFileSrc[RefSrc]
-Dip2RefSrc = Dip2ChrFileSrc[RefSrc]
+HapRefFile = HapSrc[RefSrc]
+Dip1RefFile = Dip1Src[RefSrc]
+Dip2RefFile = Dip2Src[RefSrc]
 
-RefSrcT = TypeVar("RefSrcT", HapRefSrc, Dip1RefSrc, Dip2RefSrc)
+RefSrcT = TypeVar("RefSrcT", HapRefFile, Dip1RefFile, Dip2RefFile)
 
 # bed-like files may be remote, local, or specified manually in the config
-BedFileSrc = BedLocalSrc | BedHttpSrc
+BedSrc = BedLocalSrc | BedHttpSrc
 
-AnyBedSrc = BedLocalSrc | BedHttpSrc
+HapBedSrc = HapSrc[BedSrc]
+DipBedSrc = Dip1Src[BedSrc] | Dip2Src[BedSrc]
+Dip1BedSrc = Dip1Src[BedSrc]
+Dip2BedSrc = Dip2Src[BedSrc]
 
-HapBedSrc = HapChrFileSrc[BedFileSrc]
-DipBedSrc = Dip1ChrFileSrc[BedFileSrc] | Dip2ChrFileSrc[BedFileSrc]
-Dip1BedSrc = Dip1ChrFileSrc[BedFileSrc]
-Dip2BedSrc = Dip2ChrFileSrc[BedFileSrc]
+BedSrcT = TypeVar("BedSrcT", HapBedSrc, Dip1BedSrc | Dip2BedSrc)
 
 HapBedFile = BedFile[HapBedSrc]
 Dip1BedFile = BedFile[Dip1BedSrc]
 Dip2BedFile = BedFile[Dip2BedSrc]
 
-HapBedFileOrTxt = HapBedFile | HapChrTxtSrc
-Dip1BedFileOrTxt = Dip1BedFile | Dip1ChrTxtSrc
-Dip2BedFileOrTxt = Dip2BedFile | Dip2ChrTxtSrc
+HapBedFileOrCoords = HapBedFile | HapBedCoords
+Dip1BedFileOrCoords = Dip1BedFile | Dip1BedCoords
+Dip2BedFileOrCoords = Dip2BedFile | Dip2BedCoords
 
-DipChrTxtSrc = Dip1ChrTxtSrc | Dip2ChrTxtSrc
+DipBedCoords = Dip1BedCoords | Dip2BedCoords
 
-AnyBedT = TypeVar("AnyBedT", HapBedSrc, Dip1BedSrc | Dip2BedSrc)
-AnyBedTxtT = TypeVar("AnyBedTxtT", HapChrTxtSrc, Dip1ChrTxtSrc | Dip2ChrTxtSrc)
+BedCoordsT = TypeVar("BedCoordsT", HapBedCoords, Dip1BedCoords | Dip2BedCoords)
 
 # vcf files may only be remote or local, and unlike bed files, there is no
 # option to use a dip1 bed file for a dip2 reference and vice versa
-HapVcfSrc = HapChrFileSrc[BedFileSrc]
-Dip1VcfSrc = Dip1ChrFileSrc[BedFileSrc]
-Dip2VcfSrc = Dip2ChrFileSrc[BedFileSrc]
+HapVcfSrc = HapSrc[BedSrc]
+Dip1VcfSrc = Dip1Src[BedSrc]
+Dip2VcfSrc = Dip2Src[BedSrc]
 
-AnyVcfT = TypeVar("AnyVcfT", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
-AnyVcf = HapVcfSrc | Dip1VcfSrc | Dip2VcfSrc
+VcfSrcT = TypeVar("VcfSrcT", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
+VcfSrc = HapVcfSrc | Dip1VcfSrc | Dip2VcfSrc
 
 
-class VCFFile(GenericModel, Generic[Q]):
+class VCFFile(GenericModel, Generic[VcfSrcT]):
     """Inport specs for a vcf file."""
 
-    vcf: Q
+    vcf: VcfSrcT
 
 
 class RMSKFile(BedFile[Q], Generic[Q]):
@@ -3050,12 +3101,12 @@ class SatFile(BedFile[Q], Generic[Q]):
         return super()._read(path, [self.sat_col])
 
 
-class LowComplexity(GenericModel, Generic[Q, AnyBedTxtT]):
+class LowComplexity(GenericModel, Generic[Q, BedCoordsT]):
     """Configuration for low complexity stratification."""
 
-    rmsk: RMSKFile[Q] | AnyBedTxtT | None = None
-    simreps: BedFile[Q] | AnyBedTxtT | None = None
-    satellites: SatFile[Q] | AnyBedTxtT | None = None
+    rmsk: RMSKFile[Q] | BedCoordsT | None = None
+    simreps: BedFile[Q] | BedCoordsT | None = None
+    satellites: SatFile[Q] | BedCoordsT | None = None
 
 
 class XYFile(HapBedFile):
@@ -3157,10 +3208,10 @@ class Mappability(BaseModel):
     unplaced_chr_patterns: list[str]
 
 
-class SegDups(GenericModel, Generic[Q, AnyBedTxtT]):
+class SegDups(GenericModel, Generic[Q, BedCoordsT]):
     """Configuration for Segdup stratifications."""
 
-    superdups: BedFile[Q] | AnyBedTxtT | None = None
+    superdups: BedFile[Q] | BedCoordsT | None = None
 
 
 class LowMapParams(BaseModel):
@@ -3288,7 +3339,7 @@ class Include(BaseModel):
     hets: set[int] = {5, 10, 25, 50, 100}
 
 
-class OtherBedFile(GenericModel, Generic[AnyBedT, AnyBedTxtT]):
+class OtherBedFile(GenericModel, Generic[BedSrcT, BedCoordsT]):
     """A bed file that is imported with minimal processing and included as-is
     in a given stratification package. Useful for one-off bed files made in a
     somewhat hacky (but documented) manner that I don't feel like enshrining
@@ -3306,10 +3357,10 @@ class OtherBedFile(GenericModel, Generic[AnyBedT, AnyBedTxtT]):
 
     description: str
     remove_gaps: bool = False
-    data: BedFile[AnyBedT] | AnyBedTxtT
+    data: BedFile[BedSrcT] | BedCoordsT
 
 
-class Bench(GenericModel, Generic[AnyBedT, AnyVcfT]):
+class Bench(GenericModel, Generic[BedSrcT, VcfSrcT]):
     """Configuration for benchmark to use when validating stratifications.
 
     Note: the two vcf files need to have haploid/diploid layouts that correspond
@@ -3323,9 +3374,9 @@ class Bench(GenericModel, Generic[AnyBedT, AnyVcfT]):
 
     # TODO I could probably split/compine the VCFs as well...but that sounds
     # like too much work
-    bench_vcf: VCFFile[AnyVcfT]
-    query_vcf: VCFFile[AnyVcfT]
-    bench_bed: BedFile[AnyBedT]
+    bench_vcf: VCFFile[VcfSrcT]
+    query_vcf: VCFFile[VcfSrcT]
+    bench_bed: BedFile[BedSrcT]
 
 
 class BuildCompare(BaseModel):
@@ -3371,15 +3422,15 @@ class Malloc(BaseModel):
     runHappy: int = 48000
 
 
-OtherDict = dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT, AnyBedTxtT]]]
+OtherDict = dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[BedSrcT, BedCoordsT]]]
 
 
-class Build(GenericModel, Generic[AnyBedT, AnyVcfT, AnyBedTxtT]):
+class Build(GenericModel, Generic[BedSrcT, VcfSrcT, BedCoordsT]):
     chr_filter: set[ChrIndex]
     comparison: BuildCompare | None = None
-    bench: Bench[AnyBedT, AnyVcfT] | None = None
+    bench: Bench[BedSrcT, VcfSrcT] | None = None
     other_strats: dict[
-        OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT, AnyBedTxtT]]
+        OtherLevelKey, dict[OtherStratKey, OtherBedFile[BedSrcT, BedCoordsT]]
     ] = {}
     # TODO if I really want I could validate this such that the user would be
     # politely alerted in case they specify any diploid params for a haploid
@@ -3394,8 +3445,8 @@ class Build(GenericModel, Generic[AnyBedT, AnyVcfT, AnyBedTxtT]):
     @validator("other_strats")
     def valid_other(
         cls,
-        os: dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT, AnyBedTxtT]]],
-    ) -> dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[AnyBedT, AnyBedTxtT]]]:
+        os: dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[BedSrcT, BedCoordsT]]],
+    ) -> dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[BedSrcT, BedCoordsT]]]:
         for k, v in os.items():
             if k == CoreLevel.OTHER_DIFFICULT:
                 bs = v.keys() & BUILTIN_OTHER
@@ -3446,7 +3497,7 @@ class CDS(BedFile[Q], Generic[Q]):
 
 # TODO move these to the Functional directory given that the non-cds stuff
 # describes "genes" anyways?
-class Functional(GenericModel, Generic[Q, AnyBedTxtT]):
+class Functional(GenericModel, Generic[Q, BedCoordsT]):
     """Configuration for all Functional-ish bed files.
 
     If not given, and the build has vdj/mhc/kir regions, attempt to get these
@@ -3456,19 +3507,19 @@ class Functional(GenericModel, Generic[Q, AnyBedTxtT]):
     doesn't work (these regions are strange after all).
     """
 
-    cds: CDS[Q] | AnyBedTxtT | None = None
-    mhc: BedFile[Q] | AnyBedTxtT | None = None
-    kir: BedFile[Q] | AnyBedTxtT | None = None
-    vdj: BedFile[Q] | AnyBedTxtT | None = None
+    cds: CDS[Q] | BedCoordsT | None = None
+    mhc: BedFile[Q] | BedCoordsT | None = None
+    kir: BedFile[Q] | BedCoordsT | None = None
+    vdj: BedFile[Q] | BedCoordsT | None = None
 
 
-class StratInputs(GenericModel, Generic[AnyBedT, AnyBedTxtT]):
-    gap: BedFile[AnyBedT] | AnyBedTxtT | None
-    low_complexity: LowComplexity[AnyBedT, AnyBedTxtT] = LowComplexity()
+class StratInputs(GenericModel, Generic[BedSrcT, BedCoordsT]):
+    gap: BedFile[BedSrcT] | BedCoordsT | None
+    low_complexity: LowComplexity[BedSrcT, BedCoordsT] = LowComplexity()
     xy: XY = XY()
     mappability: Mappability | None
-    segdups: SegDups[AnyBedT, AnyBedTxtT] = SegDups()
-    functional: Functional[AnyBedT, AnyBedTxtT] = Functional()
+    segdups: SegDups[BedSrcT, BedCoordsT] = SegDups()
+    functional: Functional[BedSrcT, BedCoordsT] = Functional()
 
     @property
     def xy_features_unsafe(self) -> XYFeatures:
@@ -3482,14 +3533,14 @@ class StratInputs(GenericModel, Generic[AnyBedT, AnyBedTxtT]):
         return choose_xy_unsafe(i, f.x_bed, f.y_bed)
 
 
-HapStratInputs = StratInputs[HapBedSrc, HapChrTxtSrc]
-DipStratInputs = StratInputs[DipBedSrc, DipChrTxtSrc]
+HapStratInputs = StratInputs[HapBedSrc, HapBedCoords]
+DipStratInputs = StratInputs[DipBedSrc, DipBedCoords]
 
 StratInputT = TypeVar("StratInputT", HapStratInputs, DipStratInputs)
 
 
 @dataclass(frozen=True)
-class RefData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
+class RefData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
     """A helper class corresponding a given reference and its builds.
 
     This is primarily meant to provide a glue layer b/t the configuration
@@ -3503,8 +3554,8 @@ class RefData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
 
     refkey: RefKey
     ref: RefSrcT
-    strat_inputs: StratInputs[AnyBedT, AnyBedTxtT]
-    builds: dict[BuildKey, Build[AnyBedT, AnyVcfT, AnyBedTxtT]]
+    strat_inputs: StratInputs[BedSrcT, BedCoordsT]
+    builds: dict[BuildKey, Build[BedSrcT, VcfSrcT, BedCoordsT]]
 
     @property
     def ref_refkeys(self) -> RefKeyFull1or2:
@@ -3530,7 +3581,7 @@ class RefData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
     def to_build_data_unsafe(
         self,
         bk: BuildKey,
-    ) -> "BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]":
+    ) -> "BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]":
         "Lookup a given build with a build key (and throw DesignError on fail)"
         bd = self.to_build_data(bk)
         if bd is None:
@@ -3540,7 +3591,7 @@ class RefData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
     def to_build_data(
         self,
         bk: BuildKey,
-    ) -> "BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT] | None":
+    ) -> "BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT] | None":
         "Lookup a given build with a build key"
         try:
             return BuildData_(self, bk, self.builds[bk])
@@ -3602,23 +3653,23 @@ class RefData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
         return self.strat_inputs.low_complexity.satellites is not None
 
 
-HapRefData = RefData_[HapRefSrc, HapBedSrc, HapVcfSrc, HapChrTxtSrc]
-Dip1RefData = RefData_[Dip1RefSrc, DipBedSrc, Dip1VcfSrc, DipChrTxtSrc]
-Dip2RefData = RefData_[Dip2RefSrc, DipBedSrc, Dip2VcfSrc, DipChrTxtSrc]
+HapRefData = RefData_[HapRefFile, HapBedSrc, HapVcfSrc, HapBedCoords]
+Dip1RefData = RefData_[Dip1RefFile, DipBedSrc, Dip1VcfSrc, DipBedCoords]
+Dip2RefData = RefData_[Dip2RefFile, DipBedSrc, Dip2VcfSrc, DipBedCoords]
 
 AnyRefData = HapRefData | Dip1RefData | Dip2RefData
 
 
 @dataclass(frozen=True)
-class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
+class BuildData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
     """A helper class corresponding a given build.
 
     This follows a similar motivation as 'RefData_' above.
     """
 
-    refdata: RefData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]
+    refdata: RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]
     buildkey: BuildKey
-    build: Build[AnyBedT, AnyVcfT, AnyBedTxtT]
+    build: Build[BedSrcT, VcfSrcT, BedCoordsT]
 
     @property
     def build_chrs(self) -> BuildChrs:
@@ -3698,9 +3749,9 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
     @property
     def want_hets(self) -> bool:
         r = self.refdata.ref
-        if isinstance(r, HapChrFileSrc):
+        if isinstance(r, HapSrc):
             return False
-        elif isinstance(r, Dip1ChrFileSrc) or isinstance(r, Dip2ChrFileSrc):
+        elif isinstance(r, Dip1Src) or isinstance(r, Dip2Src):
             return len(self.build.include.hets) > 0
         else:
             assert_never(r)
@@ -3845,23 +3896,23 @@ class BuildData_(Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
         return self.want_vdj and (self._have_cds_src | self._have_vdj_src)
 
 
-class Stratification(GenericModel, Generic[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]):
+class Stratification(GenericModel, Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
     """Configuration for stratifications for a given reference."""
 
     ref: RefSrcT
-    strat_inputs: StratInputs[AnyBedT, AnyBedTxtT]
-    builds: dict[BuildKey, Build[AnyBedT, AnyVcfT, AnyBedTxtT]]
+    strat_inputs: StratInputs[BedSrcT, BedCoordsT]
+    builds: dict[BuildKey, Build[BedSrcT, VcfSrcT, BedCoordsT]]
 
 
-HapBuildData = BuildData_[HapRefSrc, HapBedSrc, HapVcfSrc, HapChrTxtSrc]
-Dip1BuildData = BuildData_[Dip1RefSrc, DipBedSrc, Dip1VcfSrc, DipChrTxtSrc]
-Dip2BuildData = BuildData_[Dip2RefSrc, DipBedSrc, Dip2VcfSrc, DipChrTxtSrc]
+HapBuildData = BuildData_[HapRefFile, HapBedSrc, HapVcfSrc, HapBedCoords]
+Dip1BuildData = BuildData_[Dip1RefFile, DipBedSrc, Dip1VcfSrc, DipBedCoords]
+Dip2BuildData = BuildData_[Dip2RefFile, DipBedSrc, Dip2VcfSrc, DipBedCoords]
 
 AnyBuildData = HapBuildData | Dip1BuildData | Dip2BuildData
 
-HapStrat = Stratification[HapRefSrc, HapBedSrc, HapVcfSrc, HapChrTxtSrc]
-Dip1Strat = Stratification[Dip1RefSrc, DipBedSrc, Dip1VcfSrc, DipChrTxtSrc]
-Dip2Strat = Stratification[Dip2RefSrc, DipBedSrc, Dip2VcfSrc, DipChrTxtSrc]
+HapStrat = Stratification[HapRefFile, HapBedSrc, HapVcfSrc, HapBedCoords]
+Dip1Strat = Stratification[Dip1RefFile, DipBedSrc, Dip1VcfSrc, DipBedCoords]
+Dip2Strat = Stratification[Dip2RefFile, DipBedSrc, Dip2VcfSrc, DipBedCoords]
 
 
 class Documentation(BaseModel):
@@ -4325,7 +4376,7 @@ class GiabStrats(BaseModel):
             else raise_inline()
         )
 
-    def _refkey_to_src(self, f: RefDataToSrc, rk: RefKeyFullS) -> AnyBedSrc:
+    def _refkey_to_src(self, f: RefDataToSrc, rk: RefKeyFullS) -> BedSrc:
         rk_, hap = parse_full_refkey(rk)
         src = with_ref_data(
             self.to_ref_data(rk_), lambda rd: f(rd), lambda rd: f(rd), lambda rd: f(rd)
@@ -4333,7 +4384,7 @@ class GiabStrats(BaseModel):
         # TODO this should check for a single/double anybedsrc
         return from_single_or_double(src, hap) if src is not None else raise_inline()
 
-    def refsrckey_to_bed_src(self, f: StratInputToBed, rk: RefKeyFullS) -> AnyBedSrc:
+    def refsrckey_to_bed_src(self, f: StratInputToBed, rk: RefKeyFullS) -> BedSrc:
         """Lookup a haplotype-specific bed file source with the given function."""
         return self._refkey_to_src(
             lambda rd: (
@@ -4344,18 +4395,18 @@ class GiabStrats(BaseModel):
             rk,
         )
 
-    def _refsrckey_to_xy_feature_src(self, rsk: RefKeyFullS, i: ChrIndex) -> AnyBedSrc:
+    def _refsrckey_to_xy_feature_src(self, rsk: RefKeyFullS, i: ChrIndex) -> BedSrc:
         return (
             self.to_ref_data(strip_full_refkey(rsk))
             .strat_inputs.xy_feature_bed_unsafe(i)
             .bed.src.elem
         )
 
-    def refsrckey_to_x_features_src(self, rsk: RefKeyFullS) -> AnyBedSrc:
+    def refsrckey_to_x_features_src(self, rsk: RefKeyFullS) -> BedSrc:
         """Return the X features source file for a given reference."""
         return self._refsrckey_to_xy_feature_src(rsk, ChrIndex.CHRX)
 
-    def refsrckey_to_y_features_src(self, rsk: RefKeyFullS) -> AnyBedSrc:
+    def refsrckey_to_y_features_src(self, rsk: RefKeyFullS) -> BedSrc:
         """Return the Y features source file for a given reference."""
         return self._refsrckey_to_xy_feature_src(rsk, ChrIndex.CHRY)
 
@@ -4398,7 +4449,7 @@ class GiabStrats(BaseModel):
 
     def buildkey_to_bed_src(
         self, f: BuildDataToBed, rk: RefKeyFullS, bk: BuildKey
-    ) -> AnyBedSrc:
+    ) -> BedSrc:
         """Like 'refsrckey_to_bed_src' but build-specific.
 
         Used for looking up benchmark sources for each build.
@@ -4415,7 +4466,7 @@ class GiabStrats(BaseModel):
 
     def buildkey_to_vcf_src(
         self, f: BuildDataToVCF, rk: RefKeyFullS, bk: BuildKey
-    ) -> AnyBedSrc:
+    ) -> BedSrc:
         """Like 'buildkey_to_bed_src' but for benchmark VCF sources."""
         # TODO not DRY
         rk_, hap = parse_full_refkey(rk)
@@ -4762,11 +4813,11 @@ class GiabStrats(BaseModel):
         self,
         rk: RefKey,
         get_bed_f: RefDataToBed,
-        hap_f: Callable[[HapRefData, HapBedFileOrTxt], X],
-        dip_1to1_f: Callable[[Dip1RefData, Dip1BedFileOrTxt], X],
-        dip_1to2_f: Callable[[Dip2RefData, Dip1BedFileOrTxt], X],
-        dip_2to1_f: Callable[[Dip1RefData, Dip2BedFileOrTxt], X],
-        dip_2to2_f: Callable[[Dip2RefData, Dip2BedFileOrTxt], X],
+        hap_f: Callable[[HapRefData, HapBedFileOrCoords], X],
+        dip_1to1_f: Callable[[Dip1RefData, Dip1BedFileOrCoords], X],
+        dip_1to2_f: Callable[[Dip2RefData, Dip1BedFileOrCoords], X],
+        dip_2to1_f: Callable[[Dip1RefData, Dip2BedFileOrCoords], X],
+        dip_2to2_f: Callable[[Dip2RefData, Dip2BedFileOrCoords], X],
     ) -> X:
         """Lookup refdata and bed file according to the given function.
         Then apply function depending on if the bed is haploid or diploid and
@@ -4793,11 +4844,11 @@ class GiabStrats(BaseModel):
         self,
         rk: RefKeyFullS,
         get_bed_f: RefDataToBed,
-        hap_f: Callable[[HapRefData, HapBedFileOrTxt], Z],
-        dip_1to1_f: Callable[[Dip1RefData, Dip1BedFileOrTxt], Z],
-        dip_1to2_f: Callable[[Haplotype, Dip2RefData, Dip1BedFileOrTxt], Z],
-        dip_2to1_f: Callable[[Dip1RefData, Dip2BedFileOrTxt], Z],
-        dip_2to2_f: Callable[[Haplotype, Dip2RefData, Dip2BedFileOrTxt], Z],
+        hap_f: Callable[[HapRefData, HapBedFileOrCoords], Z],
+        dip_1to1_f: Callable[[Dip1RefData, Dip1BedFileOrCoords], Z],
+        dip_1to2_f: Callable[[Haplotype, Dip2RefData, Dip1BedFileOrCoords], Z],
+        dip_2to1_f: Callable[[Dip1RefData, Dip2BedFileOrCoords], Z],
+        dip_2to2_f: Callable[[Haplotype, Dip2RefData, Dip2BedFileOrCoords], Z],
     ) -> Z:
         """Like 'with_ref_data_and_bed' but also takes a full refkey and
         supplies the haplotype to the dip2-reference case."""
@@ -4817,11 +4868,11 @@ class GiabStrats(BaseModel):
         rk: RefKey,
         bk: BuildKey,
         get_bed_f: BuildDataToBed,
-        hap_f: Callable[[HapBuildData, HapBedFileOrTxt], Z],
-        dip_1to1_f: Callable[[Dip1BuildData, Dip1BedFileOrTxt], Z],
-        dip_1to2_f: Callable[[Dip2BuildData, Dip1BedFileOrTxt], Z],
-        dip_2to1_f: Callable[[Dip1BuildData, Dip2BedFileOrTxt], Z],
-        dip_2to2_f: Callable[[Dip2BuildData, Dip2BedFileOrTxt], Z],
+        hap_f: Callable[[HapBuildData, HapBedFileOrCoords], Z],
+        dip_1to1_f: Callable[[Dip1BuildData, Dip1BedFileOrCoords], Z],
+        dip_1to2_f: Callable[[Dip2BuildData, Dip1BedFileOrCoords], Z],
+        dip_2to1_f: Callable[[Dip1BuildData, Dip2BedFileOrCoords], Z],
+        dip_2to2_f: Callable[[Dip2BuildData, Dip2BedFileOrCoords], Z],
     ) -> Z:
         """Like 'with_ref_data_and_bed' but for build data."""
         return self.with_ref_data_and_bed(
@@ -4839,11 +4890,11 @@ class GiabStrats(BaseModel):
         rk: RefKeyFullS,
         bk: BuildKey,
         get_bed_f: BuildDataToBed,
-        hap_f: Callable[[HapBuildData, HapBedFileOrTxt], Z],
-        dip_1to1_f: Callable[[Dip1BuildData, Dip1BedFileOrTxt], Z],
-        dip_1to2_f: Callable[[Haplotype, Dip2BuildData, Dip1BedFileOrTxt], Z],
-        dip_2to1_f: Callable[[Dip1BuildData, Dip2BedFileOrTxt], Z],
-        dip_2to2_f: Callable[[Haplotype, Dip2BuildData, Dip2BedFileOrTxt], Z],
+        hap_f: Callable[[HapBuildData, HapBedFileOrCoords], Z],
+        dip_1to1_f: Callable[[Dip1BuildData, Dip1BedFileOrCoords], Z],
+        dip_1to2_f: Callable[[Haplotype, Dip2BuildData, Dip1BedFileOrCoords], Z],
+        dip_2to1_f: Callable[[Dip1BuildData, Dip2BedFileOrCoords], Z],
+        dip_2to2_f: Callable[[Haplotype, Dip2BuildData, Dip2BedFileOrCoords], Z],
     ) -> Z:
         """Like 'with_ref_data_and_bed_full' but for build data."""
         return self.with_ref_data_and_bed_full(
@@ -4919,11 +4970,11 @@ class GiabStrats(BaseModel):
         output_f: Callable[[RefKeyFull], Y],
         write_outputs: Callable[[list[Y]], None],
         get_bed_f: BuildDataToBed,
-        hap_f: Callable[[Y, HapBuildData, HapBedFileOrTxt], Z],
-        dip_1to1_f: Callable[[Y, Dip1BuildData, Dip1BedFileOrTxt], Z],
-        dip_1to2_f: Callable[[tuple[Y, Y], Dip2BuildData, Dip1BedFileOrTxt], Z],
-        dip_2to1_f: Callable[[Y, Dip1BuildData, Dip2BedFileOrTxt], Z],
-        dip_2to2_f: Callable[[tuple[Y, Y], Dip2BuildData, Dip2BedFileOrTxt], Z],
+        hap_f: Callable[[Y, HapBuildData, HapBedFileOrCoords], Z],
+        dip_1to1_f: Callable[[Y, Dip1BuildData, Dip1BedFileOrCoords], Z],
+        dip_1to2_f: Callable[[tuple[Y, Y], Dip2BuildData, Dip1BedFileOrCoords], Z],
+        dip_2to1_f: Callable[[Y, Dip1BuildData, Dip2BedFileOrCoords], Z],
+        dip_2to2_f: Callable[[tuple[Y, Y], Dip2BuildData, Dip2BedFileOrCoords], Z],
     ) -> Z:
         def out1(src: Single[RefSrc]) -> Y:
             return with_first(output_f(src.key(rk)), lambda o: write_outputs([o]))
@@ -4994,14 +5045,14 @@ class GiabStrats(BaseModel):
         output: Path,
         output_pattern: str,
         get_bed_f: BuildDataToBed,
-        hap_f: Callable[[Path, HapBuildData, HapChrTxtSrc], list[Path]],
-        dip_1to1_f: Callable[[Path, Dip1BuildData, Dip1ChrTxtSrc], list[Path]],
+        hap_f: Callable[[Path, HapBuildData, HapBedCoords], list[Path]],
+        dip_1to1_f: Callable[[Path, Dip1BuildData, Dip1BedCoords], list[Path]],
         dip_1to2_f: Callable[
-            [tuple[Path, Path], Dip2BuildData, Dip1ChrTxtSrc], list[Path]
+            [tuple[Path, Path], Dip2BuildData, Dip1BedCoords], list[Path]
         ],
-        dip_2to1_f: Callable[[Path, Dip1BuildData, Dip2ChrTxtSrc], list[Path]],
+        dip_2to1_f: Callable[[Path, Dip1BuildData, Dip2BedCoords], list[Path]],
         dip_2to2_f: Callable[
-            [Path, Haplotype, Dip2BuildData, Dip2ChrTxtSrc], list[Path]
+            [Path, Haplotype, Dip2BuildData, Dip2BedCoords], list[Path]
         ],
     ) -> list[Path]:
         def write_output(ps: list[Path]) -> None:
@@ -5113,7 +5164,7 @@ class GiabStrats(BaseModel):
         Return a string of rmarkdown paragraphs formatted with 80-char wrap.
         """
 
-        def hap(bf: HapBedFileOrTxt) -> list[str]:
+        def hap(bf: HapBedFileOrCoords) -> list[str]:
             if isinstance(bf, BedFile):
                 if isinstance(inputs, IsYamlBed):
                     raise DesignError()
@@ -5125,7 +5176,7 @@ class GiabStrats(BaseModel):
             else:
                 return [bf.hap.provenance]
 
-        def dip1to1(bf: Dip1BedFileOrTxt) -> list[str]:
+        def dip1to1(bf: Dip1BedFileOrCoords) -> list[str]:
             if isinstance(bf, BedFile):
                 if isinstance(inputs, IsYamlBed):
                     raise DesignError()
@@ -5138,7 +5189,7 @@ class GiabStrats(BaseModel):
             else:
                 return [bf.dip.provenance]
 
-        def dip1to2(bf: Dip1BedFileOrTxt, hap: Haplotype) -> list[str]:
+        def dip1to2(bf: Dip1BedFileOrCoords, hap: Haplotype) -> list[str]:
             dip_txt = " ".join(
                 [
                     "This source contained both haplotypes for this reference,",
@@ -5157,7 +5208,7 @@ class GiabStrats(BaseModel):
             else:
                 return [dip_txt, bf.dip.provenance]
 
-        def dip2to1(bf: Dip2BedFileOrTxt) -> list[str]:
+        def dip2to1(bf: Dip2BedFileOrCoords) -> list[str]:
             indent = level * "#"
             dip_txt = " ".join(
                 [
@@ -5200,7 +5251,7 @@ class GiabStrats(BaseModel):
                     bf.pat.provenance,
                 ]
 
-        def dip2to2(bf: Dip2BedFileOrTxt, hap: Haplotype) -> list[str]:
+        def dip2to2(bf: Dip2BedFileOrCoords, hap: Haplotype) -> list[str]:
             dip_txt = " ".join(
                 [
                     f"This source contained only the {hap.name} haplotype for",
@@ -6113,24 +6164,24 @@ class GiabStrats(BaseModel):
 
 class RefDataToBed(Protocol):
     A = TypeVar("A", HapBedSrc, DipBedSrc)
-    B = TypeVar("B", HapChrTxtSrc, DipChrTxtSrc)
+    B = TypeVar("B", HapBedCoords, DipBedCoords)
 
-    def __call__(self, __x: RefData_[RefSrcT, A, AnyVcfT, B]) -> BedFile[A] | B | None:
+    def __call__(self, __x: RefData_[RefSrcT, A, VcfSrcT, B]) -> BedFile[A] | B | None:
         pass
 
 
 class RefDataToSrc(Protocol):
-    A = TypeVar("A", Single[AnyBedSrc], Double[AnyBedSrc])
+    A = TypeVar("A", Single[BedSrc], Double[BedSrc])
 
     def __call__(
-        self, __x: RefData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]
+        self, __x: RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]
     ) -> A | None:
         pass
 
 
 class StratInputToBed(Protocol):
     A = TypeVar("A", HapBedSrc, DipBedSrc)
-    B = TypeVar("B", HapChrTxtSrc, DipChrTxtSrc)
+    B = TypeVar("B", HapBedCoords, DipBedCoords)
 
     def __call__(self, __x: StratInputs[A, B]) -> BedFile[A] | B | None:
         pass
@@ -6138,18 +6189,18 @@ class StratInputToBed(Protocol):
 
 # TODO not sure how to get manual text through this
 class StratInputToSrc(Protocol):
-    A = TypeVar("A", Single[AnyBedSrc], Double[AnyBedSrc])
+    A = TypeVar("A", Single[BedSrc], Double[BedSrc])
 
-    def __call__(self, __x: StratInputs[AnyBedT, AnyBedTxtT]) -> A | None:
+    def __call__(self, __x: StratInputs[BedSrcT, BedCoordsT]) -> A | None:
         pass
 
 
 class BuildDataToBed(Protocol):
     A = TypeVar("A", HapBedSrc, DipBedSrc)
-    B = TypeVar("B", HapChrTxtSrc, DipChrTxtSrc)
+    B = TypeVar("B", HapBedCoords, DipBedCoords)
 
     def __call__(
-        self, __x: BuildData_[RefSrcT, A, AnyVcfT, B]
+        self, __x: BuildData_[RefSrcT, A, VcfSrcT, B]
     ) -> BedFile[A] | B | None:
         pass
 
@@ -6158,15 +6209,15 @@ class BuildDataToVCF(Protocol):
     A = TypeVar("A", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
 
     def __call__(
-        self, __x: BuildData_[RefSrcT, AnyBedT, A, AnyBedTxtT]
+        self, __x: BuildData_[RefSrcT, BedSrcT, A, BedCoordsT]
     ) -> VCFFile[A] | None:
         pass
 
 
 class BuildDataToSrc(Protocol):
-    A = TypeVar("A", Single[AnyBedSrc], Double[AnyBedSrc])
+    A = TypeVar("A", Single[BedSrc], Double[BedSrc])
 
     def __call__(
-        self, __x: BuildData_[RefSrcT, AnyBedT, AnyVcfT, AnyBedTxtT]
+        self, __x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]
     ) -> A | None:
         pass
