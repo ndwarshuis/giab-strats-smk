@@ -1,6 +1,4 @@
-## Workflow
-
-### Simple Repeats (perfect and imperfect)
+## Simple Repeats (perfect and imperfect)
 
 Each of the `SimpleRepeat` files were generated directly from the reference
 using a simple C program (`repseq`, see below) that loops through a fasta file
@@ -33,7 +31,7 @@ These were subset to lengths at least 11 or 21 base pairs long:
 - `{{ file }}`
 {%- endfor %}
 
-#### Perfect/Imperfect Homopolymers
+### Perfect/Imperfect Homopolymers
 
 We also created a special combination file with all imperfect homopolymers 11 or
 more bases long, and all perfect homopolymers 7 or more bases long.
@@ -54,13 +52,13 @@ This was then flipped using `complementBed` to create the following:
 `{{ not_homopolymers_file }}`
 
 {% if sat_src is not none -%}
-### Satellites
+## Satellites
 
-#### Source
+### Source
 
 {{ sat_src }}
 
-#### Merging
+### Merging
 
 Regions were extended by 5 base pairs in either direction using `slopBed`.
 Overlaps were then merged using `mergeBed`. This resulted in the following:
@@ -73,21 +71,21 @@ This was then complemented with `complementBed` to produce the following:
 
 {% endif -%}
 {% if trf_src is not none -%}
-### All Tandem Repeats and Homopolymers
+## All Tandem Repeats and Homopolymers
 
-#### Satellite Source
+### Satellite Source
 
 Same as above
 
-#### Repeat Masker Source
+### Repeat Masker Source
 
 {{ rmsk_src }}
 
-#### Tandem Repeat Finder Source
+### Tandem Repeat Finder Source
 
 {{ trf_src }}
 
-#### Processing
+### Processing
 
 The following repeat files were combined by sequentially applying
 `multiIntersectBed`, `slopBed` with `-b 5`, and `mergeBed`:
