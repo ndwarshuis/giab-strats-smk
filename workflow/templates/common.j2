@@ -7,11 +7,12 @@ Stratification group: {{ group }}
 {% if haplotypes|length == 1 -%}
 This reference is diploid. The files here contain regions for the 
 {{ haplotypes[0] }} haplotype.
-{%- elif haplotypes|length == 2 %}
+
+{% elif haplotypes|length == 2 -%}
 This reference is diploid. The files here contain regions for both 
 {{ haplotypes[0] }} and {{ haplotypes[1] }} haplotypes.
-{%- endif %}
 
+{% endif -%}
 For contact information, sharing and access information, data usage policy,
 recommended citations, general workflow information, quality control, and other
 high-level information, see the top-level readme one level up.
