@@ -1,9 +1,10 @@
-## Description of methods used to generate the stratifications
+## Processing
 
 Regions with low mappability for different read lengths and error rates were
-generated using GEM (see below for source). The GEM mappability tool finds
-regions `l` basepairs long that match other regions in the reference genome with
-up to `m` mismatches (SNPs) and up to `e` indels < 15bp.
+generated using GEM (see below for source) on the reference fasta. The GEM
+mappability tool finds regions `l` basepairs long that match other regions in
+the reference genome with up to `m` mismatches (SNPs) and up to `e` indels <
+15bp.
 
 {%- if params|length > 1 %}
 
@@ -43,11 +44,6 @@ This result was then complemented using `complementBed` to make the
 `notinlowmappabilityall`.
 
 {% endif -%}
-
-## Dependencies
-
-These stratifications only depend on the reference.
-  
 ## Software
 
 The GEM mappability program ([Derrien T, Estellé J, Marco Sola S, Knowles DG,

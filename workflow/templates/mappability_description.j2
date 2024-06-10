@@ -1,6 +1,4 @@
-## File List
-
-### All Low-Mappability Regions
+## All Low-Mappability Regions
 
 {%- if single_lowmap_files|length == 0 %}
 
@@ -31,7 +29,7 @@ Also included is the complement to this file.
 
 `{{ not_all_lowmap_file }}`
 
-### Specific Low-Mappability Regions
+## Specific Low-Mappability Regions
 
 Each of these files represents regions that map to at least one other location
 in the genome with varying alignment parameters. The alignment paramters are
@@ -43,4 +41,4 @@ number of INDEL mismatches less than 15bp respectively.
 `{{ file }}`
 {%- endfor %}
 
-{% endif -%}
+{%- endif -%}
