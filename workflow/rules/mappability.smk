@@ -198,7 +198,7 @@ rule combine_dip1_nonunique_beds:
         mlty.inter.postsort.data / "combined_unique_l{l}_m{m}_e{e}.bed.gz",
     shell:
         """
-        cat {input.hap1} {input.hap2} > {output}
+        cat {input.pat} {input.mat} > {output}
         """
 
 

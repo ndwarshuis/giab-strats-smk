@@ -13,7 +13,7 @@ config = GiabStrats.parse_obj(config)
 
 
 _alphanumdash = "[A-Za-z0-9-]+"
-_alphanumdash_hap = "[A-Za-z0-9-]+(\.hap(1|2))?"
+_alphanumdash_hap = "[A-Za-z0-9-]+(\.[mp]at)?"
 
 
 wildcard_constraints:
