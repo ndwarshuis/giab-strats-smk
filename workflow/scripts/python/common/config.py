@@ -219,8 +219,8 @@ def flip_hap(h: Haplotype) -> Haplotype:
 
 
 def parse_full_refkey_class(s: RefKeyFullS) -> RefKeyFull:
-    m = re.match("(.+)\\.(hap[12])", s)
-    # ASSUME this will never fail due to the hap1/2 permitted match pattern
+    m = re.match("(.+)\\.([mp]at)", s)
+    # ASSUME this will never fail due to the pat/mat permitted match pattern
     rk, hap = (s, None) if m is None else (m[1], Haplotype.from_name(m[2]))
     return RefKeyFull(RefKey(rk), hap)
 
@@ -1357,7 +1357,7 @@ class Haplotype(Enum):
 
     @classmethod
     def from_name(cls, n: str) -> Self:
-        "Build haplotype from a string. Must be exactly 'hap1' or 'hap2'."
+        "Build haplotype from a string. Must be exactly 'pat' or 'mat'."
         try:
             return next(i for i in cls if i.name == n)
         except StopIteration:
@@ -1365,7 +1365,7 @@ class Haplotype(Enum):
 
     @property
     def name(self) -> HaplotypeName:
-        return HaplotypeName(f"hap{self.value + 1}")
+        return HaplotypeName(self.choose("pat", "mat"))
 
     def choose(self, left: X, right: X) -> X:
         "Do either left (pat) or right (mat) depending on the haplotype."
