@@ -1,9 +1,12 @@
 {% if all_auto_file is not none -%}
 ## All Autosomes
 
+This represents all autosomal regions (minus gaps).
+
 `{{ all_auto_file }}`
 
 {% endif -%}
+{% if par_files|length > 0 and ampliconic_files|length > 0 and xtr_files|length > 0 -%}
 ## Sex Chromosome Files
 
 X and Y chromosomes are broken out into seperate files denoted with "chrX" or
@@ -44,4 +47,5 @@ homologous between the two (but also outside the PAR).
 {% for file in xtr_files -%}
 `{{ file }}`
 {% endfor %}
+{%- endif -%}
 {%- endif -%}

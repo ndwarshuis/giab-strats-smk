@@ -5,6 +5,13 @@ import common.config as cfg
 from common.functional import DesignError, fmap_maybe
 import template_utils as tu
 
+AUTO_METHOD = cfg.readme_fill(
+    (
+        "The autosomes bed file was generated using the entire length of "
+        "chromosomes 1-22 and subtracting gaps."
+    )
+)
+
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     ws: dict[str, str] = smk.wildcards
@@ -90,6 +97,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_methods(t: j2.Template) -> str:
         return t.render(
+            auto_method=AUTO_METHOD if auto_path else None,
             **src,
             deps=bedtools_deps,
         )

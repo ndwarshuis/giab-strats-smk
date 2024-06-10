@@ -1,4 +1,10 @@
-{% if x_par_src is not none and y_par_src is not none -%}
+{% if auto_method is not none -%}
+## All autosomes
+
+{{ auto_method }}
+
+{% endif -%}
+{% if x_par_src is not none and y_par_src is not none -%} 
 ## PAR
 
 Each of these was used as-is and also complemented with `complementBed` to
