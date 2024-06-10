@@ -4,7 +4,7 @@ Stratification group: {{ group }}
 
 {{ "These stratifications represent %s." | format(description) | wordwrap }}
 
-{%- if haplotypes|length == 1 %}
+{% if haplotypes|length == 1 -%}
 This reference is diploid. The files here contain regions for the 
 {{ haplotypes[0] }} haplotype.
 {%- elif haplotypes|length == 2 %}
