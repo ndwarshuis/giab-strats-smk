@@ -4,7 +4,7 @@
 {{ auto_method }}
 
 {% endif -%}
-{% if x_par_src is not none and y_par_src is not none -%} 
+{% if x_par_src is not none or y_par_src is not none -%} 
 ## PAR
 
 Each of these was used as-is and also complemented with `complementBed` to

@@ -6,7 +6,7 @@ This represents all autosomal regions (minus gaps).
 `{{ all_auto_file }}`
 
 {% endif -%}
-{% if par_files|length > 0 and ampliconic_files|length > 0 and xtr_files|length > 0 -%}
+{% if par_files|length > 0 or ampliconic_files|length > 0 or xtr_files|length > 0 -%}
 ## Sex Chromosome Files
 
 X and Y chromosomes are broken out into seperate files denoted with "chrX" or
