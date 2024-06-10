@@ -2,31 +2,32 @@ Note that in all cases, 50bp of slop was added to the regions described.
 
 ## Low extreme 
 
-`{{low_file}}`
-
 This file includes GC content that is less than X.
+
+`{{low_file}}`
 
 ## High extreme
 
-`{{high_file}}`
-
 This file includes GC content that is greater than X.
+
+`{{high_file}}`
 
 {% if range_files|length > 0 -%}
 ## Ranges
+
+These files include regions where GC content is between X and Y percent.
 {% for file in range_files %}
 `{{file}}`
 {%- endfor %}
 
-These files include regions where GC content is between X and Y percent.
-
 {% endif -%}
 {% if dual_files|length > 0 -%}
 ## Dual Extremes
+
+These files include regions where GC content is either less than (lt) X% or
+greater than (gt) Y%.
 {% for file in dual_files %}
 `{{file}}`
 {%- endfor %}
 
-These files include regions where GC content is either less than (lt) X% or
-greater than (gt) Y%.
 {%- endif -%}
