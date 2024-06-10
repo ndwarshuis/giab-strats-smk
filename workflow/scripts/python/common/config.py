@@ -3294,9 +3294,14 @@ class OtherBedFile(GenericModel, Generic[AnyBedT, AnyBedTxtT]):
     somewhat hacky (but documented) manner that I don't feel like enshrining
     via code here.
 
-    If 'remove_gaps' is True, subtract that gaps bed if present. This is the
-    only processing done to these files. However, they are still checked for
-    correctness during the validation stage.
+    The only processing done on these files is gap removal if desired. They are
+    still checked for correctness.
+
+    Attributes:
+    - remove_gaps: If True, subtract that gaps bed if present.
+    - description: Single sentence documenting the contents of the file. Will
+      show up in the README.
+    - data: the bed file source or yaml coordinates
     """
 
     description: str
