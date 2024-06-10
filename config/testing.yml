@@ -840,6 +840,7 @@ diploid2_stratifications:
         chr_filter: [23, 24]
         include:
           low_complexity: false
+          segdups: false
           xy: false
           gc: null
           cds: false
