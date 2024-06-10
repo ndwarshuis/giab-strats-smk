@@ -30,7 +30,8 @@ into AT- and GC-specific regions:
 ### Imperfect Homopolymers
 
 These represent homopolymers that may be interrupted by one non-homopolymer
-base:
+base. Note that due to the way homopolymers are defined, the shortest continuous
+length where all bases are the same is 4 base pairs:
 {% for file in imperfect_files %}
 - `{{ file }}`
 {%- endfor %}
