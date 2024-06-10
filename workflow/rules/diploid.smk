@@ -270,7 +270,7 @@ rule combine_dip1_hets:
         dip.inter.postsort.data / "combined_het_regions.bed.gz",
     shell:
         """
-        cat {input.hap1} {input.hap2} > {output}
+        cat {input.pat} {input.mat} > {output}
         """
 
 
