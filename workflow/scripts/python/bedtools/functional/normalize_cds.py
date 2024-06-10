@@ -222,7 +222,7 @@ def main(smk: Any) -> None:
                 cds.inputs,
                 lambda i0, i1: [
                     GFFOut(
-                        cfg.read_filter_sort_dip2to1_bed(bd, bf, (i0, i1)),
+                        cfg.read_filter_sort_dip2to1_bed(bd, bf, cfg.Double(i0, i1)),
                         bd.refdata.ref.src.key(rk),
                     )
                 ],

@@ -75,7 +75,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
                 b,
                 gap_inputs,
                 lambda i, bf: cfg.read_filter_sort_dip2to2_bed(
-                    bd, bf, hap.choose(*i), hap
+                    bd, bf, i.choose(hap), hap
                 ),
                 lambda bc: cfg.build_dip2to2_coords_df(hap, bd, bc),
             ),

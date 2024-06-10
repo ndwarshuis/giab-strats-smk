@@ -134,7 +134,6 @@ from common.functional import (
     fmap_maybe,
     fmap_maybe_def,
     maybe_to_list,
-    both,
     with_first,
     DesignError,
     match1_unsafe,
@@ -287,28 +286,6 @@ def prefix_to_refkey_config(s: str) -> tuple[bool, bool]:
     return split, nohap
 
 
-def wrap_dip_2to2_i_f(
-    f: Callable[[X, Haplotype, Dip2BuildData, Dip2BedFileOrCoords], Y],
-    i: tuple[X, X],
-    bd: Dip2BuildData,
-    bf: Dip2BedFileOrCoords,
-) -> tuple[Y, Y]:
-    return (f(i[0], Haplotype.PAT, bd, bf), f(i[1], Haplotype.MAT, bd, bf))
-
-
-def wrap_dip_2to2_io_f(
-    f: Callable[[X, Path, Haplotype, Dip2BuildData, Dip2BedFile], Y],
-    i: tuple[X, X],
-    o: tuple[Path, Path],
-    bd: Dip2BuildData,
-    bf: Dip2BedFile,
-) -> tuple[Y, Y]:
-    return (
-        f(i[0], o[0], Haplotype.PAT, bd, bf),
-        f(i[1], o[1], Haplotype.MAT, bd, bf),
-    )
-
-
 # type helpers
 
 
@@ -327,18 +304,6 @@ def is_dip2_bed(
 ) -> TypeGuard[BedFile[Dip2Src[S]] | Dip2BedCoords]:
     return isinstance(x, Dip2BedCoords) or (
         isinstance(x, BedFile) and isinstance(x.bed, Dip2Src)
-    )
-
-
-def wrap_dip_2to2_io_txt_f(
-    f: Callable[[Path, Haplotype, Dip2BuildData, Dip2BedCoords], Y],
-    o: tuple[Path, Path],
-    bd: Dip2BuildData,
-    bf: Dip2BedCoords,
-) -> tuple[Y, Y]:
-    return (
-        f(o[0], Haplotype.PAT, bd, bf),
-        f(o[1], Haplotype.MAT, bd, bf),
     )
 
 
@@ -381,7 +346,7 @@ def map_single_or_double(
     if isinstance(x, Single):
         return Single(f(x.elem))
     if isinstance(x, Double):
-        return x.both(lambda y, _: f(y))
+        return x.both_(f)
     else:
         assert_never(x)
 
@@ -484,11 +449,11 @@ def with_inputs_dip1(
 def with_inputs_dip2(
     b: BedFile[Dip2Src[S]] | Dip2BedCoords,
     inputs: list[X],
-    src_f: Callable[[tuple[X, X], BedFile[Dip2Src[S]]], Y],
+    src_f: Callable[[Double[X], BedFile[Dip2Src[S]]], Y],
     coords_f: Callable[[Dip2BedCoords], Y],
 ) -> Y:
     if isinstance(b, BedFile):
-        return match2_unsafe(inputs, lambda i0, i1: src_f((i0, i1), b))
+        return match2_unsafe(inputs, lambda i0, i1: src_f(Double(i0, i1), b))
     elif isinstance(b, Dip1BedCoords) or isinstance(b, Dip2BedCoords):
         if len(inputs) > 0:
             raise DesignError()
@@ -515,7 +480,7 @@ def dip1_split_noop_conversion(
 
 
 def dip2_noop_conversion(h: Haplotype, bd: Dip2BuildData) -> HapToHapChrConversion:
-    return h.choose(*bd.refdata.ref.noop_conversion(bd.build_chrs))
+    return bd.refdata.ref.noop_conversion(bd.build_chrs).choose(h)
 
 
 # functions for dealing with 'dict[RefKey, X]' type things
@@ -981,37 +946,28 @@ def read_write_filter_sort_dip1to1_bed(
     bed.write_bed(opath, g(df))
 
 
-# TDOO consider not using a tuple here for ipath
 def read_filter_sort_dip2to1_bed(
     bd: Dip1BuildData,
     bf: Dip2BedFile,
-    ipath: tuple[Path, Path],
+    ipath: Double[Path],
 ) -> pd.DataFrame:
     """Read two haploid bed files, combine and sort them as diploid, and write
     it in bgzip format.
     """
-
-    def go(b: Dip2BedFile, i: Path, imap: bed.InitMapper) -> pd.DataFrame:
-        df = b.read(i)
-        return bed.filter_sort_bed(imap, fmap, df)
 
     conv = bd.refdata.ref.hap_chr_conversion(bf.bed.chr_pattern, bd.build_chrs)
     imap = conv.init_mapper
     fmap = conv.final_mapper
 
     return pd.concat(
-        [
-            go(bf, *x)
-            for x in [
-                (ipath[0], imap.pat),
-                (ipath[1], imap.mat),
-            ]
-        ]
+        imap.both(
+            lambda i, hap: bed.filter_sort_bed(i, fmap, bf.read(ipath.choose(hap)))
+        ).as_list
     )
 
 
 def read_write_filter_sort_dip2to1_bed(
-    ipath: tuple[Path, Path],
+    ipath: Double[Path],
     opath: Path,
     bd: Dip1BuildData,
     bf: Dip2BedFile,
@@ -1044,16 +1000,15 @@ def read_filter_sort_dip1to2_bed(
 
 def read_write_filter_sort_dip1to2_bed(
     ipath: Path,
-    opath: tuple[Path, Path],
+    opath: Double[Path],
     bd: Dip2BuildData,
     bf: Dip1BedFile,
     g0: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x,
     g1: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x,
 ) -> None:
     """Read a haploid bed file, sort it, and write it in bgzip format."""
-    df0, df1 = read_filter_sort_dip1to2_bed(bd, bf, ipath).as_tuple
-    bed.write_bed(opath[0], g0(df0))
-    bed.write_bed(opath[1], g1(df1))
+    res = read_filter_sort_dip1to2_bed(bd, bf, ipath).sum(opath)
+    res.both(lambda r, hap: bed.write_bed(r[1], hap.choose(g0, g1)(r[0])))
 
 
 def read_filter_sort_dip2to2_bed(
@@ -1064,7 +1019,7 @@ def read_filter_sort_dip2to2_bed(
 ) -> pd.DataFrame:
     conv = bd.refdata.ref.hap_chr_conversion(bf.bed.chr_pattern, bd.build_chrs)
     df = bf.read(ipath)
-    conv_ = hap.choose(*conv)
+    conv_ = conv.choose(hap)
     return bed.filter_sort_bed(conv_.init_mapper, conv_.final_mapper, df)
 
 
@@ -1141,12 +1096,12 @@ def filter_sort_bed_main_inner(
             return [o]
 
         def dip1to2(
-            o: tuple[Path, Path], bd: Dip2BuildData, bf: Dip1BedCoords
+            o: Double[Path], bd: Dip2BuildData, bf: Dip1BedCoords
         ) -> list[Path]:
-            df0, df1 = build_dip1to2_coords_df(bd, bf).as_tuple
-            bed.write_bed(o[0], df0)
-            bed.write_bed(o[1], df1)
-            return [*o]
+            build_dip1to2_coords_df(bd, bf).both(
+                lambda df, hap: bed.write_bed(o.choose(hap), df)
+            )
+            return o.as_list
 
         def dip2to1(o: Path, bd: Dip1BuildData, bf: Dip2BedCoords) -> list[Path]:
             bed.write_bed(o, build_dip2to1_coords_df(bd, bf))
@@ -1183,13 +1138,13 @@ def filter_sort_bed_main_inner(
             return [o]
 
         def _dip1to2(
-            i: Path, o: tuple[Path, Path], bd: Dip2BuildData, bf: Dip1BedFile
+            i: Path, o: Double[Path], bd: Dip2BuildData, bf: Dip1BedFile
         ) -> list[Path]:
             read_write_filter_sort_dip1to2_bed(i, o, bd, bf, g)
-            return [*o]
+            return o.as_list
 
         def _dip2to1(
-            i: tuple[Path, Path], o: Path, bd: Dip1BuildData, bf: Dip2BedFile
+            i: Double[Path], o: Path, bd: Dip1BuildData, bf: Dip2BedFile
         ) -> list[Path]:
             read_write_filter_sort_dip2to1_bed(i, o, bd, bf, g)
             return [o]
@@ -1374,11 +1329,24 @@ class Double(Generic[X], _HasRefKeys):
     def as_tuple(self) -> tuple[X, X]:
         return (self.pat, self.mat)
 
+    @property
+    def as_list(self) -> list[X]:
+        return [*self.as_tuple]
+
+    def sum(self, y: Double[Y]) -> Double[tuple[X, Y]]:
+        return Double((self.pat, y.pat), (self.mat, y.mat))
+
+    def sum2(self, y: Double[Y], z: Double[Z]) -> Double[tuple[X, Y, Z]]:
+        return Double((self.pat, y.pat, z.pat), (self.mat, y.mat, z.mat))
+
     def choose(self, hap: Haplotype) -> X:
         return hap.choose(self.pat, self.mat)
 
     def both(self, f: Callable[[X, Haplotype], Y]) -> Double[Y]:
         return Double(f(self.pat, Haplotype.PAT), f(self.mat, Haplotype.MAT))
+
+    def both_(self, f: Callable[[X], Y]) -> Double[Y]:
+        return self.both(lambda x, _: f(x))
 
     def key1(self, rk: RefKey) -> RefKeyFull:
         return RefKeyFull(rk, Haplotype.PAT)
@@ -2713,14 +2681,14 @@ class Dip2Src(GenericDocumentable2, Generic[S]):
         self,
         fromChr: Double[HapChrPattern],
         cis: BuildChrs,
-    ) -> tuple[HapToHapChrConversion, HapToHapChrConversion]:
+    ) -> Double[HapToHapChrConversion]:
         """Create a dip2->dip2 conversion corresponding to 'fromChr'.
 
         'cis' is the list of chromosome indices that the conversion will
         consider not excluded.
         """
         toChr = self.chr_pattern
-        return (
+        return Double(
             HapToHapChrConversion(fromChr.pat, toChr.pat, cis),
             HapToHapChrConversion(fromChr.mat, toChr.mat, cis),
         )
@@ -2737,9 +2705,7 @@ class Dip2Src(GenericDocumentable2, Generic[S]):
         """
         return DipToHapChrConversion(fromChr, self.chr_pattern, cis)
 
-    def noop_conversion(
-        self, cis: BuildChrs
-    ) -> tuple[HapToHapChrConversion, HapToHapChrConversion]:
+    def noop_conversion(self, cis: BuildChrs) -> Double[HapToHapChrConversion]:
         """Create a chromosome conversion for this source itself.
 
         Useful for anything generated via the reference itself, since those
@@ -3066,10 +3032,6 @@ class RMSKFile(BedFile[Q], Generic[Q]):
     bed: Q  # type narrowing won't work without this redfinition
     class_col: NonNegativeInt
 
-    # @property
-    # def rmsk_documentation(self) -> RMSKDoc:
-    #     return RMSKDoc(bed=self._documentation, class_col=self.class_col)
-
     @validator("class_col")
     def end_different(
         cls,
@@ -3093,10 +3055,6 @@ class SatFile(BedFile[Q], Generic[Q]):
     bed: Q
     sat_col: NonNegativeInt
 
-    # @property
-    # def sat_documentation(self) -> SatDoc:
-    #     return SatDoc(bed=self._documentation, sat_col=self.sat_col)
-
     def read(self, path: Path) -> pd.DataFrame:
         return super()._read(path, [self.sat_col])
 
@@ -3113,10 +3071,6 @@ class XYFile(HapBedFile):
     """Bed file input for XY features."""
 
     level_col: NonNegativeInt
-
-    # @property
-    # def documentation(self) -> XYDoc:
-    #     return XYDoc(bed=self._documentation, level_col=self.level_col)
 
     @validator("level_col")
     def level_different(
@@ -4916,8 +4870,8 @@ class GiabStrats(BaseModel):
         hap_f: Callable[[X, HapBuildData, HapBedFile], Z],
         dip_1to1_f: Callable[[X, Dip1BuildData, Dip1BedFile], Z],
         dip_1to2_f: Callable[[X, Dip2BuildData, Dip1BedFile], Z],
-        dip_2to1_f: Callable[[tuple[X, X], Dip1BuildData, Dip2BedFile], Z],
-        dip_2to2_f: Callable[[tuple[X, X], Dip2BuildData, Dip2BedFile], Z],
+        dip_2to1_f: Callable[[Double[X], Dip1BuildData, Dip2BedFile], Z],
+        dip_2to2_f: Callable[[Double[X], Dip2BuildData, Dip2BedFile], Z],
     ) -> Z:
         """Like 'with_build_data_and_bed' but also take a list of input files
         and supply it to one of the supplied higher-order functions.
@@ -4948,7 +4902,7 @@ class GiabStrats(BaseModel):
             lambda bd, bf: match2_unsafe(
                 inputs,
                 lambda i0, i1: (
-                    dip_2to1_f((i0, i1), bd, bf)
+                    dip_2to1_f(Double(i0, i1), bd, bf)
                     if isinstance(bf, BedFile)
                     else raise_inline()
                 ),
@@ -4956,7 +4910,7 @@ class GiabStrats(BaseModel):
             lambda bd, bf: match2_unsafe(
                 inputs,
                 lambda i0, i1: (
-                    dip_2to2_f((i0, i1), bd, bf)
+                    dip_2to2_f(Double(i0, i1), bd, bf)
                     if isinstance(bf, BedFile)
                     else raise_inline()
                 ),
@@ -4972,16 +4926,17 @@ class GiabStrats(BaseModel):
         get_bed_f: BuildDataToBed,
         hap_f: Callable[[Y, HapBuildData, HapBedFileOrCoords], Z],
         dip_1to1_f: Callable[[Y, Dip1BuildData, Dip1BedFileOrCoords], Z],
-        dip_1to2_f: Callable[[tuple[Y, Y], Dip2BuildData, Dip1BedFileOrCoords], Z],
+        dip_1to2_f: Callable[[Double[Y], Dip2BuildData, Dip1BedFileOrCoords], Z],
         dip_2to1_f: Callable[[Y, Dip1BuildData, Dip2BedFileOrCoords], Z],
-        dip_2to2_f: Callable[[tuple[Y, Y], Dip2BuildData, Dip2BedFileOrCoords], Z],
+        dip_2to2_f: Callable[[Double[Y], Dip2BuildData, Dip2BedFileOrCoords], Z],
     ) -> Z:
         def out1(src: Single[RefSrc]) -> Y:
             return with_first(output_f(src.key(rk)), lambda o: write_outputs([o]))
 
-        def out2(src: Double[RefSrc]) -> tuple[Y, Y]:
+        def out2(src: Double[RefSrc]) -> Double[Y]:
             return with_first(
-                both(output_f, src.keys(rk).as_tuple), lambda o: write_outputs([*o])
+                src.keys(rk).both_(output_f),
+                lambda o: write_outputs(o.as_list),
             )
 
         return self.with_build_data_and_bed(
@@ -4995,7 +4950,6 @@ class GiabStrats(BaseModel):
             lambda bd, bf: dip_2to2_f(out2(bd.refdata.ref.src), bd, bf),
         )
 
-    # TODO replace tuples here with single/double? and the input list
     def with_build_data_and_bed_io2(
         self,
         rk: RefKey,
@@ -5006,9 +4960,9 @@ class GiabStrats(BaseModel):
         get_bed_f: BuildDataToBed,
         hap_f: Callable[[X, Y, HapBuildData, HapBedFile], Z],
         dip_1to1_f: Callable[[X, Y, Dip1BuildData, Dip1BedFile], Z],
-        dip_1to2_f: Callable[[X, tuple[Y, Y], Dip2BuildData, Dip1BedFile], Z],
-        dip_2to1_f: Callable[[tuple[X, X], Y, Dip1BuildData, Dip2BedFile], Z],
-        dip_2to2_f: Callable[[tuple[X, X], tuple[Y, Y], Dip2BuildData, Dip2BedFile], Z],
+        dip_1to2_f: Callable[[X, Double[Y], Dip2BuildData, Dip1BedFile], Z],
+        dip_2to1_f: Callable[[Double[X], Y, Dip1BuildData, Dip2BedFile], Z],
+        dip_2to2_f: Callable[[Double[X], Double[Y], Dip2BuildData, Dip2BedFile], Z],
     ) -> Z:
         """Like '_with_build_data_and_bed_i' but also take a function that
         generates an output file path and function that writes the outputs paths
@@ -5021,9 +4975,10 @@ class GiabStrats(BaseModel):
         def out1(src: Single[RefSrc]) -> Y:
             return with_first(output_f(src.key(rk)), lambda o: write_outputs([o]))
 
-        def out2(src: Double[RefSrc]) -> tuple[Y, Y]:
+        def out2(src: Double[RefSrc]) -> Double[Y]:
             return with_first(
-                both(output_f, src.keys(rk).as_tuple), lambda o: write_outputs([*o])
+                src.keys(rk).both_(output_f),
+                lambda o: write_outputs(o.as_list),
             )
 
         return self.with_build_data_and_bed_i(
@@ -5047,9 +5002,7 @@ class GiabStrats(BaseModel):
         get_bed_f: BuildDataToBed,
         hap_f: Callable[[Path, HapBuildData, HapBedCoords], list[Path]],
         dip_1to1_f: Callable[[Path, Dip1BuildData, Dip1BedCoords], list[Path]],
-        dip_1to2_f: Callable[
-            [tuple[Path, Path], Dip2BuildData, Dip1BedCoords], list[Path]
-        ],
+        dip_1to2_f: Callable[[Double[Path], Dip2BuildData, Dip1BedCoords], list[Path]],
         dip_2to1_f: Callable[[Path, Dip1BuildData, Dip2BedCoords], list[Path]],
         dip_2to2_f: Callable[
             [Path, Haplotype, Dip2BuildData, Dip2BedCoords], list[Path]
@@ -5077,14 +5030,17 @@ class GiabStrats(BaseModel):
             lambda o, bd, bf: (
                 dip_2to1_f(o, bd, bf) if not isinstance(bf, BedFile) else raise_inline()
             ),
-            # dip_1to1_f,
-            # dip_1to2_f,
-            # dip_2to1_f,
-            lambda o, bd, bf: list(
-                chain(*wrap_dip_2to2_io_txt_f(dip_2to2_f, o, bd, bf))
-                if not isinstance(bf, BedFile)
-                else raise_inline()
-            ),
+            lambda o, bd, bf: [
+                y
+                for x in o.both(
+                    lambda o, hap: (
+                        dip_2to2_f(o, hap, bd, bf)
+                        if not isinstance(bf, BedFile)
+                        else raise_inline()
+                    )
+                ).as_list
+                for y in x
+            ],
         )
 
     def with_build_data_and_bed_io(
@@ -5097,12 +5053,8 @@ class GiabStrats(BaseModel):
         get_bed_f: BuildDataToBed,
         hap_f: Callable[[X, Path, HapBuildData, HapBedFile], list[Path]],
         dip_1to1_f: Callable[[X, Path, Dip1BuildData, Dip1BedFile], list[Path]],
-        dip_1to2_f: Callable[
-            [X, tuple[Path, Path], Dip2BuildData, Dip1BedFile], list[Path]
-        ],
-        dip_2to1_f: Callable[
-            [tuple[X, X], Path, Dip1BuildData, Dip2BedFile], list[Path]
-        ],
+        dip_1to2_f: Callable[[X, Double[Path], Dip2BuildData, Dip1BedFile], list[Path]],
+        dip_2to1_f: Callable[[Double[X], Path, Dip1BuildData, Dip2BedFile], list[Path]],
         dip_2to2_f: Callable[
             [X, Path, Haplotype, Dip2BuildData, Dip2BedFile], list[Path]
         ],
@@ -5140,9 +5092,13 @@ class GiabStrats(BaseModel):
             dip_1to1_f,
             dip_1to2_f,
             dip_2to1_f,
-            lambda i, o, bd, bf: list(
-                chain(*wrap_dip_2to2_io_f(dip_2to2_f, i, o, bd, bf))
-            ),
+            lambda i, o, bd, bf: [
+                y
+                for x in i.both(
+                    lambda i, hap: dip_2to2_f(i, o.choose(hap), hap, bd, bf)
+                ).as_list
+                for y in x
+            ],
         )
 
     # TODO this really should be called "source_doc" or something
