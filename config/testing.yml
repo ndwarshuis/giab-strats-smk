@@ -248,7 +248,7 @@ haploid_stratifications:
                   hap:
                     url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
               remove_gaps: true
-              # This must be a complete sentence
+              # The must be a complete sentence and will show up in the README
               description: This represents contigs less than 500,000 bp.
             test:
               data:
@@ -256,6 +256,8 @@ haploid_stratifications:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
+                  # The must be a complete sentence and will show up in the
+                  # README
                   provenance: I come in piece.
               description: If you see this it worked.
 
@@ -789,7 +791,7 @@ diploid2_stratifications:
         chr_filter: [21, 22]
         include:
           xy: false
-          segdups: false
+          segdups: true
           cds: true
           vdj: true
           kir: true
