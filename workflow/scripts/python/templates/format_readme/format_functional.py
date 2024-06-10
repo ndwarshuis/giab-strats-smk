@@ -16,7 +16,7 @@ def format_cds_params(p: cfg.CDSParams) -> str:
             [
                 f"Lines where {source_txt} and {type_txt} were selected.",
                 "Coordinates where start == end were removed.",
-                "The remainining regions were merged using `mergeBed`.",
+                "The remaining regions were merged using `mergeBed`.",
             ]
         )
     )
