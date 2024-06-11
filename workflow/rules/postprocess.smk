@@ -36,24 +36,6 @@ def all_readme_targets(wildcards):
     return [r.readme for f in ALL_TARGETS if (r := f(rk, bk)) is not None]
 
 
-rule build_strat_README:
-    input:
-        readme="workflow/templates/main.j2",
-        ref=lambda w: expand_final_to_src(rules.download_ref.output, w)[0],
-    output:
-        config.final_build_dir / "{ref_final_key}-README.md",
-    params:
-        segdups=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
-        functional=lambda w: all_functional(w["ref_final_key"], w["build_key"]),
-        otherdiff=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
-        union=lambda w: all_union(w["ref_final_key"], w["build_key"]),
-        xy=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
-    conda:
-        "../envs/templates.yml"
-    script:
-        "../scripts/python/templates/format_readme/format_main.py"
-
-
 rule list_all_strats:
     input:
         all_strat_targets,
@@ -319,24 +301,51 @@ rule summarize_happy:
         "../scripts/rmarkdown/rmarkdown/benchmark.Rmd"
 
 
-rule copy_READMEs:
+rule copy_strat_background:
     input:
-        main="workflow/files/README_main.md",
-        validation="workflow/files/README_validation.md",
+        "workflow/files/BACKGROUND.md",
     output:
-        validation=validation_dir / "README.md",
-        main=config.final_root_dir / "README.md",
+        config.final_root_dir / "BACKGROUND.md",
     shell:
         """
-        cp {input.main} {output.main}
-        cp {input.validation} {output.validation}
+        cp {input} {output}
         """
+
+
+rule copy_validation_README:
+    input:
+        "workflow/files/README_validation.md",
+    output:
+        validation_dir / "README.md",
+    shell:
+        """
+        cp {input} {output}
+        """
+
+
+rule build_strat_README:
+    input:
+        readme="workflow/templates/main.j2",
+        ref=lambda w: expand_final_to_src(rules.download_ref.output, w)[0],
+    output:
+        config.final_build_dir / "{ref_final_key}-README.md",
+    params:
+        segdups=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
+        functional=lambda w: all_functional(w["ref_final_key"], w["build_key"]),
+        otherdiff=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
+        union=lambda w: all_union(w["ref_final_key"], w["build_key"]),
+        xy=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_main.py"
 
 
 rule generate_tarballs:
     input:
         all_strats=rules.generate_tsv_list.output,
-        main_readme=rules.build_strat_README.output,
+        background=strat_rules.copy_strat_background.output,
+        readme=rules.build_strat_README.output,
         _checksums=rules.generate_md5sums.output,
         _strat_readmes=all_readme_targets,
     output:
@@ -354,7 +363,8 @@ rule generate_tarballs:
 rule generate_bb_tarballs:
     input:
         all_strats=rules.generate_bb_tsv_list.output,
-        main_readme=rules.build_strat_README.output,
+        background=strat_rules.copy_strat_background.output,
+        readme=rules.build_strat_README.output,
         _checksums=rules.generate_bb_md5sums.output,
         _strat_readmes=all_readme_targets,
     output:
@@ -371,7 +381,7 @@ rule generate_bb_tarballs:
 
 rule checksum_everything:
     input:
-        rules.copy_READMEs.output,
+        rules.copy_validation_README.output,
         rules.make_coverage_plots.output,
         rules.summarize_happy.output,
         rules.all_comparisons.input,
