@@ -3770,7 +3770,7 @@ class GiabStrats(BaseModel):
         "segdups",
     ]
     malloc: Malloc = Malloc()
-    docs: Documentation
+    docs: Documentation = Documentation()
 
     # TODO validate comparison keys
     @validator(
