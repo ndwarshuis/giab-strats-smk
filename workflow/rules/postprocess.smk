@@ -50,7 +50,7 @@ rule build_strat_README:
     conda:
         "../envs/templates.yml"
     script:
-        "../scripts/python/templates/format_readme/format_misc.py"
+        "../scripts/python/templates/format_readme/format_main.py"
 
 
 rule list_all_strats:
