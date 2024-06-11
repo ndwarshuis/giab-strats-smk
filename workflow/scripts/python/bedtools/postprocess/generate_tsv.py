@@ -11,7 +11,7 @@ def main(smk: Any) -> None:
     with open(ip, "r") as i, open(op, "w") as o:
         for f in i:
             fp = Path(f.strip())
-            level = re.sub("^[^_]+_", "", fp.name.replace(".bed.gz", ""))
+            level = re.sub("^[^_]+_", "", fp.name.replace(suffix, ""))
             o.write(f"{level}\t{Path(fp.parent.name) / fp.name}\n")
 
 
