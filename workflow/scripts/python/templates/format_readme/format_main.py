@@ -34,7 +34,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     bd = sconf.to_build_data_full(rfk, bk)
 
-    otherdifficult = fmap_maybe(
+    otherdiff = fmap_maybe(
         lambda o: (
             [
                 cfg.readme_fill(x)
@@ -88,7 +88,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         have_functional=have_final_outputs("functional", cfg.FunctionalPaths),
         have_gc=bd.want_gc,
         have_mappability=bd.want_mappability,
-        otherdifficult=otherdifficult,
+        otherdiff=otherdiff,
         other_levels=[o for o in sconf.other_levels if o.key in other_keys],
         ref_src=ref_src_txt,
         pipeline_repo=sconf.docs.pipeline_repo,
