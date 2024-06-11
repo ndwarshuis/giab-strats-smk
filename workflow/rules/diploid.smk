@@ -311,11 +311,11 @@ rule merge_het_regions:
         genome=rules.filter_sort_ref.output["genome"],
         xy_nonpar=rules.concat_xy_nonpar.output,
     output:
-        dip.final("het_regions_{merge_len}k"),
+        dip.final("het_regions_{merge_len}"),
     conda:
         "../envs/bedtools.yml"
     params:
-        size=lambda w: int(w["merge_len"]) * 1000,
+        size=lambda w: int(w["merge_len"]),
     wildcard_constraints:
         merge_len=f"\d+",
     # NOTE: The initial gunzip is very necessary despite the fact that mergeBed
@@ -343,7 +343,7 @@ use rule merge_het_regions as merge_het_SNVorSV_regions with:
         genome=rules.filter_sort_ref.output["genome"],
         xy_nonpar=rules.concat_xy_nonpar.output,
     output:
-        dip.final("het_SNVorSV_regions_{merge_len}k"),
+        dip.final("het_SNVorSV_regions_{merge_len}"),
     wildcard_constraints:
         merge_len=f"\d+",
 
@@ -355,7 +355,7 @@ rule invert_het_regions:
         genome=rules.filter_sort_ref.output["genome"],
         xy_nonpar=rules.concat_xy_nonpar.output,
     output:
-        dip.final("hom_regions_{merge_len}k"),
+        dip.final("hom_regions_{merge_len}"),
     conda:
         "../envs/bedtools.yml"
     wildcard_constraints:
@@ -376,7 +376,7 @@ use rule invert_het_regions as invert_het_SNVorSV_regions with:
         genome=rules.filter_sort_ref.output["genome"],
         xy_nonpar=rules.concat_xy_nonpar.output,
     output:
-        dip.final("hom_SNVorSV_regions_{merge_len}k"),
+        dip.final("hom_SNVorSV_regions_{merge_len}"),
     wildcard_constraints:
         merge_len=f"\d+",
 
