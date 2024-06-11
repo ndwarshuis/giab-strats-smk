@@ -84,7 +84,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         have_telomeres=bd.want_telomeres,
         have_low_complexity=bd.want_low_complexity,
         have_segdups=have_final_outputs("segdups", cfg.SegdupPaths),
-        have_xy=have_final_outputs("xy", cfg.SexPaths),
+        have_sex=have_final_outputs("xy", cfg.SexPaths),
         have_functional=have_final_outputs("functional", cfg.FunctionalPaths),
         have_gc=bd.want_gc,
         have_mappability=bd.want_mappability,

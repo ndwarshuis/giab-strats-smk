@@ -21,21 +21,21 @@ Regions with different types and sizes of low complexity sequence, e.g.,
 homopolymers, STRs, VNTRs and other locally repetitive sequences.
 
 {% endif -%}
-{% if segdups -%}
+{% if have_segdups -%}
 ## Segmental Duplications
 
 Regions with segmental duplications (generally defined as repeated regions >1kb
 with >90% similarity).
 
 {% endif -%}
-{% if sex -%}
+{% if have_sex -%}
 ## XY
 
 Chomosome XY specific regions such as pseudoautosomal regions (PAR), XTR or
 ampliconic.
 
 {% endif -%}
-{% if functional -%}
+{% if have_functional -%}
 ## Functional
 
 Regions to stratify variants inside and outside coding regions.
