@@ -356,7 +356,11 @@ rule generate_tarballs:
         target=lambda _, input: Path(input.all_strats[0]).parent.name,
     shell:
         """
-        tar czf {output} -C {params.parent} --exclude=*.bb {params.target} 
+        tar czf {output} -C {params.parent} \
+          --exclude=*.bb \
+          --exclude=*-all-bb-stratifications.tsv \
+          --exclude=*-genome-stratifications-bb-md5s.txt \
+          {params.target} 
         """
 
 
@@ -375,7 +379,11 @@ rule generate_bb_tarballs:
         target=lambda _, input: Path(input.all_strats[0]).parent.name,
     shell:
         """
-        tar czf {output} -C {params.parent} --exclude=*.bed.gz {params.target} 
+        tar czf {output} -C {params.parent} \
+          --exclude=*.bed.gz \
+          --exclude=*-all-stratifications.tsv \
+          --exclude=*-genome-stratifications-md5s.txt \
+          {params.target} 
         """
 
 
