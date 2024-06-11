@@ -363,9 +363,9 @@ rule otherdifficult_readme:
         odiff.readme,
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_otherdifficult.py"
-    localrule: True
 
 
 rule misc_readme:
