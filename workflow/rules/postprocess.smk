@@ -39,7 +39,7 @@ def all_readme_targets(wildcards):
 rule build_strat_README:
     input:
         readme="workflow/templates/main.j2",
-        ref=lambda w: expand_final_to_src(rules.download_ref.output, w),
+        ref=lambda w: expand_final_to_src(rules.download_ref.output, w)[0],
     output:
         config.final_build_dir / "{ref_final_key}-README.tsv",
     params:
