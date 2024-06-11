@@ -56,9 +56,7 @@ run_linters:
     - ./lint.sh stratlint
   cache:
     paths:
-      - stratlint-bedtools
-      - stratlint-templates
-      - stratlint-rmarkdown
+      - stratlint-*
     key:
       files:
         - workflow/scripts/python/*/env.yml
