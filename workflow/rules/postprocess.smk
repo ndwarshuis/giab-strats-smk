@@ -374,7 +374,7 @@ rule generate_tarballs:
 
 rule generate_bb_tarballs:
     input:
-        rules.generate_tarballs.input,
+        **rules.generate_tarballs.input,
     output:
         config.final_root_dir
         / "genome-stratifications-bb-{ref_final_key}@{build_key}.tar.gz",
