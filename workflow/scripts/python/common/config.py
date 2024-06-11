@@ -3699,10 +3699,6 @@ Dip2Strat = Stratification[Dip2RefFile, DipBedSrc, Dip2VcfSrc, DipBedCoords]
 
 
 class Documentation(BaseModel):
-    pi_name: str
-    pi_email: str
-    contact_name: str
-    contact_email: str
     pipeline_repo: HttpUrl = "https://github.com/ndwarshuis/giab-strats-smk"  # type: ignore
     config_repo: HttpUrl = (
         "https://github.com/ndwarshuis/giab-stratifications"  # type: ignore
