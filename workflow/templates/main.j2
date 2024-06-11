@@ -64,14 +64,14 @@ the genome, including:
 {% endfor -%}
 {% if otherdiff[1] -%}
 - and more, which are described in the accompanying README
-{% endif -%}
 
+{% endif -%}
 {% else -%}
 This category contains stratifications for miscellaneously difficult regions of
 the genome, which are described in the accompanying README.
+{%- endif %}
+{%- endif %}
 
-{% endif -%}
-{% endif -%}
 {% if have_telomeres -%}
 ## Telomeres
 
@@ -86,14 +86,14 @@ difficult region or complex variant. For example, performance can be measured in
 just "easy" or "all difficult" regions of the genome.
 
 {% endif -%}
-{% for other in other_levels %}
+{% for other in other_levels -%}
 ## {{ other.key }}
 
 {{ other.desc }}
 
 These are described in futher detail in the accompanying README.
-{% endfor %}
 
+{% endfor -%}
 # Reference Source
 
 {{ ref_src }}

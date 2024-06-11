@@ -67,7 +67,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     )
 
     ref_src_txt = cfg.readme_fill(
-        cfg.format_src(ref_src.documentation, refpath, "reference FASTA")
+        cfg.format_src(ref_src.documentation, refpath, "The reference FASTA")
     )
 
     compare_txt = fmap_maybe(
@@ -84,7 +84,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     txt = tu.load_template_path(readme).render(
         refname=rfk,
-        haplotypes=sconf.refkey_haplotypes(rfk),
+        haplotypes=[h.name for h in sconf.refkey_haplotypes(rfk)],
         have_low_complexity=bd.want_low_complexity,
         have_segdups=have_final_outputs("segdups", cfg.SegdupPaths),
         have_sex=have_final_outputs("xy", cfg.SexPaths),
