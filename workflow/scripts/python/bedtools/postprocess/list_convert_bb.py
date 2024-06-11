@@ -10,7 +10,7 @@ def main(smk: Any) -> None:
     targets = cfg.smk_to_inputs_name(smk, "targets")
     out = cfg.smk_to_output(smk)
     log = cfg.smk_to_log(smk)
-    with open(out, "w") as o, open(log, "wa") as g:
+    with open(out, "w") as o, open(log, "a") as g:
         for t in targets:
             if not io.gzip_is_empty(t):
                 outfile = str(t).replace(".bed.gz", ".bb")
