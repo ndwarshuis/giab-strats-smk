@@ -56,7 +56,7 @@ Regions where short read mapping can be challenging.
 {% if otherdiff is not none -%}
 ## Other Difficult
 
-{% if otherdiff[0] > 0 -%}
+{% if otherdiff[0]|length > 0 -%}
 This category contains stratifications for miscellaneously difficult regions of
 the genome, including:
 {% for desc in otherdiff[0] %}
