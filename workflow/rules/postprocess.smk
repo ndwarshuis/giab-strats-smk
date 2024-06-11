@@ -41,7 +41,7 @@ rule build_strat_README:
         readme="workflow/templates/main.j2",
         ref=lambda w: expand_final_to_src(rules.download_ref.output, w)[0],
     output:
-        config.final_build_dir / "{ref_final_key}-README.tsv",
+        config.final_build_dir / "{ref_final_key}-README.md",
     params:
         segdups=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
         functional=lambda w: all_functional(w["ref_final_key"], w["build_key"]),
