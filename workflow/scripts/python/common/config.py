@@ -5369,7 +5369,14 @@ class GiabStrats(BaseModel):
                 lk: {
                     sk: (
                         to_str_refkeys(v.data.bed.src, rk).map(
-                            lambda r: sub_wildcard_path(other, "ref_src_key", r)
+                            lambda r: sub_wildcards_path(
+                                other,
+                                {
+                                    "ref_src_key": r,
+                                    "other_level_key": lk,
+                                    "other_strat_key": sk,
+                                },
+                            )
                         )
                         if isinstance(v.data, BedFile)
                         else Null()
