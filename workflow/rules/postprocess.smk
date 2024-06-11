@@ -325,7 +325,7 @@ rule generate_tarballs:
         target=lambda _, input: Path(input.all_strats[0]).parent.name,
     shell:
         """
-        tar --exclude=*.bb czf {output} -C {params.parent} {params.target} 
+        tar czf {output} -C {params.parent} --exclude=*.bb {params.target} 
         """
 
 
@@ -342,7 +342,7 @@ rule generate_bb_tarballs:
         target=lambda _, input: Path(input.all_strats[0]).parent.name,
     shell:
         """
-        tar --exclude=*.bed czf {output} -C {params.parent} {params.target} 
+        tar czf {output} -C {params.parent} --exclude=*.bed {params.target} 
         """
 
 
