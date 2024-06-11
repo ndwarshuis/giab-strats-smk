@@ -299,7 +299,7 @@ checkpoint normalize_other:
     wildcard_constraints:
         **other_constraints,
     script:
-        "../scripts/python/bedtools/other/normalize_other.py"
+        "../scripts/python/bedtools/functional/normalize_other.py"
 
 
 rule remove_gaps_other:
