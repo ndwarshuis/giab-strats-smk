@@ -61,9 +61,8 @@ run_linters:
       - stratlint-rmarkdown
     key:
       files:
-        - workflow/scripts/python/bedtools/env.yml
-        - workflow/scripts/python/templates/env.yml
-        - workflow/scripts/rmarkdown/rmarkdown/env.yml
+        - workflow/scripts/python/*/env.yml
+        - workflow/scripts/rmarkdown/*/env.yml
 
 ################################################################################
 # test snakemake things
