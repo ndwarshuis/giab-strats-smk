@@ -305,7 +305,7 @@ rule copy_strat_background:
     input:
         "workflow/files/BACKGROUND.md",
     output:
-        config.final_root_dir / "BACKGROUND.md",
+        config.final_build_dir / "{ref_final_key}-BACKGROUND.md",
     shell:
         """
         cp {input} {output}
