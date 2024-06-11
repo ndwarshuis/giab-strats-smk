@@ -348,12 +348,24 @@ rule build_strat_README:
 # changing the directory contents while it is running
 rule generate_tarballs:
     input:
+        unpack(
+            lambda w: {
+                "_bb_checksums": (
+                    rules.generate_bb_md5sums.output
+                    if (
+                        t := config.to_build_data_full(
+                            w["ref_final_key"], w["build_key"]
+                        ).want_bb
+                    )
+                    else []
+                ),
+                "all_bb": rules.generate_bb_tsv_list.output if t else [],
+            }
+        ),
         all_bed=rules.generate_tsv_list.output,
-        all_bb=rules.generate_bb_tsv_list.output,
         background=rules.copy_strat_background.output,
         readme=rules.build_strat_README.output,
         _bed_checksums=rules.generate_md5sums.output,
-        _bb_checksums=rules.generate_bb_md5sums.output,
         _strat_readmes=all_readme_targets,
     output:
         config.final_root_dir
@@ -379,8 +391,8 @@ rule generate_bb_tarballs:
         config.final_root_dir
         / "genome-stratifications-bb-{ref_final_key}@{build_key}.tar.gz",
     params:
-        parent=lambda _, input: Path(input.all_bb[0]).parent.parent,
-        target=lambda _, input: Path(input.all_bb[0]).parent.name,
+        parent=lambda _, input: Path(input.all_bed[0]).parent.parent,
+        target=lambda _, input: Path(input.all_bed[0]).parent.name,
     localrule: True
     shell:
         """
