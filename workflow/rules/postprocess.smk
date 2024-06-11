@@ -344,19 +344,23 @@ rule build_strat_README:
         "../scripts/python/templates/format_readme/format_main.py"
 
 
+# include bed/bb in both of these since tar will complain of the bed->bb step is
+# changing the directory contents while it is running
 rule generate_tarballs:
     input:
-        all_strats=rules.generate_tsv_list.output,
+        all_bed=rules.generate_tsv_list.output,
+        all_bb=rules.generate_bb_tsv_list.output,
         background=rules.copy_strat_background.output,
         readme=rules.build_strat_README.output,
-        _checksums=rules.generate_md5sums.output,
+        _bed_checksums=rules.generate_md5sums.output,
+        _bb_checksums=rules.generate_bb_md5sums.output,
         _strat_readmes=all_readme_targets,
     output:
         config.final_root_dir
         / "genome-stratifications-{ref_final_key}@{build_key}.tar.gz",
     params:
-        parent=lambda _, input: Path(input.all_strats[0]).parent.parent,
-        target=lambda _, input: Path(input.all_strats[0]).parent.name,
+        parent=lambda _, input: Path(input.all_bed[0]).parent.parent,
+        target=lambda _, input: Path(input.all_bed[0]).parent.name,
     localrule: True
     shell:
         """
@@ -370,17 +374,13 @@ rule generate_tarballs:
 
 rule generate_bb_tarballs:
     input:
-        all_strats=rules.generate_bb_tsv_list.output,
-        background=rules.copy_strat_background.output,
-        readme=rules.build_strat_README.output,
-        _checksums=rules.generate_bb_md5sums.output,
-        _strat_readmes=all_readme_targets,
+        rules.generate_tarballs.input,
     output:
         config.final_root_dir
         / "genome-stratifications-bb-{ref_final_key}@{build_key}.tar.gz",
     params:
-        parent=lambda _, input: Path(input.all_strats[0]).parent.parent,
-        target=lambda _, input: Path(input.all_strats[0]).parent.name,
+        parent=lambda _, input: Path(input.all_bb[0]).parent.parent,
+        target=lambda _, input: Path(input.all_bb[0]).parent.name,
     localrule: True
     shell:
         """
