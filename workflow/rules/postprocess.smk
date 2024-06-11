@@ -9,6 +9,7 @@ post_log_dir = config.log_build_dir / "postprocess"
 post_bench_dir = config.bench_build_dir / "postprocess"
 validation_dir = config.final_root_dir / "validation"
 
+
 ALL_TARGETS = [
     all_diploid,
     all_functional,
@@ -33,6 +34,23 @@ def all_readme_targets(wildcards):
     rk = wildcards["ref_final_key"]
     bk = wildcards["build_key"]
     return [r.readme for f in ALL_TARGETS if (r := f(rk, bk)) is not None]
+
+
+rule build_strat_README:
+    input:
+        readme="workflow/templates/main.j2",
+        ref=lambda w: expand_final_to_src(rules.download_ref.output, w),
+    output:
+        config.final_build_dir / "{ref_final_key}-README.tsv",
+    params:
+        segdups=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
+        functional=lambda w: all_functional(w["ref_final_key"], w["build_key"]),
+        otherdiff=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
+        xy=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
+    conda:
+        "../envs/templates.yml"
+    script:
+        "../scripts/python/templates/format_readme/format_misc.py"
 
 
 rule list_all_strats:
@@ -317,6 +335,7 @@ rule copy_READMEs:
 rule generate_tarballs:
     input:
         all_strats=rules.generate_tsv_list.output,
+        main_readme=rules.build_strat_README.output,
         _checksums=rules.generate_md5sums.output,
         _strat_readmes=all_readme_targets,
     output:
@@ -334,6 +353,7 @@ rule generate_tarballs:
 rule generate_bb_tarballs:
     input:
         all_strats=rules.generate_bb_tsv_list.output,
+        main_readme=rules.build_strat_README.output,
         _checksums=rules.generate_bb_md5sums.output,
         _strat_readmes=all_readme_targets,
     output:

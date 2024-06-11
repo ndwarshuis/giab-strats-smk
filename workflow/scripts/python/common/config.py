@@ -2045,7 +2045,6 @@ class FunctionalPaths(_HasSources, _HasFinalBeds):
         return fmap_maybe_def([], lambda z: z.paths, self.cds_output)
 
 
-# TODO rename
 @dataclass(frozen=True)
 class SourceOutputPaths:
     source: Path0or1or2
@@ -2778,6 +2777,7 @@ class Dip2BedCoords(Diploid[HapBedLines]):
         return self.double.both(lambda p, hap: [c.line(hap) for c in p.lines])
 
 
+# TODO make this mandatory
 class HashedSrc_(BaseDocumentable):
     """A source that may be hashed to verify its integrity"""
 
@@ -2843,6 +2843,7 @@ class Paths(BaseModel):
     results: Path = Path("results")
 
 
+# TODO add checksum for GEM
 class Tools(BaseModel):
     """Urls for tools to download/build/use in the pipeline."""
 
@@ -3701,25 +3702,41 @@ class Documentation(BaseModel):
     pi_email: str
     contact_name: str
     contact_email: str
+    pipeline_repo: HttpUrl = "https://github.com/ndwarshuis/giab-strats-smk"  # type: ignore
+    config_repo: HttpUrl = (
+        "https://github.com/ndwarshuis/giab-stratifications"  # type: ignore
+    )
+
+
+GENOME_SPECIFIC_DESC = (
+    "Difficult regions due to potentially difficult variation in a NIST/GIAB "
+    "sample, including 1) regions containing putative compound heterozygous "
+    "variants 2) small regions containing multiple phased variants, 3) regions "
+    "with potential structural or copy number variation."
+)
+
+FUNCTIONAL_TECH_DESC = (
+    "Functional, or potentially functional, regions that are also likely to be "
+    "technically difficult to sequences."
+)
 
 
 # TODO add validator to ensure none of the keys in the strat/build dicts overlap
 class GiabStrats(BaseModel):
     """Top level stratification object."""
 
-    # TODO make these descriptions actually work
     other_levels: list[OtherLevelDescription] = [
         OtherLevelDescription(
             key=OtherLevelKey("Ancestry"),
-            desc="stuff for ancestry",
+            desc="Regions with inferred patterns of local ancestry.",
         ),
         OtherLevelDescription(
             key=OtherLevelKey("FunctionalTechnicallyDifficult"),
-            desc="stuff that is technical and functional and difficult",
+            desc=FUNCTIONAL_TECH_DESC,
         ),
         OtherLevelDescription(
             key=OtherLevelKey("GenomeSpecific"),
-            desc="Stuff that is specific to a particular genome",
+            desc=GENOME_SPECIFIC_DESC,
         ),
     ]
     paths: Paths = Paths()

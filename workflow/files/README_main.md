@@ -21,12 +21,6 @@ These files were generated using the configuration
 located [here](https://github.com/ndwarshuis/giab-strats-smk). Please see these
 for further information, including exact code and source files.
 
-Currently, this pipeline is set up to build stratifications for the following
-references:
-* GRCh37
-* GRCh38
-* CHM13
-
 ## General Information
 
 Author Information
