@@ -56,11 +56,14 @@ run_linters:
     - ./lint.sh stratlint
   cache:
     paths:
-      - stratlint-*
+      - stratlint-bedtools
+      - stratlint-templates
+      - stratlint-rmarkdown
     key:
       files:
-        - workflow/scripts/python/*/env.yml
-        - workflow/scripts/rmarkdown/*/env.yml
+        - workflow/scripts/python/bedtools/env.yml
+        - workflow/scripts/python/templates/env.yml
+        - workflow/scripts/rmarkdown/rmarkdown/env.yml
 
 ################################################################################
 # test snakemake things
