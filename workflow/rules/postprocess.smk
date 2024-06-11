@@ -344,7 +344,7 @@ rule build_strat_README:
 rule generate_tarballs:
     input:
         all_strats=rules.generate_tsv_list.output,
-        background=strat_rules.copy_strat_background.output,
+        background=rules.copy_strat_background.output,
         readme=rules.build_strat_README.output,
         _checksums=rules.generate_md5sums.output,
         _strat_readmes=all_readme_targets,
@@ -363,7 +363,7 @@ rule generate_tarballs:
 rule generate_bb_tarballs:
     input:
         all_strats=rules.generate_bb_tsv_list.output,
-        background=strat_rules.copy_strat_background.output,
+        background=rules.copy_strat_background.output,
         readme=rules.build_strat_README.output,
         _checksums=rules.generate_bb_md5sums.output,
         _strat_readmes=all_readme_targets,
