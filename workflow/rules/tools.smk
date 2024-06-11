@@ -22,9 +22,22 @@ rule download_gem:
         "curl -sS -L -o {output} {params.url}"
 
 
-rule unpack_gem:
+rule check_gem:
     input:
         rules.download_gem.output,
+    output:
+        config.tools_src_dir / "gemlib.tbz2.valid",
+    localrule: True
+    params:
+        validhash=config.tools.gemhash,
+    script:
+        "../scripts/python/bedtools/misc/test_hash.py"
+
+
+rule unpack_gem:
+    input:
+        archive=rules.download_gem.output,
+        _test=rules.check_gem.output,
     output:
         # called by other binaries
         config.tools_bin_dir / "gem-indexer_fasta2meta+cont",
@@ -41,7 +54,7 @@ rule unpack_gem:
     shell:
         """
         mkdir -p {config.tools_bin_dir} && \
-        tar xjf {input} \
+        tar xjf {input.archive} \
         --directory {config.tools_bin_dir} \
         --strip-components=2 \
         {params.bins}
