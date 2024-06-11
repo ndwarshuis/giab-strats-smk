@@ -891,8 +891,6 @@ comparison_strats:
 #   gemlib: https://sourceforge.net/projects/gemlibrary/files/gem-library/Binary%20pre-release%203/GEM-binaries-Linux-x86_64-core_i3-20130406-045632.tbz2/download
 
 # stuff for documenting the readmes goes here
-docs:
-  pi_name: Justin Zook
-  pi_email: iamzook@nist.gov
-  contact_name: Nate Dwarshuis
-  contact_email: iamtransverse@nist.gov
+# docs:
+  # pipeline_repo: url_for_repo
+  # config_repo: url_for_repo
