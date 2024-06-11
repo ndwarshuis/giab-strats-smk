@@ -2071,7 +2071,7 @@ class OtherDifficultPaths(_HasSources, _HasFinalBeds):
     def all_sources(self) -> list[Path]:
         return [
             p
-            for x in [self.gaps, self.vdj, self.mhc, self.kir]
+            for x in [self.gaps, self.vdj, self.mhc, self.kir, *self.other.values()]
             if x is not None
             for p in x.source.as_list
         ]
