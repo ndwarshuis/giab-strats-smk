@@ -112,9 +112,3 @@ haploid_stratifications:
       test-autosome:
         chr_filter: []
         include: {}
-
-docs:
-  pi_name: Justin Zook
-  pi_email: iamzook@nist.gov
-  contact_name: Nate Dwarshuis
-  contact_email: iamtransverse@nist.gov
