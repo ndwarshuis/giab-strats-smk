@@ -45,5 +45,6 @@ rule telomere_readme:
         telo.readme,
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_telomeres.py"

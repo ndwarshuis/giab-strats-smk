@@ -51,6 +51,7 @@ rule unpack_gem:
         bins=lambda wildcards, output: " ".join(
             str(gemlib_bin / basename(o)) for o in output
         ),
+    localrule: True
     shell:
         """
         mkdir -p {config.tools_bin_dir} && \
@@ -112,6 +113,7 @@ use rule download_repseq as download_kent with:
         config.tools_src_dir / "kent.tar.gz",
     params:
         url=config.tools.kent,
+    localrule: True
 
 
 use rule unpack_repseq as unpack_kent with:
@@ -119,6 +121,7 @@ use rule unpack_repseq as unpack_kent with:
         rules.download_kent.output,
     output:
         directory(config.tools_make_dir / "kent"),
+    localrule: True
 
 
 # NOTE this entire thing is simply to get bigBedToBed and bedToBigBed, which I

@@ -115,5 +115,6 @@ rule segdups_readme:
         paths=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_segdups.py"

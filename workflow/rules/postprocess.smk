@@ -306,6 +306,7 @@ rule copy_strat_background:
         "workflow/files/BACKGROUND.md",
     output:
         config.final_build_dir / "{ref_final_key}-BACKGROUND.md",
+    localrule: True
     shell:
         """
         cp {input} {output}
@@ -317,6 +318,7 @@ rule copy_validation_README:
         "workflow/files/README_validation.md",
     output:
         validation_dir / "README.md",
+    localrule: True
     shell:
         """
         cp {input} {output}
@@ -337,6 +339,7 @@ rule build_strat_README:
         xy=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_main.py"
 
@@ -354,6 +357,7 @@ rule generate_tarballs:
     params:
         parent=lambda _, input: Path(input.all_strats[0]).parent.parent,
         target=lambda _, input: Path(input.all_strats[0]).parent.name,
+    localrule: True
     shell:
         """
         tar czf {output} -C {params.parent} \
@@ -377,6 +381,7 @@ rule generate_bb_tarballs:
     params:
         parent=lambda _, input: Path(input.all_strats[0]).parent.parent,
         target=lambda _, input: Path(input.all_strats[0]).parent.name,
+    localrule: True
     shell:
         """
         tar czf {output} -C {params.parent} \
@@ -407,6 +412,7 @@ rule checksum_everything:
         config.final_root_dir / "genome-stratifications-md5s.txt",
     params:
         root=config.final_root_dir,
+    localrule: True
     shell:
         """
         find {params.root} -type f -exec md5sum {{}} + | \

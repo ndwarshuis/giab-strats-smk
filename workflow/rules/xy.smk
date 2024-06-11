@@ -123,5 +123,6 @@ rule xy_readme:
         xy.readme,
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_xy.py"

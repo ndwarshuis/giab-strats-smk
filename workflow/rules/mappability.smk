@@ -265,5 +265,6 @@ rule mappability_readme:
         mlty.readme,
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_mappability.py"

@@ -343,6 +343,7 @@ rule functional_readme:
         func.readme,
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_functional.py"
 
@@ -364,6 +365,7 @@ rule otherdifficult_readme:
         "../envs/templates.yml"
     script:
         "../scripts/python/templates/format_readme/format_otherdifficult.py"
+    localrule: True
 
 
 rule misc_readme:
@@ -390,5 +392,6 @@ rule misc_readme:
         ),
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_misc.py"

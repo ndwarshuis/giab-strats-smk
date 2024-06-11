@@ -784,5 +784,6 @@ rule low_complexity_readme:
         lc.readme,
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_lowcomplexity.py"

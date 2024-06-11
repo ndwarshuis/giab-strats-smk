@@ -75,5 +75,6 @@ rule union_readme:
         uni.readme,
     conda:
         "../envs/templates.yml"
+    localrule: True
     script:
         "../scripts/python/templates/format_readme/format_union.py"
