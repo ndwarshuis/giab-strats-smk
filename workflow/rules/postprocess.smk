@@ -46,6 +46,7 @@ rule build_strat_README:
         segdups=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
         functional=lambda w: all_functional(w["ref_final_key"], w["build_key"]),
         otherdiff=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
+        union=lambda w: all_union(w["ref_final_key"], w["build_key"]),
         xy=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
     conda:
         "../envs/templates.yml"

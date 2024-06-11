@@ -81,7 +81,6 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     txt = tu.load_template_path(readme).render(
         refname=rfk,
         haplotypes=sconf.refkey_haplotypes(rfk),
-        have_telomeres=bd.want_telomeres,
         have_low_complexity=bd.want_low_complexity,
         have_segdups=have_final_outputs("segdups", cfg.SegdupPaths),
         have_sex=have_final_outputs("xy", cfg.SexPaths),
@@ -89,6 +88,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         have_gc=bd.want_gc,
         have_mappability=bd.want_mappability,
         otherdiff=otherdiff,
+        have_telomeres=bd.want_telomeres,
+        have_union=have_final_outputs("union", cfg.UnionPaths),
         other_levels=[o for o in sconf.other_levels if o.key in other_keys],
         ref_src=ref_src_txt,
         pipeline_repo=sconf.docs.pipeline_repo,
