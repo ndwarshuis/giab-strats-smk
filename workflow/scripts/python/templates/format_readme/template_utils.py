@@ -58,7 +58,7 @@ def fmt_other_srcs(
     rk: cfg.RefKeyFullS,
     bk: cfg.BuildKey,
     lk: cfg.OtherLevelKey,
-    paths: dict[cfg.OtherStratKey, cfg.GapsPaths],
+    paths: dict[cfg.OtherStratKey, cfg.SourceOutputPaths],
 ) -> dict[cfg.OtherStratKey, str]:
     # NOTE sub these three keys because unlike other sources, these are
     # build specific and are also denoted by the other strat/level keys. Other
@@ -68,20 +68,15 @@ def fmt_other_srcs(
         sk: sconf.with_build_data_and_bed_doc(
             rk,
             bk,
-            (
-                cfg.map_single_or_double(
-                    lambda x: cfg.sub_wildcards_path(
-                        x,
-                        {
-                            "build_key": bk,
-                            "other_level_key": lk,
-                            "other_strat_key": sk,
-                        },
-                    ),
-                    p.source,
-                )
-                if not isinstance(p.source, cfg.IsYamlBed)
-                else cfg.IsYamlBed()  # poor man's bind instance :/
+            p.source.map(
+                lambda x: cfg.sub_wildcards_path(
+                    x,
+                    {
+                        "build_key": bk,
+                        "other_level_key": lk,
+                        "other_strat_key": sk,
+                    },
+                ),
             ),
             lambda bd: cfg.bd_to_other_bed(lk, sk, bd),
             None,
@@ -96,7 +91,7 @@ def fmt_other_descriptions(
     rk: cfg.RefKeyFullS,
     bk: cfg.BuildKey,
     lk: cfg.OtherLevelKey,
-    paths: dict[cfg.OtherStratKey, cfg.GapsPaths],
+    paths: dict[cfg.OtherStratKey, cfg.SourceOutputPaths],
 ) -> dict[str, str]:
     def go(sk: cfg.OtherStratKey) -> str:
         d = sconf.with_build_data_full(

@@ -1,16 +1,11 @@
 import pandas as pd
 import json
 from pathlib import Path
+from more_itertools import flatten
 from typing import Any, assert_never, NamedTuple, Callable
 import common.config as cfg
 from common.bed import write_bed
-from common.functional import (
-    DesignError,
-    fmap_maybe,
-    match12_unsafe,
-    match1_unsafe,
-    match2_unsafe,
-)
+from common.functional import DesignError, fmap_maybe
 
 GFF2Bed = Callable[[pd.DataFrame], pd.DataFrame]
 
@@ -123,10 +118,10 @@ def main(smk: Any) -> None:
                 write_bed(bedpath, keep_bed_columns(g.gff2bed(res.df)))
                 return [bedpath]
 
-            def write2(res1: GFFOut, res2: GFFOut) -> list[Path]:
-                return write1(res1) + write1(res2)
+            def write2(res: cfg.Double[GFFOut]) -> list[Path]:
+                return [*flatten(res.map(write1).as_list)]
 
-            bedpaths = match12_unsafe(res, write1, write2)
+            bedpaths = cfg.match12_unsafe(res, write1, write2)
         else:
             bedpaths = []
 
@@ -169,12 +164,12 @@ def main(smk: Any) -> None:
 
     def hap(bd: cfg.HapBuildData, bf: cfg.HapBedFileOrCoords) -> None:
         if isinstance(bf, cfg.BedFile):
-            gff = match1_unsafe(
+            gff = cfg.match1_unsafe(
                 cds.inputs,
                 lambda i: [
                     GFFOut(
                         cfg.read_filter_sort_hap_bed(bd, bf, i),
-                        bd.refdata.ref.src.key(rk),
+                        bd.refdata.ref.src.key(rk).elem,
                     )
                 ],
             )
@@ -184,12 +179,12 @@ def main(smk: Any) -> None:
 
     def dip1to1(bd: cfg.Dip1BuildData, bf: cfg.Dip1BedFileOrCoords) -> None:
         if isinstance(bf, cfg.BedFile):
-            gff = match1_unsafe(
+            gff = cfg.match1_unsafe(
                 cds.inputs,
                 lambda i: [
                     GFFOut(
                         cfg.read_filter_sort_dip1to1_bed(bd, bf, i),
-                        bd.refdata.ref.src.key(rk),
+                        bd.refdata.ref.src.key(rk).elem,
                     )
                 ],
             )
@@ -199,17 +194,13 @@ def main(smk: Any) -> None:
 
     def dip1to2(bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFileOrCoords) -> None:
         if isinstance(bf, cfg.BedFile):
-            gff = match1_unsafe(
+            gff = cfg.match1_unsafe(
                 cds.inputs,
-                lambda i: [
-                    GFFOut(d, k)
-                    for d, k in zip(
-                        cfg.read_filter_sort_dip1to2_bed(bd, bf, i).as_tuple,
-                        bd.refdata.ref.src.keys(rk).as_tuple,
-                    )
-                ],
+                lambda i: cfg.read_filter_sort_dip1to2_bed(bd, bf, i).both(
+                    lambda df, hap: GFFOut(df, bd.refdata.ref.src.keys(rk).choose(hap))
+                ),
             )
-            write_gff_all(gff)
+            write_gff_all(gff.as_list)
         else:
             write_no_gff_all()
 
@@ -218,12 +209,12 @@ def main(smk: Any) -> None:
         bf: cfg.Dip2BedFileOrCoords,
     ) -> None:
         if isinstance(bf, cfg.BedFile):
-            gff = match2_unsafe(
+            gff = cfg.match2_unsafe(
                 cds.inputs,
-                lambda i0, i1: [
+                lambda i: [
                     GFFOut(
-                        cfg.read_filter_sort_dip2to1_bed(bd, bf, cfg.Double(i0, i1)),
-                        bd.refdata.ref.src.key(rk),
+                        cfg.read_filter_sort_dip2to1_bed(bd, bf, i),
+                        bd.refdata.ref.src.key(rk).elem,
                     )
                 ],
             )
@@ -233,26 +224,16 @@ def main(smk: Any) -> None:
 
     def dip2to2(bd: cfg.Dip2BuildData, bf: cfg.Dip2BedFileOrCoords) -> None:
         if isinstance(bf, cfg.BedFile):
-
-            def go(
-                i: Path,
-                bd: cfg.Dip2BuildData,
-                bf: cfg.Dip2BedFile,
-                hap: cfg.Haplotype,
-            ) -> GFFOut:
-                return GFFOut(
-                    cfg.read_filter_sort_dip2to2_bed(bd, bf, i, hap),
-                    cfg.RefKeyFull(rk, hap),
-                )
-
-            gff = match2_unsafe(
+            gff = cfg.match2_unsafe(
                 cds.inputs,
-                lambda i0, i1: (
-                    go(i0, bd, bf, cfg.Haplotype.PAT),
-                    go(i1, bd, bf, cfg.Haplotype.MAT),
+                lambda i2: i2.both(
+                    lambda i, hap: GFFOut(
+                        cfg.read_filter_sort_dip2to2_bed(bd, bf, i, hap),
+                        bd.refdata.ref.src.keys(rk).choose(hap),
+                    )
                 ),
             )
-            write_gff_all([*gff])
+            write_gff_all(gff.as_list)
         else:
             write_no_gff_all()
 

@@ -37,7 +37,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
 
-    def fmt_maybe(p: cfg.GapsPaths | None) -> str | None:
+    def fmt_maybe(p: cfg.SourceOutputPaths | None) -> str | None:
         return fmap_maybe(lambda z: tu.sub_rk(rfk, z.output.name), p)
 
     def render_description(t: j2.Template) -> str:

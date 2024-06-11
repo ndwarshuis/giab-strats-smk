@@ -112,54 +112,6 @@ def not_none_unsafe(x: X | None, f: Callable[[X], Y], msg: None | str = None) ->
     return f(x)
 
 
-def match1_unsafe(xs: list[X], f: Callable[[X], Y], msg: None | str = None) -> Y:
-    """Call function with the one value from a singleton list.
-
-    Error if list is not a singleton.
-    """
-    match xs:
-        case [x]:
-            return f(x)
-        case _:
-            raise DesignError(
-                msg if msg is not None else f"One input expected, got {len(xs)}"
-            )
-
-
-def match2_unsafe(xs: list[X], f: Callable[[X, X], Y], msg: None | str = None) -> Y:
-    """Call function with the twos value from a 2-ary list.
-
-    Error if list does not have two members.
-    """
-    match xs:
-        case [x1, x2]:
-            return f(x1, x2)
-        case _:
-            raise DesignError(
-                msg if msg is not None else f"Two inputs expected, got {len(xs)}"
-            )
-
-
-def match12_unsafe(
-    xs: list[X],
-    f1: Callable[[X], Y],
-    f2: Callable[[X, X], Y],
-    msg: None | str = None,
-) -> Y:
-    """Combination of `match1_unsafe` and `match2_unsafe` with two functions
-    for each case. Error if input list is does not have one or two elements.
-    """
-    match xs:
-        case [x1]:
-            return f1(x1)
-        case [x1, x2]:
-            return f2(x1, x2)
-        case _:
-            raise DesignError(
-                msg if msg is not None else f"Two inputs expected, got {len(xs)}"
-            )
-
-
 # versions of unzip that won't return an empty tuple when given an empty list
 def unzip2(xs: list[tuple[X, Y]]) -> tuple[list[X], list[Y]]:
     return ([x[0] for x in xs], [x[1] for x in xs])

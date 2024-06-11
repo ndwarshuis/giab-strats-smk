@@ -197,13 +197,6 @@ use rule _invert_autosomal_regions as invert_cds with:
         func.final("notinrefseq_cds"),
 
 
-# rule all_cds:
-#     input:
-#         rules.merge_cds.output,
-#         rules.invert_cds.output,
-#     localrule: True
-
-
 rule remove_vdj_gaps:
     input:
         bed=lambda w: read_named_checkpoint("normalize_cds", "vdj", w),
@@ -282,15 +275,6 @@ checkpoint normalize_other:
         lambda w: all_otherdifficult_sources_wc(w).other_source(
             w["other_level_key"], w["other_strat_key"]
         ),
-        # lambda w: expand(
-        #     rules.download_other.output,
-        #     allow_missing=True,
-        #     ref_src_key=config.buildkey_to_bed_refsrckeys_smk(
-        #         lambda bd: bd_to_other(w.other_level_key, w.other_strat_key, bd),
-        #         w.ref_key,
-        #         w.build_key,
-        #     ),
-        # ),
     output:
         config.intermediate_build_hapless_dir
         / "other"

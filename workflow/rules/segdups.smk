@@ -102,15 +102,6 @@ use rule notin_superdups as notin_long_superdups with:
         segdup.final("notinsegdups_gt10kb"),
 
 
-# rule all_segdups:
-#     input:
-#         rules.merge_superdups.output,
-#         rules.filter_long_superdups.output,
-#         rules.notin_superdups.output,
-#         rules.notin_long_superdups.output,
-#     localrule: True
-
-
 rule segdups_readme:
     input:
         common="workflow/templates/common.j2",

@@ -769,54 +769,6 @@ use rule invert_satellites as invert_HPs_and_TRs with:
         lc.final("notinAllTandemRepeatsandHomopolymers_slop5"),
 
 
-# def all_low_complexity(ref_final_key):
-#     rd = config.to_ref_data_full(ref_final_key)
-#     rmsk = rd.has_low_complexity_rmsk
-#     simreps = rd.has_low_complexity_simreps
-#     censat = rd.has_low_complexity_censat
-#     has_sats = rmsk or censat
-
-#     # homopolymers and uniform repeats are included no matter what
-#     uniform = UniformRepeats(
-#         perfect=rules.all_uniform_repeats.input,
-#         homopolymers=rules.merge_all_uniform_repeats.output[0],
-#         not_homopolymers=rules.invert_all_uniform_repeats.output[0],
-#     )
-
-#     # include satellites only if we have rmsk or censat
-#     sats = (
-#         SatellitesPaths(
-#             sats=rules.merge_satellites.output[0],
-#             notsats=rules.invert_satellites.output[0],
-#         )
-#         if has_sats
-#         else None
-#     )
-
-#     # include tandem repeats and merged output if we have rmsk/censat and simreps
-#     repeats = (
-#         RepeatsPaths(
-#             filtered_trs=rules.all_TRs.input,
-#             all_trs=rules.merge_filtered_TRs.output[0],
-#             not_all_trs=rules.invert_TRs.output[0],
-#             all_repeats=rules.merge_HPs_and_TRs.output[0],
-#             not_all_repeats=rules.invert_HPs_and_TRs.output[0],
-#         )
-#         if has_sats and simreps and rmsk
-#         else None
-#     )
-
-#     return LowComplexityPaths(
-#         uniform_repeat=uniform,
-#         satellites=sats,
-#         repeats=repeats,
-#     )
-
-
-# def all_low_complexity_flat(ref_final_key, build_key):
-#     return all_low_complexity_smk(ref_final_key, build_key).all_outputs
-
-
 rule low_complexity_readme:
     input:
         common="workflow/templates/common.j2",

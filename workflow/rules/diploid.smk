@@ -381,19 +381,6 @@ use rule invert_het_regions as invert_het_SNVorSV_regions with:
         merge_len=f"\d+",
 
 
-# def het_hom_inputs(ref_final_key, build_key):
-#     bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
-#     return expand(
-#         rules.invert_het_regions.output
-#         + rules.invert_het_SNVorSV_regions.output
-#         + rules.merge_het_regions.output
-#         + rules.merge_het_SNVorSV_regions.output,
-#         merge_len=bd.build.include.hets,
-#         ref_final_key=ref_final_key,
-#         build_key=build_key,
-#     )
-
-
 rule diploid_readme:
     input:
         common="workflow/templates/common.j2",

@@ -247,17 +247,8 @@ checkpoint merge_nonunique:
 use rule _invert_autosomal_regions as invert_merged_nonunique with:
     input:
         rules.merge_nonunique.output.all_lowmap,
-        # lambda w: nonunique_inputs(w.ref_final_key, w.build_key)["all_lowmap"],
     output:
         mlty.final("notinlowmappabilityall"),
-
-
-# def mappabilty_inputs(ref_final_key, build_key):
-#     return nonunique_inputs_flat(ref_final_key, build_key) + expand(
-#         rules.invert_merged_nonunique.output,
-#         ref_final_key=ref_final_key,
-#         build_key=build_key,
-#     )
 
 
 # TODO what is the >0.9 thing in awk above?
@@ -266,8 +257,6 @@ rule mappability_readme:
         common="workflow/templates/common.j2",
         description="workflow/templates/mappability_description.j2",
         methods="workflow/templates/mappability_methods.j2",
-        # lowmap=rules.merge_nonunique.output[0],
-        # notinlowmap=rules.invert_merged_nonunique.output[0],
         map_env="workflow/envs/map.yml",
         bedtools_env="workflow/envs/bedtools.yml",
     params:

@@ -13,7 +13,7 @@ def format_sources(
     rfk: cfg.RefKeyFullS,
     bk: cfg.BuildKey,
 ) -> tuple[str | None, str | None, str | None]:
-    def go(f: cfg.BuildDataToBed, paths: cfg.Path1or2orYaml) -> str:
+    def go(f: cfg.BuildDataToBed, paths: cfg.Path0or1or2) -> str:
         return sconf.with_build_data_and_bed_doc(rfk, bk, paths, f, None, 5)
 
     if ps is None:

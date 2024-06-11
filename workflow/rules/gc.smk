@@ -16,11 +16,6 @@ def gc_inputs(ref_final_key, build_key):
         return json.load(f)
 
 
-# def gc_inputs_flat(ref_final_key, build_key):
-#     res = gc_inputs(ref_final_key, build_key)
-#     return [*res["gc_ranges"], *res["other_extremes"], res["widest_extreme"]]
-
-
 def all_gc(ref_final_key, build_key):
     # guard to prevent checkpoint from firing if we don't need GC
     bd = config.to_build_data_full(ref_final_key, build_key)
