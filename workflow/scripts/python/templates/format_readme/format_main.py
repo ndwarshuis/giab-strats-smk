@@ -1,6 +1,6 @@
 from typing import Any, TypeVar, Type
 import common.config as cfg
-from common.functional import DesignError, fmap_maybe, fmap_maybe_def, from_maybe
+from common.functional import DesignError, fmap_maybe, fmap_maybe_def
 import template_utils as tu
 
 X = TypeVar("X")
@@ -11,6 +11,10 @@ KIR_DESC = (
 )
 MHC_DESC = "the major histocompatibility complex (MHC) region (highly polymorphic)"
 VDJ_DESC = "the VDJ loci (highly polymorphic with somatic rearrangements)"
+
+
+def if_source(s: str, x: cfg.SourceOutputPaths | None) -> str | None:
+    return s if fmap_maybe(lambda y: y.source, x) is not None else None
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
@@ -39,10 +43,10 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             [
                 cfg.readme_fill(x)
                 for x in [
-                    from_maybe(GAPS_DESC, o.gaps),
-                    from_maybe(KIR_DESC, o.kir),
-                    from_maybe(MHC_DESC, o.mhc),
-                    from_maybe(VDJ_DESC, o.vdj),
+                    if_source(GAPS_DESC, o.gaps),
+                    if_source(KIR_DESC, o.kir),
+                    if_source(MHC_DESC, o.mhc),
+                    if_source(VDJ_DESC, o.vdj),
                 ]
                 if x is not None
             ],
