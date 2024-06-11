@@ -52,6 +52,8 @@ rule list_all_bb_strats:
         genome=rules.filter_sort_ref.output.genome,
     output:
         post_inter_dir / "all_bb_strats.txt",
+    log:
+        post_log_dir / "all_bb_strats.log",
     script:
         "../scripts/python/bedtools/postprocess/list_convert_bb.py"
 
