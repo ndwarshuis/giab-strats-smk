@@ -108,25 +108,27 @@ use rule unpack_repseq as unpack_kent with:
         directory(config.tools_make_dir / "kent"),
 
 
-# NOTE this entire thing is simply to get bigBedToBed, which I can't seem to
-# install using conda without it complaining that the constraints for my other
-# packages can't be satisfied (something about openssl and python needing
-# different version). This binary is also available on the UCSC download portal
-# but it doesn't seem to be version-tagged. "easy" solution: build from source.
-# Start by building just the kent libraries and then just build the bigBedToBed
-# binary.
+# NOTE this entire thing is simply to get bigBedToBed and bedToBigBed, which I
+# can't seem to install using conda without it complaining that the constraints
+# for my other packages can't be satisfied (something about openssl and python
+# needing different version). This binary is also available on the UCSC download
+# portal but it doesn't seem to be version-tagged. "easy" solution: build from
+# source. Start by building just the kent libraries and then just build the
+# binaries.
 rule build_kent:
     input:
         rules.unpack_kent.output[0],
     output:
-        config.tools_bin_dir / "bigBedToBed",
+        bb2bed=config.tools_bin_dir / "bigBedToBed",
+        bed2bb=config.tools_bin_dir / "bedToBigBed",
     threads: 8
     log:
         config.log_tools_dir / "tools" / "kent_build.log",
     conda:
         "../envs/kent.yml"
     params:
-        destdir=lambda _, output: str(Path(output[0]).parent),
+        bb2bed_dest=lambda _, output: str(Path(output["bb2bed"]).parent),
+        bed2bb_dest=lambda _, output: str(Path(output["bed2bb"]).parent),
     shell:
         """
         here=$(pwd)
@@ -138,7 +140,10 @@ rule build_kent:
           make libs -j{threads} > $here/{log} 2>&1 
 
         cd $here/{input}/src/utils/bigBedToBed
-        make DESTDIR=$here/{params.destdir} BINDIR=/ 2>&1 > $here/{log}
+        make DESTDIR=$here/{params.bb2bed_dest} BINDIR=/ 2>&1 > $here/{log}
+
+        cd $here/{input}/src/utils/bedToBigBed
+        make DESTDIR=$here/{params.bed2bb_dest} BINDIR=/ 2>&1 > $here/{log}
         """
 
 

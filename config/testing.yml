@@ -233,6 +233,9 @@ haploid_stratifications:
         # chromosomes.
         chr_filter: [21, 22]
 
+        # Set this to true to also make bigBed files
+        bigbed: true
+
         # Other bed files to include as stratifications. Useful for the case
         # where one wants to use old stratifications and/or use bed files that
         # were generated in some esoteric way that I don't feel like programming

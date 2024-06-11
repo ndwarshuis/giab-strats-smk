@@ -45,6 +45,17 @@ rule list_all_strats:
         "../scripts/python/bedtools/postprocess/list_strats.py"
 
 
+rule list_all_bb_strats:
+    input:
+        bed2bb=rules.build_kent.output.bed2bb,
+        targets=all_strat_targets,
+        genome=rules.filter_sort_ref.output.genome,
+    output:
+        post_inter_dir / "all_bb_strats.txt",
+    script:
+        "../scripts/python/bedtools/postprocess/list_convert_bb.py"
+
+
 rule generate_md5sums:
     input:
         rules.list_all_strats.output,
@@ -52,8 +63,17 @@ rule generate_md5sums:
         config.final_build_dir / "{ref_final_key}-genome-stratifications-md5s.txt",
     conda:
         "../envs/bedtools.yml"
+    localrule: True
     script:
         "../scripts/python/bedtools/postprocess/list_md5.py"
+
+
+use rule generate_md5sums as generate_bb_md5sums with:
+    input:
+        rules.list_all_bb_strats.output,
+    output:
+        config.final_build_dir / "{ref_final_key}-genome-stratifications-bb-md5s.txt",
+    localrule: True
 
 
 rule generate_tsv_list:
@@ -61,9 +81,21 @@ rule generate_tsv_list:
         rules.list_all_strats.output,
     output:
         config.final_build_dir / "{ref_final_key}-all-stratifications.tsv",
+    params:
+        suffix=".bed.gz",
     localrule: True
     script:
         "../scripts/python/bedtools/postprocess/generate_tsv.py"
+
+
+use rule generate_tsv_list as generate_bb_tsv_list with:
+    input:
+        rules.list_all_bb_strats.output,
+    output:
+        config.final_build_dir / "{ref_final_key}-all-bb-stratifications.tsv",
+    params:
+        suffix=".bb",
+    localrule: True
 
 
 rule unit_test_strats:
@@ -293,7 +325,24 @@ rule generate_tarballs:
         target=lambda _, input: Path(input.all_strats[0]).parent.name,
     shell:
         """
-        tar czf {output} -C {params.parent} {params.target}
+        tar czf {output} -C {params.parent} {params.target} --exclude=*.bb
+        """
+
+
+rule generate_bb_tarballs:
+    input:
+        all_strats=rules.generate_bb_tsv_list.output,
+        _checksums=rules.generate_bb_md5sums.output,
+        _strat_readmes=all_readme_targets,
+    output:
+        config.final_root_dir
+        / "genome-stratifications-bb-{ref_final_key}@{build_key}.tar.gz",
+    params:
+        parent=lambda _, input: Path(input.all_strats[0]).parent.parent,
+        target=lambda _, input: Path(input.all_strats[0]).parent.name,
+    shell:
+        """
+        tar czf {output} -C {params.parent} {params.target} --exclude=*.bed
         """
 
 
@@ -307,6 +356,11 @@ rule checksum_everything:
         [
             expand(rules.generate_tarballs.output, ref_final_key=rk, build_key=bk)
             for rk, bk in zip(*config.all_full_build_keys)
+        ],
+        [
+            expand(rules.generate_bb_tarballs.output, ref_final_key=rk, build_key=bk)
+            for rk, bk in zip(*config.all_full_build_keys)
+            if config.to_build_data_full(rk, bk).want_bb
         ],
     output:
         config.final_root_dir / "genome-stratifications-md5s.txt",

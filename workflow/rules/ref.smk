@@ -109,7 +109,7 @@ use rule filter_sort_ref as filter_sort_split_ref_nohap with:
 
 rule download_gaps:
     input:
-        rules.build_kent.output,
+        rules.build_kent.output.bb2bed,
     output:
         ref.src.reference.data / "gap.bed.gz",
     params:

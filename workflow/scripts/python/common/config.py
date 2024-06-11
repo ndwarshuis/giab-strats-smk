@@ -3360,6 +3360,7 @@ class Build(GenericModel, Generic[BedSrcT, VcfSrcT, BedCoordsT]):
     # config.
     include: Include = Include()
     malloc: Malloc | None = None
+    bigbed: bool = False
 
     @property
     def compare_key(self) -> CompareKey | None:
@@ -3585,6 +3586,10 @@ class BuildData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
     def chr_indices(self) -> set[ChrIndex]:
         cs = self.build.chr_filter
         return set([x for x in ChrIndex]) if len(cs) == 0 else cs
+
+    @property
+    def want_bb(self) -> bool:
+        return self.build.bigbed
 
     @property
     def want_low_complexity(self) -> bool:
