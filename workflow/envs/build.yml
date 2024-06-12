@@ -1,5 +1,23 @@
+# provides
+# - make=4.3
+# - gcc=12.2.0
+
+name: giab-strats-build
 channels:
   - conda-forge
+  - bioconda
 dependencies:
-  - make=4.3
-  - gcc=12.2.0
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=2_gnu
+  - binutils_impl_linux-64=2.40=ha1999f0_3
+  - gcc=12.2.0=h26027b1_13
+  - gcc_impl_linux-64=12.2.0=hcc96c02_19
+  - kernel-headers_linux-64=2.6.32=he073ed8_17
+  - ld_impl_linux-64=2.40=hf3520f5_3
+  - libgcc-devel_linux-64=12.2.0=h3b97bd3_19
+  - libgcc-ng=13.2.0=h77fa898_7
+  - libgomp=13.2.0=h77fa898_7
+  - libsanitizer=12.2.0=h46fd767_19
+  - libstdcxx-ng=13.2.0=hc0a3c3a_7
+  - make=4.3=hd18ef5c_1
+  - sysroot_linux-64=2.12=he073ed8_17

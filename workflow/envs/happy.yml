@@ -1,10 +1,13 @@
+# provides
+# - hap.py=0.3.14
+# - rtg-tools=3.12.1
+# - libxcrypt1=4.4.35 (perl whines without this)
+
+name: giab-strats-happy
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  # - hap.py=0.3.14
-  # - rtg-tools=3.12.1
-  # - libxcrypt1=4.4.35 # perl whines without this
   - _libgcc_mutex=0.1=conda_forge
   - _openmp_mutex=4.5=2_gnu
   - alsa-lib=1.2.3.2=h166bdaf_0

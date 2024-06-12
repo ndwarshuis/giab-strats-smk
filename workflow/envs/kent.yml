@@ -1,12 +1,59 @@
+# provides
+#  build tools
+#  - make=4.3
+#  - gxx=13.2.0
+#  - binutils=2.40
+#  stuff that kent needs to build everything
+#  - mysql=8.3.0
+#  - libuuid=2.38.1
+#  - zlib=1.2.13
+#  - freetype=2.12.1
+
+name: giab-strats-kent
 channels:
   - conda-forge
+  - bioconda
 dependencies:
-  # build tools
-  - make=4.3
-  - gxx=13.2.0
-  - binutils=2.40
-  # stuff that kent needs to build everything
-  - mysql=8.3.0
-  - libuuid=2.38.1
-  - zlib=1.2.13
-  - freetype=2.12.1
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=2_gnu
+  - binutils=2.40=h4852527_3
+  - binutils_impl_linux-64=2.40=ha1999f0_3
+  - ca-certificates=2024.6.2=hbcca054_0
+  - cyrus-sasl=2.1.27=h54b06d7_7
+  - freetype=2.12.1=h267a509_2
+  - gcc=13.2.0=hc7bed06_7
+  - gcc_impl_linux-64=13.2.0=h9eb54c0_7
+  - gxx=13.2.0=hc7bed06_7
+  - gxx_impl_linux-64=13.2.0=h2a599c4_7
+  - icu=73.2=h59595ed_0
+  - kernel-headers_linux-64=2.6.32=he073ed8_17
+  - keyutils=1.6.1=h166bdaf_0
+  - krb5=1.21.2=h659d440_0
+  - ld_impl_linux-64=2.40=hf3520f5_3
+  - libabseil=20240116.2=cxx17_h59595ed_0
+  - libedit=3.1.20191231=he28a2e2_2
+  - libevent=2.1.12=hf998b51_1
+  - libgcc-devel_linux-64=13.2.0=hceb6213_107
+  - libgcc-ng=13.2.0=h77fa898_7
+  - libgomp=13.2.0=h77fa898_7
+  - libntlm=1.4=h7f98852_1002
+  - libpng=1.6.43=h2797004_0
+  - libprotobuf=4.25.3=h08a7969_0
+  - libsanitizer=13.2.0=h6ddb7a1_7
+  - libstdcxx-devel_linux-64=13.2.0=hceb6213_107
+  - libstdcxx-ng=13.2.0=hc0a3c3a_7
+  - libuuid=2.38.1=h0b41bf4_0
+  - libzlib=1.2.13=h4ab18f5_6
+  - lz4-c=1.9.4=hcb278e6_0
+  - make=4.3=hd18ef5c_1
+  - mysql=8.3.0=h27aab58_4
+  - mysql-client=8.3.0=h545f5f4_4
+  - mysql-common=8.3.0=hf1915f5_4
+  - mysql-devel=8.3.0=hf1915f5_4
+  - mysql-libs=8.3.0=hca2cd23_4
+  - mysql-server=8.3.0=h27b9c54_4
+  - ncurses=6.5=h59595ed_0
+  - openssl=3.3.1=h4ab18f5_0
+  - sysroot_linux-64=2.12=he073ed8_17
+  - zlib=1.2.13=h4ab18f5_6
+  - zstd=1.5.6=ha6fb4c9_0

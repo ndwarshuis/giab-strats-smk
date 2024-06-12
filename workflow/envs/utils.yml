@@ -1,9 +1,43 @@
+# provides
+# - curl=8.5.0
+# - libarchive=3.5.2
+# - samtools=1.19.2
+# - gzip=1.12
+# - sed=4.8
+name: giab-strats-utils
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - curl=8.5.0
-  - libarchive=3.5.2
-  - samtools=1.19.2
-  - gzip=1.12
-  - sed=4.8
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=2_gnu
+  - bzip2=1.0.8=hd590300_5
+  - c-ares=1.28.1=hd590300_0
+  - ca-certificates=2024.6.2=hbcca054_0
+  - curl=8.5.0=hca28451_0
+  - gzip=1.12=h166bdaf_0
+  - htslib=1.19.1=h81da01d_2
+  - icu=73.2=h59595ed_0
+  - keyutils=1.6.1=h166bdaf_0
+  - krb5=1.21.2=h659d440_0
+  - libarchive=3.5.2=hada088e_3
+  - libcurl=8.5.0=hca28451_0
+  - libdeflate=1.20=hd590300_0
+  - libedit=3.1.20191231=he28a2e2_2
+  - libev=4.33=hd590300_2
+  - libgcc-ng=13.2.0=h77fa898_7
+  - libgomp=13.2.0=h77fa898_7
+  - libiconv=1.17=hd590300_2
+  - libnghttp2=1.58.0=h47da74e_1
+  - libssh2=1.11.0=h0841786_0
+  - libstdcxx-ng=13.2.0=hc0a3c3a_7
+  - libxml2=2.12.7=hc051c1a_1
+  - libzlib=1.2.13=h4ab18f5_6
+  - lz4-c=1.9.4=hcb278e6_0
+  - lzo=2.10=hd590300_1001
+  - ncurses=6.5=h59595ed_0
+  - openssl=3.3.1=h4ab18f5_0
+  - samtools=1.19.2=h50ea8bc_1
+  - sed=4.8=he412f7d_0
+  - xz=5.2.6=h166bdaf_0
+  - zstd=1.5.6=ha6fb4c9_0
