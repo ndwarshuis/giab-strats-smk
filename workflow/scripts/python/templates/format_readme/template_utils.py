@@ -11,7 +11,11 @@ def env_dependencies(p: Path, deps: set[str]) -> dict[str, str]:
         x = yaml.safe_load(f)
         try:
             ds: list[str] = x["dependencies"]
-            ys = {s[0].strip(): s[1].strip() for d in ds if len(s := d.split("=")) == 2}
+            ys = {
+                s[0].strip(): s[1].strip()
+                for d in ds
+                if len(s := d.split("=")) in [2, 3]
+            }
             return filter_dict_strict(ys, deps)
         except KeyError:
             raise DesignError(f"dependencies not found in {p}")
