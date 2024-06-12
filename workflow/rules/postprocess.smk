@@ -346,22 +346,19 @@ rule build_strat_README:
 
 # include bed/bb in both of these since tar will complain of the bed->bb step is
 # changing the directory contents while it is running
+def bb_inputs(wildcards):
+    rk = wildcards["ref_final_key"]
+    bk = wildcards["build_key"]
+    t = config.to_build_data_full(rk, bk).want_bb
+    return {
+        "_bb_checksums": (rules.generate_bb_md5sums.output if t else []),
+        "_all_bb": rules.generate_bb_tsv_list.output if t else [],
+    }
+
+
 rule generate_tarballs:
     input:
-        unpack(
-            lambda w: {
-                "_bb_checksums": (
-                    rules.generate_bb_md5sums.output
-                    if (
-                        t := config.to_build_data_full(
-                            w["ref_final_key"], w["build_key"]
-                        ).want_bb
-                    )
-                    else []
-                ),
-                "all_bb": rules.generate_bb_tsv_list.output if t else [],
-            }
-        ),
+        unpack(bb_inputs),
         all_bed=rules.generate_tsv_list.output,
         background=rules.copy_strat_background.output,
         readme=rules.build_strat_README.output,
@@ -386,6 +383,8 @@ rule generate_tarballs:
 
 rule generate_bb_tarballs:
     input:
+        # since double-star apparently doesn't apply to functions
+        unpack(bb_inputs),
         **rules.generate_tarballs.input,
     output:
         config.final_root_dir
