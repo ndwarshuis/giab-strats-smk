@@ -10,18 +10,24 @@ post_bench_dir = config.bench_build_dir / "postprocess"
 validation_dir = config.final_root_dir / "validation"
 
 
-ALL_TARGETS = [
+# split these functions apart so I can use non-checkpoint paths without angering
+# the snakemake gods
+ALL_NON_CP_TARGETS = [
     all_diploid,
     all_functional,
     all_otherdifficult,
-    all_gc,
     all_low_complexity,
-    all_mappability,
     all_segdups,
     all_telomeres,
     all_union,
     all_xy,
 ] + [lambda rk, bk: all_misc(lk, rk, bk) for lk in config.other_level_keys]
+
+ALL_TARGETS = [
+    all_gc,
+    all_mappability,
+    *ALL_NON_CP_TARGETS,
+]
 
 
 def all_strat_targets(wildcards):

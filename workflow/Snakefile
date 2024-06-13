@@ -51,15 +51,6 @@ rule all_resources:
     input:
         rules.all_tools.output,
         expand(rules.download_ref.output, ref_src_key=config.all_ref_refsrckeys),
-        expand(rules.download_gaps.output, ref_src_key=config.all_refkey_gap),
-        expand(rules.download_rmsk.output, ref_src_key=config.all_refkey_rmsk),
-        expand(rules.download_simreps.output, ref_src_key=config.all_refkey_simreps),
-        expand(rules.download_censat.output, ref_src_key=config.all_refkey_censat),
-        expand(rules.download_superdups.output, ref_src_key=config.all_refkey_segdups),
-        expand(rules.download_cds.output, ref_src_key=config.all_refkey_cds),
-        expand(rules.download_mhc.output, ref_src_key=config.all_refkey_mhc),
-        expand(rules.download_kir.output, ref_src_key=config.all_refkey_kir),
-        expand(rules.download_vdj.output, ref_src_key=config.all_refkey_vdj),
         expand(
             rules.download_bench_vcf.output
             + rules.download_bench_bed.output
@@ -67,6 +58,13 @@ rule all_resources:
             ref_src_key=(t := unzip2(config.all_buildkey_bench))[0],
             build_key=t[1],
         ),
+        [
+            s
+            for rk, bk in config.all_full_ref_and_build_keys
+            for f in ALL_NON_CP_TARGETS
+            if (r := f(rk, bk)) is not None
+            for s in expand(r.all_sources, build_key=bk)
+        ],
 
 
 rule all:

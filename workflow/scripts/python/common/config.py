@@ -2129,8 +2129,13 @@ class GCPaths(_HasFinalBeds):
 
 
 @dataclass(frozen=True)
-class TelomerePaths(_HasFinalBeds):
+class TelomerePaths(_HasFinalBeds, _HasSources):
     telomeres: Path
+
+    # dummy property
+    @property
+    def all_sources(self) -> list[Path]:
+        return []
 
     @property
     def all_final(self) -> list[Path]:
@@ -2162,13 +2167,18 @@ class SegdupPaths(_HasSources, _HasFinalBeds):
 
 
 @dataclass(frozen=True)
-class DiploidPaths(_HasFinalBeds):
+class DiploidPaths(_HasFinalBeds, _HasSources):
     hets: list[Path]
     SNVorSV_hets: list[Path]
     homs: list[Path]
     SNVorSV_homs: list[Path]
 
     nonpar: list[Path]
+
+    # dummy property
+    @property
+    def all_sources(self) -> list[Path]:
+        return []
 
     @property
     def non_par(self) -> list[Path]:
@@ -2214,9 +2224,14 @@ class AllDifficultPaths:
 
 
 @dataclass(frozen=True)
-class UnionPaths(_HasFinalBeds):
+class UnionPaths(_HasFinalBeds, _HasSources):
     segdup_lowmap: SegdupLowmapPaths
     all_difficult: AllDifficultPaths | None
+
+    # dummy property
+    @property
+    def all_sources(self) -> list[Path]:
+        return []
 
     @property
     def segdup_lowmap_inputs(self) -> list[Path]:
@@ -5088,6 +5103,14 @@ class GiabStrats(BaseModel):
             + all_ref_build_keys(self.diploid2_stratifications)
         )
 
+    @property
+    def all_full_ref_and_build_keys(self) -> list[tuple[RefKeyFullS, BuildKey]]:
+        return (
+            all_ref_build_keys(self.haploid_stratifications)
+            + all_ref_build_keys(self.diploid1_stratifications)
+            + all_ref_build_keys(self.diploid2_stratifications)
+        )
+
     # source refkey/buildkey lists (for the "all resources" rule)
 
     @property
@@ -5110,48 +5133,48 @@ class GiabStrats(BaseModel):
     def _all_bed_refsrckeys(self, f: BuildDataToSrc) -> list[RefKeyFullS]:
         return [rk for rk, _ in self._all_bed_build_and_refsrckeys(f)]
 
-    @property
-    def all_refkey_gap(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(
-                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_gaps(bd)
-            )
-        )
+    # @property
+    # def all_refkey_gap(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(
+    #         lambda bd: fmap_maybe(
+    #             lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_gaps(bd)
+    #         )
+    #     )
 
-    @property
-    def all_refkey_rmsk(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(
-                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_rmsk(bd)
-            )
-        )
+    # @property
+    # def all_refkey_rmsk(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(
+    #         lambda bd: fmap_maybe(
+    #             lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_rmsk(bd)
+    #         )
+    #     )
 
-    @property
-    def all_refkey_simreps(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(
-                lambda x: x.bed.src if isinstance(x, BedFile) else None,
-                bd_to_simreps(bd),
-            )
-        )
+    # @property
+    # def all_refkey_simreps(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(
+    #         lambda bd: fmap_maybe(
+    #             lambda x: x.bed.src if isinstance(x, BedFile) else None,
+    #             bd_to_simreps(bd),
+    #         )
+    #     )
 
-    @property
-    def all_refkey_censat(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(
-                lambda x: x.bed.src if isinstance(x, BedFile) else None,
-                bd_to_satellites(bd),
-            )
-        )
+    # @property
+    # def all_refkey_censat(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(
+    #         lambda bd: fmap_maybe(
+    #             lambda x: x.bed.src if isinstance(x, BedFile) else None,
+    #             bd_to_satellites(bd),
+    #         )
+    #     )
 
-    @property
-    def all_refkey_segdups(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(
-                lambda x: x.bed.src if isinstance(x, BedFile) else None,
-                bd_to_superdups(bd),
-            )
-        )
+    # @property
+    # def all_refkey_segdups(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(
+    #         lambda bd: fmap_maybe(
+    #             lambda x: x.bed.src if isinstance(x, BedFile) else None,
+    #             bd_to_superdups(bd),
+    #         )
+    #     )
 
     @property
     def all_buildkey_bench(self) -> list[tuple[RefKeyFullS, BuildKey]]:
@@ -5162,37 +5185,37 @@ class GiabStrats(BaseModel):
             )
         )
 
-    @property
-    def all_refkey_cds(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(
-                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_cds(bd)
-            )
-        )
+    # @property
+    # def all_refkey_cds(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(
+    #         lambda bd: fmap_maybe(
+    #             lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_cds(bd)
+    #         )
+    #     )
 
-    @property
-    def all_refkey_mhc(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(
-                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_mhc(bd)
-            )
-        )
+    # @property
+    # def all_refkey_mhc(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(
+    #         lambda bd: fmap_maybe(
+    #             lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_mhc(bd)
+    #         )
+    #     )
 
-    @property
-    def all_refkey_kir(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(
-                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_kir(bd)
-            )
-        )
+    # @property
+    # def all_refkey_kir(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(
+    #         lambda bd: fmap_maybe(
+    #             lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_kir(bd)
+    #         )
+    #     )
 
-    @property
-    def all_refkey_vdj(self) -> list[RefKeyFullS]:
-        return self._all_bed_refsrckeys(
-            lambda bd: fmap_maybe(
-                lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_vdj(bd)
-            )
-        )
+    # @property
+    # def all_refkey_vdj(self) -> list[RefKeyFullS]:
+    #     return self._all_bed_refsrckeys(
+    #         lambda bd: fmap_maybe(
+    #             lambda x: x.bed.src if isinstance(x, BedFile) else None, bd_to_vdj(bd)
+    #         )
+    #     )
 
     # source and output functions
 
