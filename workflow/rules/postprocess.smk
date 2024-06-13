@@ -21,7 +21,11 @@ ALL_NON_CP_TARGETS = [
     all_telomeres,
     all_union,
     all_xy,
-] + [lambda rk, bk: all_misc(lk, rk, bk) for lk in config.other_level_keys]
+] + [
+    lambda rk, bk, lk=lk: all_misc(lk, rk, bk) for lk in config.other_level_keys
+]  # semi-official hack to get lambda to make closure around lk (if lk=lk isn't
+# present then each lambda will only use the last value of lk in the loop,
+# see https://docs.python.org/3.4/faq/programming.html#id10)
 
 ALL_TARGETS = [
     all_gc,
