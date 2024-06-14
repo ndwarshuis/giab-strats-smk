@@ -1,11 +1,23 @@
 import pandas as pd
 import json
 from pathlib import Path
-from more_itertools import flatten
-from typing import Any, assert_never, NamedTuple, Callable
+from typing import Any, assert_never, NamedTuple, Callable, TypeVar
 import common.config as cfg
 from common.bed import write_bed
-from common.functional import DesignError, fmap_maybe
+from common.functional import DesignError, fmap_maybe, raise_inline, with_first
+
+# This is a rather complicated script due to the fact that any of the inputs
+# might be blank. Since we can (in theory) make any of the immunological regions
+# from the CDS regions, we don't need to supply the immuno regions if we have
+# the CDS. Likewise, the immuno regions can be specified directly as coordinates
+# (like all other bed files) and thus won't rely on the CDS regions in this
+# case.
+#
+# As a consequence, the logic for this is unique wrt to the other scripts which
+# read bed files, due to the fact that it is perfectly normal for a bed getter
+# function to return None (ie no bed supplied).
+
+X = TypeVar("X")
 
 GFF2Bed = Callable[[pd.DataFrame], pd.DataFrame]
 
@@ -13,13 +25,12 @@ GFF2Bed = Callable[[pd.DataFrame], pd.DataFrame]
 class IOGroup(NamedTuple):
     inputs: list[Path]
     output: Path
-    pattern: str
+    pattern: str | None
     gff2bed: GFF2Bed
+    getbed: cfg.BuildDataToBed
 
 
-class GFFOut(NamedTuple):
-    df: pd.DataFrame
-    rk: cfg.RefKeyFull
+Out = tuple[list[Path], list[Path], list[Path], list[Path]]
 
 
 # TODO don't hardcode this
@@ -91,162 +102,324 @@ def main(smk: Any) -> None:
     def filter_vdj(df: pd.DataFrame) -> pd.DataFrame:
         return df[df[3].str.match(VDJ_PAT)]
 
-    def to_io_group(name: str, f: GFF2Bed, allow_empty: bool) -> IOGroup:
+    def to_io_group(
+        name: str,
+        f: GFF2Bed,
+        g: cfg.BuildDataToBed,
+        wanted: bool,
+    ) -> IOGroup:
         return IOGroup(
-            inputs=cfg.smk_to_inputs_name(smk, name, allow_empty),
+            inputs=cfg.smk_to_inputs_name(smk, name, True),
             output=cfg.smk_to_output_name(smk, name),
-            pattern=cfg.smk_to_param_str(smk, name),
+            pattern=cfg.smk_to_param_str(smk, name) if wanted else None,
             gff2bed=f,
+            getbed=g,
         )
 
-    cds = to_io_group("cds", filter_cds, False)
-    mhc = to_io_group("mhc", filter_mhc, True)
-    kir = to_io_group("kir", filter_kir, True)
-    vdj = to_io_group("vdj", filter_vdj, True)
+    cds = to_io_group("cds", filter_cds, cfg.bd_to_cds, bd.want_cds)
+    mhc = to_io_group("mhc", filter_mhc, cfg.bd_to_mhc, bd.want_mhc)
+    kir = to_io_group("kir", filter_kir, cfg.bd_to_kir, bd.want_kir)
+    vdj = to_io_group("vdj", filter_vdj, cfg.bd_to_vdj, bd.want_vdj)
 
-    # other functions
+    def with_immuno(f: Callable[[IOGroup], X]) -> tuple[X, X, X]:
+        return (f(kir), f(mhc), f(vdj))
 
-    def write_bedpaths(p: Path, ps: list[Path]) -> None:
+    def with_pattern(g: IOGroup, f: Callable[[str], list[X]]) -> list[X]:
+        if g.pattern is not None:
+            return f(g.pattern)
+        else:
+            return []
+
+    def cds_maybe1(out: Callable[[str], Path], df: pd.DataFrame) -> list[Path]:
+        return with_pattern(
+            cds, lambda p: [with_first(out(p), lambda o: write_bed(o, df))]
+        )
+
+    def cds_maybe2(
+        out: Callable[[str], cfg.Double[Path]],
+        df: cfg.Double[pd.DataFrame],
+    ) -> list[Path]:
+        return with_pattern(
+            cds,
+            lambda p: with_first(
+                out(p),
+                lambda o: o.both(lambda _o, hap: write_bed(_o, df.choose(hap))),
+            ).as_list,
+        )
+
+    def filter_bed1(g: IOGroup, df: pd.DataFrame | None, o: Path) -> None:
+        write_bed(o, g.gff2bed(df)) if df is not None else raise_inline()
+
+    def filter_bed2(
+        g: IOGroup,
+        df: cfg.Double[pd.DataFrame] | None,
+        o: cfg.Double[Path],
+    ) -> None:
+        (
+            o.both(lambda _o, h: write_bed(_o, g.gff2bed(df.choose(h))))
+            if df is not None
+            else raise_inline()
+        )
+
+    def hap(rd: cfg.HapRefData) -> Out:
+        bd = rd.to_build_data_unsafe(bk)
+        bf = cfg.bd_to_cds(bd)
+
+        def out(pattern: str) -> Path:
+            return cfg.sub_output_path(
+                pattern,
+                bd.refdata.ref.src.key(bd.refdata.refkey).elem,
+            )
+
+        def go(g: IOGroup, df: pd.DataFrame | None) -> list[Path]:
+            return with_pattern(
+                g,
+                lambda p: [
+                    with_first(
+                        out(p),
+                        lambda o: cfg.with_inputs_null_hap(
+                            g.getbed(bd),
+                            g.inputs,
+                            lambda i, bf: cfg.read_write_filter_sort_hap_bed(
+                                i, o, bd, bf
+                            ),
+                            lambda bc: write_bed(o, cfg.build_hap_coords_df(bd, bc)),
+                            lambda: filter_bed1(g, df, o),
+                        ),
+                    )
+                ],
+            )
+
+        def with_bedfile(i: Path, bf: cfg.HapBedFile) -> Out:
+            df = cfg.read_filter_sort_hap_bed(bd, bf, i)
+            c = cds_maybe1(out, df)
+            x = with_immuno(lambda g: go(g, df))
+            return (c, *x)
+
+        def with_bedcoords(bc: cfg.HapBedCoords) -> Out:
+            df = cfg.build_hap_coords_df(bd, bc)
+            c = cds_maybe1(out, df)
+            x = with_immuno(lambda g: go(g, None))
+            return (c, *x)
+
+        def only_immuno() -> Out:
+            x = with_immuno(lambda g: go(g, None))
+            return ([], *x)
+
+        return cfg.with_inputs_null_hap(
+            bf,
+            cds.inputs,
+            with_bedfile,
+            with_bedcoords,
+            only_immuno,
+        )
+
+    def dip1(rd: cfg.Dip1RefData) -> Out:
+        bd = rd.to_build_data_unsafe(bk)
+        bf = cfg.bd_to_cds(bd)
+
+        def out(pattern: str) -> Path:
+            return cfg.sub_output_path(
+                pattern,
+                bd.refdata.ref.src.key(bd.refdata.refkey).elem,
+            )
+
+        def go(g: IOGroup, df: pd.DataFrame | None = None) -> list[Path]:
+            return with_pattern(
+                g,
+                lambda p: [
+                    with_first(
+                        out(p),
+                        lambda o: (
+                            filter_bed1(g, df, o)
+                            if (bf := g.getbed(bd)) is None
+                            else cfg.with_dip_bedfile(
+                                bf,
+                                lambda bf: cfg.with_inputs_dip1(
+                                    bf,
+                                    g.inputs,
+                                    lambda i, bf: cfg.read_write_filter_sort_dip1to1_bed(
+                                        i, o, bd, bf
+                                    ),
+                                    lambda bc: write_bed(
+                                        o, cfg.build_dip1to1_coords_df(bd, bc)
+                                    ),
+                                ),
+                                lambda bf: cfg.with_inputs_dip2(
+                                    bf,
+                                    g.inputs,
+                                    lambda i, bf: cfg.read_write_filter_sort_dip2to1_bed(
+                                        i, o, bd, bf
+                                    ),
+                                    lambda bc: write_bed(
+                                        o, cfg.build_dip2to1_coords_df(bd, bc)
+                                    ),
+                                ),
+                            )
+                        ),
+                    ),
+                ],
+            )
+
+        def with_bedfile1(i: Path, bf: cfg.Dip1BedFile) -> Out:
+            df = cfg.read_filter_sort_dip1to1_bed(bd, bf, i)
+            c = cds_maybe1(out, df)
+            x = with_immuno(lambda g: go(g, df))
+            return (c, *x)
+
+        def with_bedcoords1(bc: cfg.Dip1BedCoords) -> Out:
+            df = cfg.build_dip1to1_coords_df(bd, bc)
+            c = cds_maybe1(out, df)
+            x = with_immuno(lambda g: go(g))
+            return (c, *x)
+
+        def with_bedfile2(i: cfg.Double[Path], bf: cfg.Dip2BedFile) -> Out:
+            df = cfg.read_filter_sort_dip2to1_bed(bd, bf, i)
+            c = cds_maybe1(out, df)
+            x = with_immuno(lambda g: go(g, df))
+            return (c, *x)
+
+        def with_bedcoords2(bc: cfg.Dip2BedCoords) -> Out:
+            df = cfg.build_dip2to1_coords_df(bd, bc)
+            c = cds_maybe1(out, df)
+            x = with_immuno(lambda g: go(g))
+            return (c, *x)
+
+        def only_immuno() -> Out:
+            x = with_immuno(lambda g: go(g))
+            return ([], *x)
+
+        if bf is None:
+            return only_immuno()
+        else:
+            return cfg.with_dip_bedfile(
+                bf,
+                lambda bf: cfg.with_inputs_null_dip1(
+                    bf,
+                    cds.inputs,
+                    with_bedfile1,
+                    with_bedcoords1,
+                    only_immuno,
+                ),
+                lambda bf: cfg.with_inputs_null_dip2(
+                    bf,
+                    cds.inputs,
+                    with_bedfile2,
+                    with_bedcoords2,
+                    only_immuno,
+                ),
+            )
+
+    def dip2(rd: cfg.Dip2RefData) -> Out:
+        bd = rd.to_build_data_unsafe(bk)
+        bf = cfg.bd_to_cds(bd)
+
+        def out(pattern: str) -> cfg.Double[Path]:
+            return bd.refdata.ref.src.keys(bd.refdata.refkey).map(
+                lambda k: cfg.sub_output_path(pattern, k)
+            )
+
+        def go(g: IOGroup, df: cfg.Double[pd.DataFrame] | None = None) -> list[Path]:
+            return with_pattern(
+                g,
+                lambda p: with_first(
+                    out(p),
+                    lambda o: (
+                        filter_bed2(g, df, o)
+                        if (bf := g.getbed(bd)) is None
+                        else cfg.with_dip_bedfile(
+                            bf,
+                            lambda bf: cfg.with_inputs_dip1(
+                                bf,
+                                g.inputs,
+                                lambda i, bf: cfg.read_write_filter_sort_dip1to2_bed(
+                                    i, o, bd, bf
+                                ),
+                                lambda bc: cfg.build_dip1to2_coords_df(bd, bc).both(
+                                    lambda df, hap: write_bed(o.choose(hap), df)
+                                ),
+                            ),
+                            lambda bf: cfg.with_inputs_dip2(
+                                bf,
+                                g.inputs,
+                                lambda i, bf: o.both(
+                                    lambda _o, hap: cfg.read_write_filter_sort_dip2to2_bed(
+                                        i.choose(hap), _o, hap, bd, bf
+                                    )
+                                ),
+                                lambda bc: o.both(
+                                    lambda _o, hap: write_bed(
+                                        _o,
+                                        cfg.build_dip2to2_coords_df(hap, bd, bc),
+                                    )
+                                ),
+                            ),
+                        )
+                    ),
+                ).as_list,
+            )
+
+        def with_bedfile1(i: Path, bf: cfg.Dip1BedFile) -> Out:
+            df = cfg.read_filter_sort_dip1to2_bed(bd, bf, i)
+            c = cds_maybe2(out, df)
+            x = with_immuno(lambda g: go(g, df))
+            return (c, *x)
+
+        def with_bedcoords1(bc: cfg.Dip1BedCoords) -> Out:
+            df = cfg.build_dip1to2_coords_df(bd, bc)
+            c = cds_maybe2(out, df)
+            x = with_immuno(lambda g: go(g))
+            return (c, *x)
+
+        def with_bedfile2(i: cfg.Double[Path], bf: cfg.Dip2BedFile) -> Out:
+            df = i.both(
+                lambda _i, hap: cfg.read_filter_sort_dip2to2_bed(bd, bf, _i, hap)
+            )
+            c = cds_maybe2(out, df)
+            x = with_immuno(lambda g: go(g, df))
+            return (c, *x)
+
+        def with_bedcoords2(bc: cfg.Dip2BedCoords) -> Out:
+            df = cfg.make_double(lambda hap: cfg.build_dip2to2_coords_df(hap, bd, bc))
+            c = cds_maybe2(out, df)
+            x = with_immuno(lambda g: go(g))
+            return (c, *x)
+
+        def only_immuno() -> Out:
+            x = with_immuno(lambda g: go(g))
+            return ([], *x)
+
+        if bf is None:
+            return only_immuno()
+        else:
+            return cfg.with_dip_bedfile(
+                bf,
+                lambda bf: cfg.with_inputs_null_dip1(
+                    bf,
+                    cds.inputs,
+                    with_bedfile1,
+                    with_bedcoords1,
+                    only_immuno,
+                ),
+                lambda bf: cfg.with_inputs_null_dip2(
+                    bf,
+                    cds.inputs,
+                    with_bedfile2,
+                    with_bedcoords2,
+                    only_immuno,
+                ),
+            )
+
+    def write_output(p: Path, ps: list[Path]) -> None:
         with open(p, "w") as f:
             json.dump([str(p) for p in ps], f)
 
-    def write_from_gff(res: list[GFFOut], test: bool, g: IOGroup) -> None:
-        if test:
+    c, k, m, v = sconf.with_ref_data(rk, hap, dip1, dip2)
 
-            def write1(res: GFFOut) -> list[Path]:
-                bedpath = cfg.sub_output_path(g.pattern, res.rk)
-                write_bed(bedpath, keep_bed_columns(g.gff2bed(res.df)))
-                return [bedpath]
-
-            def write2(res: cfg.Double[GFFOut]) -> list[Path]:
-                return [*flatten(res.map(write1).as_list)]
-
-            bedpaths = cfg.match12_unsafe(res, write1, write2)
-        else:
-            bedpaths = []
-
-        write_bedpaths(g.output, bedpaths)
-
-    def write_region_inner(test: bool, g: IOGroup, bd2bed: cfg.BuildDataToBed) -> None:
-        if test:
-            bedpaths = cfg.filter_sort_bed_main_inner(
-                sconf, rk, bk, g.inputs, g.output, g.pattern, bd2bed
-            )
-        else:
-            bedpaths = []
-
-        write_bedpaths(g.output, bedpaths)
-
-    def write_region(
-        res: list[GFFOut],
-        test: bool,
-        g: IOGroup,
-        bd2bed: cfg.BuildDataToBed,
-    ) -> None:
-        if len(g.inputs) == 0:
-            write_from_gff(res, test, g)
-        else:
-            write_region_inner(test, g, bd2bed)
-
-    def write_gff_all(gff: list[GFFOut]) -> None:
-        write_from_gff(gff, bd.want_cds, cds)
-        write_region(gff, bd.want_mhc, mhc, cfg.bd_to_mhc)
-        write_region(gff, bd.want_kir, kir, cfg.bd_to_kir)
-        write_region(gff, bd.want_vdj, vdj, cfg.bd_to_vdj)
-
-    def write_no_gff_all() -> None:
-        write_region_inner(bd.want_cds, cds, cfg.bd_to_cds)
-        write_region_inner(bd.want_mhc, mhc, cfg.bd_to_mhc)
-        write_region_inner(bd.want_kir, kir, cfg.bd_to_kir)
-        write_region_inner(bd.want_vdj, vdj, cfg.bd_to_vdj)
-
-    # functions to read the GFF dataframe
-
-    def hap(bd: cfg.HapBuildData, bf: cfg.HapBedFileOrCoords) -> None:
-        if isinstance(bf, cfg.BedFile):
-            gff = cfg.match1_unsafe(
-                cds.inputs,
-                lambda i: [
-                    GFFOut(
-                        cfg.read_filter_sort_hap_bed(bd, bf, i),
-                        bd.refdata.ref.src.key(rk).elem,
-                    )
-                ],
-            )
-            write_gff_all(gff)
-        else:
-            write_no_gff_all()
-
-    def dip1to1(bd: cfg.Dip1BuildData, bf: cfg.Dip1BedFileOrCoords) -> None:
-        if isinstance(bf, cfg.BedFile):
-            gff = cfg.match1_unsafe(
-                cds.inputs,
-                lambda i: [
-                    GFFOut(
-                        cfg.read_filter_sort_dip1to1_bed(bd, bf, i),
-                        bd.refdata.ref.src.key(rk).elem,
-                    )
-                ],
-            )
-            write_gff_all(gff)
-        else:
-            write_no_gff_all()
-
-    def dip1to2(bd: cfg.Dip2BuildData, bf: cfg.Dip1BedFileOrCoords) -> None:
-        if isinstance(bf, cfg.BedFile):
-            gff = cfg.match1_unsafe(
-                cds.inputs,
-                lambda i: cfg.read_filter_sort_dip1to2_bed(bd, bf, i).both(
-                    lambda df, hap: GFFOut(df, bd.refdata.ref.src.keys(rk).choose(hap))
-                ),
-            )
-            write_gff_all(gff.as_list)
-        else:
-            write_no_gff_all()
-
-    def dip2to1(
-        bd: cfg.Dip1BuildData,
-        bf: cfg.Dip2BedFileOrCoords,
-    ) -> None:
-        if isinstance(bf, cfg.BedFile):
-            gff = cfg.match2_unsafe(
-                cds.inputs,
-                lambda i: [
-                    GFFOut(
-                        cfg.read_filter_sort_dip2to1_bed(bd, bf, i),
-                        bd.refdata.ref.src.key(rk).elem,
-                    )
-                ],
-            )
-            write_gff_all(gff)
-        else:
-            write_no_gff_all()
-
-    def dip2to2(bd: cfg.Dip2BuildData, bf: cfg.Dip2BedFileOrCoords) -> None:
-        if isinstance(bf, cfg.BedFile):
-            gff = cfg.match2_unsafe(
-                cds.inputs,
-                lambda i2: i2.both(
-                    lambda i, hap: GFFOut(
-                        cfg.read_filter_sort_dip2to2_bed(bd, bf, i, hap),
-                        bd.refdata.ref.src.keys(rk).choose(hap),
-                    )
-                ),
-            )
-            write_gff_all(gff.as_list)
-        else:
-            write_no_gff_all()
-
-    sconf.with_build_data_and_bed(
-        rk,
-        bk,
-        cfg.bd_to_cds,
-        hap,
-        dip1to1,
-        dip1to2,
-        dip2to1,
-        dip2to2,
-    )
+    write_output(cds.output, c)
+    write_output(kir.output, k)
+    write_output(mhc.output, m)
+    write_output(vdj.output, v)
 
 
 main(snakemake)  # type: ignore

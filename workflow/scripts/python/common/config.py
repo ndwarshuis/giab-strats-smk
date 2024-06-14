@@ -457,11 +457,12 @@ def with_build_data(
         assert_never(bd)
 
 
-def with_inputs_hap(
-    b: BedFile[HapSrc[S]] | HapBedCoords,
+def with_inputs_null_hap(
+    b: BedFile[HapSrc[S]] | HapBedCoords | None,
     inputs: list[X],
     src_f: Callable[[X, BedFile[HapSrc[S]]], Y],
     coords_f: Callable[[HapBedCoords], Y],
+    none_f: Callable[[], Y],
 ) -> Y:
     if isinstance(b, BedFile):
         return match1_unsafe(inputs, lambda i: src_f(i, b))
@@ -469,6 +470,36 @@ def with_inputs_hap(
         if len(inputs) > 0:
             raise DesignError()
         return coords_f(b)
+    elif b is None:
+        return none_f()
+    else:
+        assert_never(b)
+
+
+def with_inputs_hap(
+    b: BedFile[HapSrc[S]] | HapBedCoords | None,
+    inputs: list[X],
+    src_f: Callable[[X, BedFile[HapSrc[S]]], Y],
+    coords_f: Callable[[HapBedCoords], Y],
+) -> Y:
+    return with_inputs_null_hap(b, inputs, src_f, coords_f, raise_inline)
+
+
+def with_inputs_null_dip1(
+    b: Dip1BedFileOrCoords,
+    inputs: list[X],
+    src_f: Callable[[X, Dip1BedFile], Y],
+    coords_f: Callable[[Dip1BedCoords], Y],
+    none_f: Callable[[], Y],
+) -> Y:
+    if isinstance(b, BedFile):
+        return match1_unsafe(inputs, lambda i: src_f(i, b))
+    elif isinstance(b, Dip1BedCoords) or isinstance(b, Dip2BedCoords):
+        if len(inputs) > 0:
+            raise DesignError()
+        return coords_f(b)
+    elif b is not None:
+        return coords_f()
     else:
         assert_never(b)
 
@@ -479,12 +510,24 @@ def with_inputs_dip1(
     src_f: Callable[[X, Dip1BedFile], Y],
     coords_f: Callable[[Dip1BedCoords], Y],
 ) -> Y:
+    return with_inputs_null_dip1(b, inputs, src_f, coords_f, raise_inline)
+
+
+def with_inputs_null_dip2(
+    b: Dip2BedFileOrCoords,
+    inputs: list[X],
+    src_f: Callable[[Double[X], Dip2BedFile], Y],
+    coords_f: Callable[[Dip2BedCoords], Y],
+    none_f: Callable[[], Y],
+) -> Y:
     if isinstance(b, BedFile):
-        return match1_unsafe(inputs, lambda i: src_f(i, b))
+        return match2_unsafe(inputs, lambda i: src_f(i, b))
     elif isinstance(b, Dip1BedCoords) or isinstance(b, Dip2BedCoords):
         if len(inputs) > 0:
             raise DesignError()
         return coords_f(b)
+    elif b is not None:
+        return coords_f()
     else:
         assert_never(b)
 
@@ -495,14 +538,7 @@ def with_inputs_dip2(
     src_f: Callable[[Double[X], Dip2BedFile], Y],
     coords_f: Callable[[Dip2BedCoords], Y],
 ) -> Y:
-    if isinstance(b, BedFile):
-        return match2_unsafe(inputs, lambda i: src_f(i, b))
-    elif isinstance(b, Dip1BedCoords) or isinstance(b, Dip2BedCoords):
-        if len(inputs) > 0:
-            raise DesignError()
-        return coords_f(b)
-    else:
-        assert_never(b)
+    return with_inputs_null_dip2(b, inputs, src_f, coords_f, raise_inline)
 
 
 # noop conversion getters
@@ -2766,6 +2802,10 @@ class HapBedCoords(BaseModel):
 
     def lines(self, h: Haplotype) -> Single[list[bed.IndexedBedLine]]:
         return Single(elem=[x.line(h) for x in self.hap.lines])
+
+    @property
+    def lines_nohap(self) -> Single[list[bed.IndexedBedLine]]:
+        return self.lines(Haplotype.PAT)
 
 
 class Dip1BedCoords(BaseModel):
