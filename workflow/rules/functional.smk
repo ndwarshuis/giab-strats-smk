@@ -386,10 +386,7 @@ rule misc_readme:
             w["build_key"],
         ),
     output:
-        # TODO name not DRY
-        config.build_final_strat_path(
-            "{other_level_key}", "{other_level_key}_README.md"
-        ),
+        config.build_final_readme_path("{other_level_key}"),
     conda:
         "../envs/templates.yml"
     localrule: True
