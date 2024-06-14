@@ -29,7 +29,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     def render_methods(t: j2.Template) -> str:
         return t.render(
-            src=src,
+            other_srcs=src,
             deps=bedtools_deps,
         )
 
