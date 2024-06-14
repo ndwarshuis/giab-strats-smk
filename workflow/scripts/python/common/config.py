@@ -1715,7 +1715,6 @@ class _HasFinalBeds:
 
 
 class _HasSources:
-
     @property
     def all_sources(self) -> list[Path]:
         return NotImplemented
@@ -1829,7 +1828,6 @@ class PARPaths:
 
 @dataclass(frozen=True)
 class SubSexPaths:
-
     par: PARPaths | None
     features: XYFeaturePaths | None
 
@@ -1869,7 +1867,6 @@ class SubSexPaths:
 
 @dataclass(frozen=True)
 class _SexPaths:
-
     @property
     def all_paths(self) -> list[SubSexPaths]:
         return NotImplemented
@@ -3721,15 +3718,15 @@ class Documentation(BaseModel):
 
 
 GENOME_SPECIFIC_DESC = (
-    "Difficult regions due to potentially difficult variation in a NIST/GIAB "
+    "difficult regions due to potentially difficult variation in a NIST/GIAB "
     "sample, including 1) regions containing putative compound heterozygous "
     "variants 2) small regions containing multiple phased variants, 3) regions "
-    "with potential structural or copy number variation."
+    "with potential structural or copy number variation"
 )
 
 FUNCTIONAL_TECH_DESC = (
-    "Functional, or potentially functional, regions that are also likely to be "
-    "technically difficult to sequences."
+    "functional, or potentially functional, regions that are also likely to be "
+    "technically difficult to sequences"
 )
 
 
@@ -3740,7 +3737,7 @@ class GiabStrats(BaseModel):
     other_levels: list[OtherLevelDescription] = [
         OtherLevelDescription(
             key=OtherLevelKey("Ancestry"),
-            desc="Regions with inferred patterns of local ancestry.",
+            desc="regions with inferred patterns of local ancestry",
         ),
         OtherLevelDescription(
             key=OtherLevelKey("FunctionalTechnicallyDifficult"),
@@ -5039,7 +5036,6 @@ class GiabStrats(BaseModel):
                     params_txt,
                 ]
             elif isinstance(bf, Dip2BedCoords) and isinstance(inputs, Null):
-
                 return [
                     dip_txt,
                     *flatten(

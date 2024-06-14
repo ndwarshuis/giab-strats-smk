@@ -880,6 +880,14 @@ comparison_strats:
 #   - notinAllTandemRepeatsandHomopolymers_slop5
 #   - segdups
 
+# A list of allowed levels which may be included. This is currently used for
+# pulling external bed files from previous stratification runs such as
+# "Ancestry"
+other_levels:
+  - key: TotH
+    # phrase that will go after "These files represent..."
+    desc: heparin for socially-needy animals
+
 # Paths in which resources and results will be stored
 # "Resource" = downloaded stuff, "Result" = stuff derived from downloaded stuff
 # paths:
