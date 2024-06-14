@@ -253,6 +253,7 @@ haploid_stratifications:
               remove_gaps: true
               # The must be a complete sentence and will show up in the README
               description: This represents contigs less than 500,000 bp.
+          TotH:
             test:
               data:
                 hap:
