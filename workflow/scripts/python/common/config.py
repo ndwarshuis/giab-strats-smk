@@ -5545,7 +5545,7 @@ class GiabStrats(BaseModel):
             raise DesignError()
 
         return MiscPaths(
-            readme=readme,
+            readme=sub_wildcard_path(readme, "other_level_key", lk),
             desc=desc,
             paths={
                 sk: SourceOutputPaths(
