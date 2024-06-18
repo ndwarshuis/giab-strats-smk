@@ -66,9 +66,8 @@ def main(smk: Any) -> None:
         # 4: source, or type if source is not given
         # 5: type (if given)
 
-        # TODO dirty hack to get this to fail error if we try to call for a
-        # manually-specific CDS bed file (which is not a GFF and thus cannot be
-        # filtered)
+        # TODO dirty hack to get this to fail if we try to use a yaml-specified
+        # CDS bed file (which is not a GFF and thus cannot be filtered)
         if not isinstance(fnc, cfg.BedFile):
             raise DesignError()
         fps = fnc.cds_params
@@ -191,7 +190,7 @@ def main(smk: Any) -> None:
             )
 
         def with_bedfile(i: Path, bf: cfg.HapBedFile) -> Out:
-            df = cfg.read_filter_sort_hap_bed(bd, bf, i)
+            df = filter_cds(cfg.read_filter_sort_hap_bed(bd, bf, i))
             c = cds_maybe1(out, df)
             x = with_immuno(lambda g: go(g, df))
             return (c, *x)
@@ -262,7 +261,7 @@ def main(smk: Any) -> None:
             )
 
         def with_bedfile1(i: Path, bf: cfg.Dip1BedFile) -> Out:
-            df = cfg.read_filter_sort_dip1to1_bed(bd, bf, i)
+            df = filter_cds(cfg.read_filter_sort_dip1to1_bed(bd, bf, i))
             c = cds_maybe1(out, df)
             x = with_immuno(lambda g: go(g, df))
             return (c, *x)
@@ -274,7 +273,7 @@ def main(smk: Any) -> None:
             return (c, *x)
 
         def with_bedfile2(i: cfg.Double[Path], bf: cfg.Dip2BedFile) -> Out:
-            df = cfg.read_filter_sort_dip2to1_bed(bd, bf, i)
+            df = filter_cds(cfg.read_filter_sort_dip2to1_bed(bd, bf, i))
             c = cds_maybe1(out, df)
             x = with_immuno(lambda g: go(g, df))
             return (c, *x)
@@ -360,13 +359,13 @@ def main(smk: Any) -> None:
             )
 
         def with_bedfile1(i: Path, bf: cfg.Dip1BedFile) -> Out:
-            df = cfg.read_filter_sort_dip1to2_bed(bd, bf, i)
+            df = cfg.read_filter_sort_dip1to2_bed(bd, bf, i).map(filter_cds)
             c = cds_maybe2(out, df)
             x = with_immuno(lambda g: go(g, df))
             return (c, *x)
 
         def with_bedcoords1(bc: cfg.Dip1BedCoords) -> Out:
-            df = cfg.build_dip1to2_coords_df(bd, bc)
+            df = cfg.build_dip1to2_coords_df(bd, bc).map(filter_cds)
             c = cds_maybe2(out, df)
             x = with_immuno(lambda g: go(g))
             return (c, *x)
