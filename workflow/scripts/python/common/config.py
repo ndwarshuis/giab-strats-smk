@@ -2273,7 +2273,10 @@ class UnionPaths(_HasFinalBeds, _HasSources):
     @property
     def all_difficult_inputs(self) -> list[Path]:
         empty: list[Path] = []
-        return fmap_maybe_def(empty, lambda x: x._all_inputs, self.all_difficult)
+        return (
+            fmap_maybe_def(empty, lambda x: x._all_inputs, self.all_difficult)
+            + self.segdup_lowmap._all_final
+        )
 
     @property
     def all_inputs(self) -> list[Path]:
