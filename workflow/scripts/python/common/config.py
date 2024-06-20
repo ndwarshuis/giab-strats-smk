@@ -3790,6 +3790,8 @@ Dip2Strat = Stratification[
     BuildCompare2,
 ]
 
+AnyStrat = HapStrat | Dip1Strat | Dip2Strat
+
 
 class Documentation(BaseModel):
     pipeline_repo: HttpUrl = "https://github.com/ndwarshuis/giab-strats-smk"  # type: ignore
@@ -3811,7 +3813,6 @@ FUNCTIONAL_TECH_DESC = (
 )
 
 
-# TODO add validator to ensure none of the keys in the strat/build dicts overlap
 class GiabStrats(BaseModel):
     """Top level stratification object."""
 
@@ -3865,7 +3866,6 @@ class GiabStrats(BaseModel):
     malloc: Malloc = Malloc()
     docs: Documentation = Documentation()
 
-    # TODO validate comparison keys
     @validator(
         "haploid_stratifications",
         "diploid1_stratifications",
@@ -3874,9 +3874,9 @@ class GiabStrats(BaseModel):
     )
     def builds_have_valid_existing(
         cls,
-        v: HapStrat,
+        v: AnyStrat,
         values: dict[str, Any],
-    ) -> HapStrat:
+    ) -> AnyStrat:
         try:
             levels: list[OtherLevelDescription] = values["other_levels"]
             assert OTHERDIFF_KEY not in [
@@ -3907,16 +3907,21 @@ class GiabStrats(BaseModel):
     )
     def builds_have_valid_old_version(
         cls,
-        v: HapStrat,
+        v: AnyStrat,
         values: dict[str, Any],
-    ) -> HapStrat:
+    ) -> AnyStrat:
         try:
             prev: dict[CompareKey, HttpUrl] = values["comparison_strats"]
             bad = [
-                f"version='{pk}'; build='{bk}'"
+                f"version='{ck}'; build='{bk}'"
                 for bk, b in v.builds.items()
-                if b.comparison is not None
-                if (pk := b.comparison.other) not in prev
+                if (c := b.comparison) is not None
+                for ck in (
+                    [c.other]
+                    if isinstance(c, BuildCompare1)
+                    else [x.other for x in c.double.as_list]
+                )
+                if ck not in prev
             ]
             assert (
                 len(bad) == 0
