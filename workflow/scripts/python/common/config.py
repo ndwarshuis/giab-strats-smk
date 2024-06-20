@@ -568,10 +568,10 @@ def dip2_noop_conversion(h: Haplotype, bd: Dip2BuildData) -> HapToHapChrConversi
 def to_ref_data_unsafe(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
     ],
     rk: RefKey,
-) -> RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]:
+) -> RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]:
     try:
         s = xs[rk]
         return RefData_(rk, s.ref, s.strat_inputs, s.builds)
@@ -582,16 +582,16 @@ def to_ref_data_unsafe(
 def all_ref_data(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
     ],
-) -> list[RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]]:
+) -> list[RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]]:
     return [to_ref_data_unsafe(xs, rk) for rk in xs]
 
 
 def all_ref_refsrckeys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
     ],
 ) -> list[RefKeyFullS]:
     return [s for k, v in xs.items() for s in to_str_refkeys(v.ref.src, k).as_list]
@@ -600,16 +600,16 @@ def all_ref_refsrckeys(
 def all_build_data(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
     ],
-) -> list[BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]]:
+) -> list[BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]]:
     return [r.to_build_data_unsafe(b) for r in all_ref_data(xs) for b in r.builds]
 
 
 def all_bed_build_and_refsrckeys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
     ],
     f: BuildDataToSrc,
 ) -> list[tuple[RefKeyFullS, BuildKey]]:
@@ -624,7 +624,7 @@ def all_bed_build_and_refsrckeys(
 def all_bed_refsrckeys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
     ],
     f: BuildDataToSrc,
 ) -> list[RefKeyFullS]:
@@ -634,7 +634,7 @@ def all_bed_refsrckeys(
 def all_build_keys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
     ],
 ) -> list[tuple[RefKey, BuildKey]]:
     return [(r.refdata.refkey, r.buildkey) for r in all_build_data(xs)]
@@ -643,7 +643,7 @@ def all_build_keys(
 def all_ref_build_keys(
     xs: dict[
         RefKey,
-        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+        Stratification[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
     ],
 ) -> list[tuple[RefKeyFullS, BuildKey]]:
     return [
@@ -671,7 +671,7 @@ def prepare_output_path(path: Path) -> Path:
 
 def bd_to_si(
     f: StratInputToBed,
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> BedFile[BedSrcT] | BedCoordsT | None:
     return f(x.refdata.strat_inputs)
 
@@ -699,25 +699,25 @@ def si_to_vdj(
 
 
 def bd_to_cds(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> CDS[BedSrcT] | BedCoordsT | None:
     return si_to_cds(x.refdata.strat_inputs)
 
 
 def bd_to_mhc(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_mhc(x.refdata.strat_inputs)
 
 
 def bd_to_kir(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_kir(x.refdata.strat_inputs)
 
 
 def bd_to_vdj(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_vdj(x.refdata.strat_inputs)
 
@@ -729,7 +729,7 @@ def si_to_simreps(
 
 
 def bd_to_simreps(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_simreps(x.refdata.strat_inputs)
 
@@ -742,7 +742,7 @@ def si_to_rmsk(
 
 # TODO take the boolean switch out of here
 def bd_to_rmsk(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> RMSKFile[BedSrcT] | BedCoordsT | None:
     return si_to_rmsk(x.refdata.strat_inputs)
 
@@ -754,7 +754,7 @@ def si_to_satellites(
 
 
 def bd_to_satellites(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> SatFile[BedSrcT] | BedCoordsT | None:
     return si_to_satellites(x.refdata.strat_inputs)
 
@@ -766,7 +766,7 @@ def si_to_superdups(
 
 
 def bd_to_superdups(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_superdups(x.refdata.strat_inputs)
 
@@ -778,7 +778,7 @@ def si_to_gaps(
 
 
 def bd_to_gaps(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> BedFile[BedSrcT] | BedCoordsT | None:
     return si_to_gaps(x.refdata.strat_inputs)
 
@@ -786,7 +786,7 @@ def bd_to_gaps(
 def bd_to_other(
     lk: OtherLevelKey,
     sk: OtherStratKey,
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> OtherBedFile[BedSrcT, BedCoordsT]:
     return x.build.other_strats[lk][sk]
 
@@ -794,25 +794,25 @@ def bd_to_other(
 def bd_to_other_bed(
     lk: OtherLevelKey,
     sk: OtherStratKey,
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> BedFile[BedSrcT] | BedCoordsT | None:
     return x.build.other_strats[lk][sk].data
 
 
 def bd_to_bench_bed(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> BedFile[BedSrcT] | None:
     return fmap_maybe(lambda y: y.bench_bed, x.build.bench)
 
 
 def bd_to_bench_vcf(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> VCFFile[VcfSrcT] | None:
     return fmap_maybe(lambda y: y.bench_vcf, x.build.bench)
 
 
 def bd_to_query_vcf(
-    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT],
+    x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT],
 ) -> VCFFile[VcfSrcT] | None:
     return fmap_maybe(lambda y: y.query_vcf, x.build.bench)
 
@@ -3045,6 +3045,21 @@ VcfSrcT = TypeVar("VcfSrcT", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
 VcfSrc = HapVcfSrc | Dip1VcfSrc | Dip2VcfSrc
 
 
+class BuildCompare1(BaseModel):
+    """Configuration for comparing generated strats to previous versions."""
+
+    other: CompareKey
+    path_mapper: dict[Path, Path] = {}
+    replacements: list[tuple[str, str]] = []
+    ignore_other: list[str] = []
+    ignore_generated: list[str] = []
+
+
+BuildCompare2 = Diploid[BuildCompare1]
+
+BuildCompareT = TypeVar("BuildCompareT", BuildCompare1, BuildCompare2)
+
+
 class VCFFile(GenericModel, Generic[VcfSrcT]):
     """Inport specs for a vcf file."""
 
@@ -3358,16 +3373,6 @@ class Bench(GenericModel, Generic[BedSrcT, VcfSrcT]):
     bench_bed: BedFile[BedSrcT]
 
 
-class BuildCompare(BaseModel):
-    """Configuration for comparing generated strats to previous versions."""
-
-    other: CompareKey
-    path_mapper: dict[Path, Path] = {}
-    replacements: list[tuple[str, str]] = []
-    ignore_other: list[str] = []
-    ignore_generated: list[str] = []
-
-
 class Malloc(BaseModel):
     """Manual memory allocations for rules in Mb
 
@@ -3404,9 +3409,9 @@ class Malloc(BaseModel):
 OtherDict = dict[OtherLevelKey, dict[OtherStratKey, OtherBedFile[BedSrcT, BedCoordsT]]]
 
 
-class Build(GenericModel, Generic[BedSrcT, VcfSrcT, BedCoordsT]):
+class Build(GenericModel, Generic[BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]):
     chr_filter: set[ChrIndex]
-    comparison: BuildCompare | None = None
+    comparison: BuildCompareT | None = None
     bench: Bench[BedSrcT, VcfSrcT] | None = None
     other_strats: dict[
         OtherLevelKey, dict[OtherStratKey, OtherBedFile[BedSrcT, BedCoordsT]]
@@ -3417,10 +3422,6 @@ class Build(GenericModel, Generic[BedSrcT, VcfSrcT, BedCoordsT]):
     include: Include = Include()
     malloc: Malloc | None = None
     bigbed: bool = False
-
-    @property
-    def compare_key(self) -> CompareKey | None:
-        return fmap_maybe(lambda x: x.other, self.comparison)
 
     @validator("other_strats")
     def valid_other(
@@ -3516,7 +3517,7 @@ StratInputT = TypeVar("StratInputT", HapStratInputs, DipStratInputs)
 
 
 @dataclass(frozen=True)
-class RefData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
+class RefData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]):
     """A helper class corresponding a given reference and its builds.
 
     This is primarily meant to provide a glue layer b/t the configuration
@@ -3531,7 +3532,7 @@ class RefData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
     refkey: RefKey
     ref: RefSrcT
     strat_inputs: StratInputs[BedSrcT, BedCoordsT]
-    builds: dict[BuildKey, Build[BedSrcT, VcfSrcT, BedCoordsT]]
+    builds: dict[BuildKey, Build[BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]]
 
     @property
     def ref_refkeys(self) -> RefKeyFull1or2:
@@ -3557,7 +3558,7 @@ class RefData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
     def to_build_data_unsafe(
         self,
         bk: BuildKey,
-    ) -> "BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]":
+    ) -> "BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]":
         "Lookup a given build with a build key (and throw DesignError on fail)"
         bd = self.to_build_data(bk)
         if bd is None:
@@ -3567,7 +3568,7 @@ class RefData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
     def to_build_data(
         self,
         bk: BuildKey,
-    ) -> "BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT] | None":
+    ) -> "BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT] | None":
         "Lookup a given build with a build key"
         try:
             return BuildData_(self, bk, self.builds[bk])
@@ -3609,23 +3610,23 @@ class RefData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
         return self.strat_inputs.low_complexity.satellites is not None
 
 
-HapRefData = RefData_[HapRefFile, HapBedSrc, HapVcfSrc, HapBedCoords]
-Dip1RefData = RefData_[Dip1RefFile, DipBedSrc, Dip1VcfSrc, DipBedCoords]
-Dip2RefData = RefData_[Dip2RefFile, DipBedSrc, Dip2VcfSrc, DipBedCoords]
+HapRefData = RefData_[HapRefFile, HapBedSrc, HapVcfSrc, HapBedCoords, BuildCompare1]
+Dip1RefData = RefData_[Dip1RefFile, DipBedSrc, Dip1VcfSrc, DipBedCoords, BuildCompare1]
+Dip2RefData = RefData_[Dip2RefFile, DipBedSrc, Dip2VcfSrc, DipBedCoords, BuildCompare2]
 
 AnyRefData = HapRefData | Dip1RefData | Dip2RefData
 
 
 @dataclass(frozen=True)
-class BuildData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
+class BuildData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]):
     """A helper class corresponding a given build.
 
     This follows a similar motivation as 'RefData_' above.
     """
 
-    refdata: RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]
+    refdata: RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]
     buildkey: BuildKey
-    build: Build[BedSrcT, VcfSrcT, BedCoordsT]
+    build: Build[BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]
 
     @property
     def build_chrs(self) -> BuildChrs:
@@ -3733,23 +3734,61 @@ class BuildData_(Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
         return self.build.include.vdj and len(VDJ_CHRS & self.build_chrs) > 0
 
 
-class Stratification(GenericModel, Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]):
+class Stratification(
+    GenericModel, Generic[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]
+):
     """Configuration for stratifications for a given reference."""
 
     ref: RefSrcT
     strat_inputs: StratInputs[BedSrcT, BedCoordsT]
-    builds: dict[BuildKey, Build[BedSrcT, VcfSrcT, BedCoordsT]]
+    builds: dict[BuildKey, Build[BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]]
 
 
-HapBuildData = BuildData_[HapRefFile, HapBedSrc, HapVcfSrc, HapBedCoords]
-Dip1BuildData = BuildData_[Dip1RefFile, DipBedSrc, Dip1VcfSrc, DipBedCoords]
-Dip2BuildData = BuildData_[Dip2RefFile, DipBedSrc, Dip2VcfSrc, DipBedCoords]
+HapBuildData = BuildData_[
+    HapRefFile,
+    HapBedSrc,
+    HapVcfSrc,
+    HapBedCoords,
+    BuildCompare1,
+]
+Dip1BuildData = BuildData_[
+    Dip1RefFile,
+    DipBedSrc,
+    Dip1VcfSrc,
+    DipBedCoords,
+    BuildCompare1,
+]
+Dip2BuildData = BuildData_[
+    Dip2RefFile,
+    DipBedSrc,
+    Dip2VcfSrc,
+    DipBedCoords,
+    BuildCompare2,
+]
 
 AnyBuildData = HapBuildData | Dip1BuildData | Dip2BuildData
 
-HapStrat = Stratification[HapRefFile, HapBedSrc, HapVcfSrc, HapBedCoords]
-Dip1Strat = Stratification[Dip1RefFile, DipBedSrc, Dip1VcfSrc, DipBedCoords]
-Dip2Strat = Stratification[Dip2RefFile, DipBedSrc, Dip2VcfSrc, DipBedCoords]
+HapStrat = Stratification[
+    HapRefFile,
+    HapBedSrc,
+    HapVcfSrc,
+    HapBedCoords,
+    BuildCompare1,
+]
+Dip1Strat = Stratification[
+    Dip1RefFile,
+    DipBedSrc,
+    Dip1VcfSrc,
+    DipBedCoords,
+    BuildCompare1,
+]
+Dip2Strat = Stratification[
+    Dip2RefFile,
+    DipBedSrc,
+    Dip2VcfSrc,
+    DipBedCoords,
+    BuildCompare2,
+]
 
 
 class Documentation(BaseModel):
@@ -5925,6 +5964,21 @@ class GiabStrats(BaseModel):
 
     # other nice functions
 
+    def get_comparison(self, rk: RefKeyFullS, bk: BuildKey) -> BuildCompare1 | None:
+        return self.with_build_data_full(
+            rk,
+            bk,
+            lambda bd: bd.build.comparison,
+            lambda bd: bd.build.comparison,
+            lambda hap, bd: fmap_maybe(
+                lambda c: c.double.choose(hap),
+                bd.build.comparison,
+            ),
+        )
+
+    def compare_key(self, rk: RefKeyFullS, bk: BuildKey) -> CompareKey | None:
+        return fmap_maybe(lambda x: x.other, self.get_comparison(rk, bk))
+
     def refkey_haplotypes(self, rk: RefKeyFullS) -> list[Haplotype]:
         """Test if refkey is dip1 or dip2.
 
@@ -6015,7 +6069,9 @@ class RefDataToBed(Protocol):
     A = TypeVar("A", HapBedSrc, DipBedSrc)
     B = TypeVar("B", HapBedCoords, DipBedCoords)
 
-    def __call__(self, __x: RefData_[RefSrcT, A, VcfSrcT, B]) -> BedFile[A] | B | None:
+    def __call__(
+        self, __x: RefData_[RefSrcT, A, VcfSrcT, B, BuildCompareT]
+    ) -> BedFile[A] | B | None:
         pass
 
 
@@ -6023,7 +6079,7 @@ class RefDataToSrc(Protocol):
     A = TypeVar("A", Single[BedSrc], Double[BedSrc])
 
     def __call__(
-        self, __x: RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]
+        self, __x: RefData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]
     ) -> A | None:
         pass
 
@@ -6049,7 +6105,7 @@ class BuildDataToBed(Protocol):
     B = TypeVar("B", HapBedCoords, DipBedCoords)
 
     def __call__(
-        self, __x: BuildData_[RefSrcT, A, VcfSrcT, B]
+        self, __x: BuildData_[RefSrcT, A, VcfSrcT, B, BuildCompareT]
     ) -> BedFile[A] | B | None:
         pass
 
@@ -6058,7 +6114,7 @@ class BuildDataToVCF(Protocol):
     A = TypeVar("A", HapVcfSrc, Dip1VcfSrc, Dip2VcfSrc)
 
     def __call__(
-        self, __x: BuildData_[RefSrcT, BedSrcT, A, BedCoordsT]
+        self, __x: BuildData_[RefSrcT, BedSrcT, A, BedCoordsT, BuildCompareT]
     ) -> VCFFile[A] | None:
         pass
 
@@ -6067,6 +6123,6 @@ class BuildDataToSrc(Protocol):
     A = TypeVar("A", Single[BedSrc], Double[BedSrc])
 
     def __call__(
-        self, __x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT]
+        self, __x: BuildData_[RefSrcT, BedSrcT, VcfSrcT, BedCoordsT, BuildCompareT]
     ) -> A | None:
         pass

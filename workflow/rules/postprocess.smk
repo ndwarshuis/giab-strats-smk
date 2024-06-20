@@ -177,9 +177,7 @@ rule compare_strats:
         # haplotype)
         old=lambda w: expand(
             rules.download_comparison_strat_tarball.output,
-            compare_key=config.to_build_data(
-                w.ref_final_key, w.build_key
-            ).build.compare_key,
+            compare_key=config.compare_key(w.ref_final_key, w.build_key),
         )[0],
         # use this to target a specific rule to satisfy the snakemake scheduler,
         # the thing I actually need here is the parent directory
@@ -200,8 +198,8 @@ rule all_comparisons:
     input:
         [
             expand(rules.compare_strats.output, ref_final_key=rk, build_key=bk)[0]
-            for rk, bk in zip(*config.all_build_keys)
-            if config.to_build_data(rk, bk).build.compare_key is not None
+            for rk, bk in zip(*config.all_full_build_keys)
+            if config.compare_key(rk, bk) is not None
         ],
     localrule: True
 

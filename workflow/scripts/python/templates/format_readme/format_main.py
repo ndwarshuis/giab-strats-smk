@@ -76,8 +76,9 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             f"a previous version obtained from {c}"
         ),
         (
-            sconf.comparison_strats[bd.build.compare_key]
-            if bd.build.compare_key in sconf.comparison_strats
+            sconf.comparison_strats[ck]
+            if (ck := sconf.compare_key(rfk, bk)) is not None
+            and ck in sconf.comparison_strats
             else None
         ),
     )
