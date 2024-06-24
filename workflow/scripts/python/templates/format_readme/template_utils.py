@@ -2,7 +2,7 @@ import yaml
 import jinja2 as j2
 from typing import Any, Callable
 from pathlib import Path
-from common.functional import DesignError, filter_dict_strict, from_maybe
+from common.functional import DesignError, filter_dict_strict, fmap_maybe_def
 import common.config as cfg
 
 
@@ -117,6 +117,6 @@ def fmt_other_descriptions(
                 else None
             ),
         )
-        return from_maybe("No description", d)
+        return fmap_maybe_def("No description", cfg.readme_fill, d)
 
     return {sub_rk(rk, p.output.name): go(k) for k, p in paths.items()}
