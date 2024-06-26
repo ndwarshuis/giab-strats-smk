@@ -26,7 +26,7 @@ Bug fixes:
 - bed files produced from GFF files (or anything else 1-indexed) are no longer
   off by one in their start/end coordinates
 
-Breading changes (in the yaml config):
+Breaking changes (in the yaml config):
 - vcf files are now specified with the 'vcf' key and not a 'bed' key (for
   obvious reasons)
 - other_strats bed files have a new structure to accomodate the 'description'
