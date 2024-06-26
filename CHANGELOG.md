@@ -1,3 +1,42 @@
+# 6.0.0
+
+This update primarily adds documentation and fixes some long-standing bugs
+and inefficiencies. Due to the code required for the documentation, the yaml
+specification needed to change; thus this is a breaking change and will require
+configuration updates when moving from older versions.
+
+New Features
+- Reference-level readmes: these specify high-level information such as a
+  summary of the contained stratifications for the given reference, the workflow
+  used to generate the stratifications, data use policies, etc. Copies of these
+  can also be found in the tarballs. Since these tarballs may be downloaded
+  individually, the documentation for each reference is meant to be
+  self-contained.
+- Stratification level readmes: Similar to the above, each stratification
+  directory (ie Functional, GCcontent, etc) now has a readme with a description
+  of the contained stratification bed files as well as the methods used to
+  create them. The methods section includes provenance information, including
+  the urls and hashes for files that were obtained remotely, as well as software
+  versions.
+- a "big bed flag" which will produce corresponding .bb files for each .bed.gz
+  file (and tarball them)
+- "hap1" and "hap2" are now called "pat" and "mat"
+  
+Bug fixes:
+- bed files produced from GFF files (or anything else 1-indexed) are no longer
+  off by one in their start/end coordinates
+
+Breading changes (in the yaml config):
+- vcf files are now specified with the 'vcf' key and not a 'bed' key (for
+  obvious reasons)
+- other_strats bed files have a new structure to accomodate the 'description'
+  keyword which will be used when constructing the readmes
+- bed files and coordinates now take 'provenance' and 'description'
+- the bed coords object has been simplified since it doesn't require a 'params'
+  key
+- the keys "hap1" and "hap2" are now called "pat" and "mat" in all cases
+- misc bed file categories can now take descriptions
+
 # 5.0.0
 
 Pipeline now works on diploid genomes. This is a major release and many previous
