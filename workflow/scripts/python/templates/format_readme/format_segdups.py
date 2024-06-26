@@ -39,7 +39,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             not_long_segdups_file=fmt_name(paths.long_segdups.negative),
         )
 
-    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
+    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools"})
 
     def render_methods(t: j2.Template) -> str:
         return t.render(src_txt=src_txt, deps=bedtools_deps)

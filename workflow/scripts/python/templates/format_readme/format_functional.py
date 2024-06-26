@@ -61,7 +61,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             ),
         )
 
-    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
+    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools"})
 
     def render_methods(t: j2.Template) -> str:
         return t.render(

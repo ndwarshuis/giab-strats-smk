@@ -51,7 +51,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             ),
         )
 
-    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
+    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools"})
 
     # gaps is relatively straightforward, just get the source for the gaps if
     # needed

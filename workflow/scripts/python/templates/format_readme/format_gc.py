@@ -28,7 +28,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     bedtools_env_path = cfg.smk_to_input_name(smk, "bedtools_env")
     seqtk_env_path = cfg.smk_to_input_name(smk, "seqtk_env")
 
-    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
+    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools"})
     seqtk_deps = tu.env_dependencies(seqtk_env_path, {"seqtk"})
 
     def render_methods(t: j2.Template) -> str:

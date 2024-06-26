@@ -163,7 +163,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     def render_description(t: j2.Template) -> str:
         return t.render(**all_paths)
 
-    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools", "samtools"})
+    bedtools_deps = tu.env_dependencies(bedtools_env_path, {"bedtools"})
 
     def render_methods(t: j2.Template) -> str:
         return t.render(
