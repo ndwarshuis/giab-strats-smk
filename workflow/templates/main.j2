@@ -109,10 +109,10 @@ query VCF callset to a benchmark callset (restricted to regions for which the
 benchmark is confident) where both callsets use {{ refname }} as the reference:
 
 ```
-export HGREF=<{{ refname }}.fa>
-hap.py <benchmark.vcf> <query.vcf> \
-  -f <benchmark_regions.vcf> \
-  -o <output_prefix \
+export HGREF=path/to/{{ refname }}.fa
+hap.py path/to/benchmark.vcf path/to/query.vcf \
+  -f path/to/benchmark_regions.vcf \
+  -o <output_prefix> \
   --stratification {{ refname }}-all-stratifications.tsv
 ```
 
