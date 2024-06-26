@@ -2,7 +2,7 @@ from pathlib import Path
 import jinja2 as j2
 from typing import Any
 import common.config as cfg
-from common.functional import DesignError, fmap_maybe_def
+from common.functional import DesignError, fmap_maybe_def, fmap_maybe
 import template_utils as tu
 
 
@@ -73,8 +73,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         return t.render(
             segdup_map_file=fmt_name(segdup_out.positive),
             not_segdup_map_file=fmt_name(segdup_out.negative),
-            alldifficult_file=alldiff_pos,
-            not_alldifficult_file=alldiff_neg,
+            alldifficult_file=fmap_maybe(lambda x: tu.sub_rk(rfk, x), alldiff_pos),
+            not_alldifficult_file=fmap_maybe(lambda x: tu.sub_rk(rfk, x), alldiff_neg),
             alldifficult_desc=alldiff_desc,
         )
 
