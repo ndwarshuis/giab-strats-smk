@@ -92,11 +92,43 @@ just "easy" or "all difficult" regions of the genome.
 These are described in futher detail in the accompanying README.
 
 {% endfor -%}
+# Example Usage
+
+The typical use-case for these stratifications is via a benchmarking tool such
+as [hap.py](https://github.com/Illumina/hap.py/tree/master). Benchmarking
+involves comparing a query VCF file to a benchmark file, both called for the
+same genome and the same reference. Each variant in this comparison is labeled
+as a true positive (in both benchmark and query), false positive (only in
+query), or false negative (only in benchmark). These labels can be further
+summarized using classification metrics such as precision and recall.
+The stratifications provided here allow these metrics to be subset to certain
+regions of interest.
+
+Here is an example which will produce stratified benchmarking results for a
+query VCF callset to a benchmark callset (restricted to regions for which the
+benchmark is confident) where both callsets use {{ refname }} as the reference:
+
+```
+export HGREF=<{{ refname }}.fa>
+hap.py <benchmark.vcf> <query.vcf> \
+  -f <benchmark_regions.vcf> \
+  -o <output_prefix \
+  --stratification {{ refname }}-all-stratifications.tsv
+```
+
+For each region in tsv specified by the `--stratification` flag, `hap.py` will
+subset to only the variants in this region before calculating performance
+metrics.
+
+This tsv file is located in the same directory as this README. The provided
+tarballs also have this tsv in the root, so one only needs to download and
+extract the tarball to have access to the stratifications to run this command.
+
 # Reference Source
 
 {{ ref_src }}
 
-# Workflow overview
+# Workflow Overview
 
 The following is very general. For more specifics on each stratification
 category outlined above, consult the README under the appropriate directory.
@@ -140,7 +172,7 @@ category outlined above, consult the README under the appropriate directory.
    
 # Reproducibility
 
-### Version control
+### Version Control
 
 The snakemake pipeline itself is stored in git here: 
 
@@ -155,7 +187,7 @@ The final stratification results should be fully determined by these two repos
 (with minor caveats as discussed below).
 
 {% if compare_txt is not none -%}
-### Stratification version comparisons
+### Stratification Version Comparisons
 
 {{ compare_txt }}
 
@@ -168,7 +200,7 @@ noted below) should be documented in the CHANGELOG in the configuration repo as
 noted above.
 
 {% endif -%}
-### Source file provenance
+### Source File Provenance
 
 For remote files, the snakemake configuration file allows for an MD5 hash of the
 expected downloaded contents (note that in the case of compressed files, this
@@ -185,12 +217,12 @@ local files are generally not sharable and is thus used sparingly if at all.
 Bed files may also be specified directly in the configuration as coordinates,
 in which case these are under revision control and thus reproducible.
 
-### Conda environment specification
+### Conda Environment Specification
 
 All snakemake environments fully specify the names and versions of all
 dependencies (as shown with `conda env export`).
 
-### External tools
+### External Tools
 
 Some tools are not provided in a conda environment (either because the package
 doesn't exist or it is incompatible with other required packages).
