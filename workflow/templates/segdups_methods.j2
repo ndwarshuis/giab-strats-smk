@@ -7,7 +7,7 @@
 Segdups up to 100 base pairs apart were merged with `mergeBed` using `-d 100`.
 This became the "segmental duplications" file described above. The "long"
 segmental duplications bed was created by filtering the previous bed with `awk`
-for regions >= 10000 base pairs (`end` - `start`).
+for regions > 10000 base pairs (`end` - `start`).
 
 The above two bed files were then complemented as-is using `complementBed`.
 

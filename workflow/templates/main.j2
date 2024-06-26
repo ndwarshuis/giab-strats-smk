@@ -31,7 +31,7 @@ with >90% similarity).
 {% if have_sex -%}
 ## XY
 
-Chomosome XY specific regions such as pseudoautosomal regions (PAR), XTR or
+Chromosome XY specific regions such as pseudoautosomal regions (PAR), XTR or
 ampliconic.
 
 {% endif -%}
@@ -110,7 +110,9 @@ category outlined above, consult the README under the appropriate directory.
 
    1. Many of these are not true "bed files" but are still TSVs with chromosomal
       coordinates and other metadata, thus we can still treat them like bed
-      files and filter based on the metadata as needed.
+      files and filter based on the metadata as needed. Chromosomal coordinates
+      which are not already 0-indexed are corrected to be 0-indexed (example,
+      GFF files)
 
    2. Each of these is filtered and sorted to match the chromosome order of the
       reference FASTA in (1).
@@ -123,7 +125,7 @@ category outlined above, consult the README under the appropriate directory.
 3. Create stratifications using source files downloaded from (2) and other tools
    that run independently on the reference FASTA (such as `seqtk` or `GEM`).
    
-4. If applicable, remove all gaps from each stratification (gaps stratication
+4. If applicable, remove all gaps from each stratification (gaps stratification
    itself excepted).
    
 5. Validate each stratification. For more details see README in the the 
@@ -180,7 +182,7 @@ if/when it happens.
 This hash rule also applies to local files, but obviously this is not ideal as
 local files are generally not sharable and is thus used sparingly if at all.
 
-Bed files may also be specified directory in the configuration as coordinates,
+Bed files may also be specified directly in the configuration as coordinates,
 in which case these are under revision control and thus reproducible.
 
 ### Conda environment specification

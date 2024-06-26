@@ -72,7 +72,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
 
     compare_txt = fmap_maybe(
         lambda c: cfg.readme_fill(
-            "This version of the stratifactions was compared against "
+            "This version of the stratifications was compared against "
             f"a previous version obtained from {c}"
         ),
         (
