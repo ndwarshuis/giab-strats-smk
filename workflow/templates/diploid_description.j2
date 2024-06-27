@@ -1,0 +1,27 @@
+## Heterozygous variants
+
+Each of these represent regions that are withn <k> bases of a heterozygous
+variant (regardless of size) where <k> is indicated in the filename:
+{% for file in het_files %}
+`{{ file }}
+{%- endfor %}
+
+### SNV or SV variants
+
+These are the same as the above but only consider heterozygous variants that are
+SNVs or SVs (ie INDELs 50 base pairs or more). The intention is to provide
+insight for phasing errors, since assemblers often use SNVs or SVs to phase each
+haplotype:
+{% for file in SNVorSV_het_files %}
+`{{ file }}
+{%- endfor %}
+
+## Homozygous variants
+
+These are merely the complements of the above heterozygous files:
+{% for file in hom_files %}
+`{{ file }}
+{%- endfor %}
+{% for file in SNVorSV_hom_files %}
+`{{ file }}
+{%- endfor %}

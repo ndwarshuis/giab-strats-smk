@@ -149,18 +149,21 @@ haploid_stratifications:
                 url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/GRCh38/chrY_genomic_features_GRCh38.bed
                 md5: 770682734c41f5f7c1655adf1f986cb6
             level_col: 3
-          # Set to true if XTR regions are desired
-          xtr: true
+          # Set to the value by which to filter XTR regions if desired
+          # xtr: XTR
+          # Set to the value by which to filter ampliconic regions if desired
           # Set to true if Ampliconic regions are desired
-          ampliconic: true
+          # ampliconic: Ampliconic
         # Data for X or Y pseudoautosomal (PAR) regions. Since these are so short
         # it's easier to simply specify them manually here with two intervals ;)
         x_par:
           start: [0, 2781479]
           end: [155701383, 156030895]
+          comment: "I cribbed this from Wikipedia."
         y_par:
           start: [10001, 2781479]
           end: [56887902, 57217415]
+          comment: "I also cribbed this from Wikipedia."
   
       # Source files for segmental duplications. For now only superdups is used
       # and supported.
@@ -230,6 +233,9 @@ haploid_stratifications:
         # chromosomes.
         chr_filter: [21, 22]
 
+        # Set this to true to also make bigBed files
+        bigbed: true
+
         # Other bed files to include as stratifications. Useful for the case
         # where one wants to use old stratifications and/or use bed files that
         # were generated in some esoteric way that I don't feel like programming
@@ -240,16 +246,24 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             contigs_lt500kb:
-              bed:
-                hap:
-                  url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
+              data:
+                bed: 
+                  hap:
+                    url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.1/GRCh38/OtherDifficult/GRCh38_contigs_lt500kb.bed.gz
               remove_gaps: true
+              # The must be a complete sentence and will show up in the README
+              description: This represents contigs less than 500,000 bp.
+          TotH:
             test:
-              bed:
+              data:
                 hap:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
+                  # The must be a complete sentence and will show up in the
+                  # README
+                  provenance: I come in piece.
+              description: If you see this it worked.
 
         # Benchmark files for this reference (if desired). Each key will be fed
         # into corresponding inputs for hap.py using the generated stratifications
@@ -259,7 +273,7 @@ haploid_stratifications:
         # bench: null
         bench:
           bench_vcf:
-            bed:
+            vcf:
               hap:
                 url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/HG005_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
           bench_bed:
@@ -267,7 +281,7 @@ haploid_stratifications:
               hap:
                 url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/HG005_GRCh38_1_22_v4.2.1_benchmark.bed
           query_vcf:
-            bed:
+            vcf:
               hap:
                 url: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/ChineseTrio/HG005_NA24631_son/NISTv4.2.1/GRCh38/SupplementaryFiles/inputvcfsandbeds/HG005_GRCh38_1_22_PacBio_HiFi_DeepVariant.vcf.gz
 
@@ -425,14 +439,14 @@ haploid_stratifications:
             level_col: 3
             params:
               sep: "\\s+"
-          xtr: true
-          ampliconic: true
         x_par:
           start: [60001, 2699520]
           end: [154931044, 155260560]
+          comment: "I cribbed this from Wikipedia."
         y_par:
           start: [0, 2749806]
           end: [59133470, 59373566]
+          comment: "I also cribbed this from Wikipedia."
       segdups:
         superdups:
           bed:
@@ -488,11 +502,12 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             test:
-              bed:
+              data:
                 hap:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
+              description: If you see this it worked.
 
       test-xy:
         chr_filter: [23, 24]
@@ -543,14 +558,15 @@ haploid_stratifications:
                 url: https://raw.githubusercontent.com/SexChrLab/SexChrCoordinates/4ad1faf2b822db6fb89498a750d0b5336703fde3/T2T/chrY_genomic_features_HG002.bed
                 md5: c2cb0d831db1f71dfb4632a6ce79b0d6
             level_col: 3
-          xtr: true
-          ampliconic: false # not present in these files
+          ampliconic: null # not present in these files
         x_par:
           start: [0, 2394410]
           end: [153925834, 154259566]
+          comment: "I cribbed this from Wikipedia."
         y_par:
           start: [0, 2458320]
           end: [62122809, 62460029]
+          comment: "I also cribbed this from Wikipedia."
       segdups:
         superdups:
           bed:
@@ -604,11 +620,12 @@ haploid_stratifications:
         other_strats:
           OtherDifficult:
             test:
-              bed:
+              data:
                 hap:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
+              description: If you see this it worked.
 
       test-xy:
         chr_filter: [23, 24]
@@ -651,23 +668,25 @@ diploid1_stratifications:
         other_strats:
           OtherDifficult:
             test_hap:
-              bed:
+              data:
                 dip:
                   lines:
                     - {chr: 2, hap: 0, start: 10, end: 50}
                     - {chr: 2, hap: 1, start: 12, end: 60}
                     - {chr: 21, hap: 0, start: 10, end: 50}
                     - {chr: 21, hap: 1, start: 15, end: 55}
+              description: If you see this it worked.
             test_dip:
-              bed:
-                hap1:
+              data:
+                pat:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
-                hap2:
+                mat:
                   lines:
                     - {chr: 2, start: 12, end: 60}
                     - {chr: 21, start: 15, end: 55}
+              description: If you see this it worked.
       test-xy:
         chr_filter: [23, 24]
         include:
@@ -682,18 +701,18 @@ diploid1_stratifications:
 diploid2_stratifications:
   HG002:
     ref:
-      hap1:
+      pat:
         url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.pat.fasta.gz
-      hap2:
+      mat:
         url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/hg002v1.0.1.mat.fasta.gz
     strat_inputs:
       low_complexity:
         rmsk:
           bed:
-            hap1:
+            pat:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/repeatmasker/hg002v1.0.1.paternal.final.bb
               md5: 5947df8866bd9f190615ca072fd9e6d9
-            hap2:
+            mat:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/repeatmasker/hg002v1.0.1.maternal.final.bb
               md5: ec8b96518a8b8d9c09794192b629d328
           class_col: 3
@@ -712,9 +731,11 @@ diploid2_stratifications:
         x_par:
           start: [0, 2392381]
           end: [154008454, 154341405]
+          comment: "I cribbed this from Wikipedia."
         y_par:
           start: [1, 2454197]
           end: [62092325, 62425490]
+          comment: "I also cribbed this from Wikipedia."
       segdups:
         superdups:
           bed:
@@ -724,51 +745,48 @@ diploid2_stratifications:
       functional:
         cds:
           bed:
-            hap1:
+            pat:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.PAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
               md5: f436fe09bfd73aeb44f946a69b3a9a83
-            hap2:
+            mat:
               url: https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/HG002/assemblies/annotation/LiftoffIsoseq/hg002v1.0.1.MAT.liftoff.polished.sqanti3.sorted.addFeatures.addTags.modiAttribute.gff
               md5: 78358c171a3c4141aaa2552fc413b5eb
           cds_params:
             source_match: ["Liftoff", 1]
         
         vdj:
-          bed:
-            # NOTE: both IGK loci are rearranged and inactivated so this
-            # regions actually starts at IGKDEL
-            hap1:
-              lines:
-                - { chr: 2,  start: 88868025,  end: 90383961  } # IGK
-                - { chr: 7,  start: 38373030,  end: 38494618  } # TRB
-                - { chr: 7,  start: 142831129, end: 143396922 } # TRG
-                - { chr: 14, start: 21320867,  end: 22186894  } # TRA/D
-                - { chr: 14, start: 105296422, end: 105793950 } # IGH
-                - { chr: 22, start: 20560550,  end: 21469622  } # IGL
-            hap2:
-              lines:
-                - { chr: 2,  start: 88855564,  end: 90457523  } # IGK
-                - { chr: 7,  start: 38345242,  end: 38476019  } # TRB
-                - { chr: 7,  start: 143849922, end: 144425196 } # TRG
-                - { chr: 14, start: 23572454,  end: 24503857  } # TRA/D
-                - { chr: 14, start: 107586020, end: 108649327 } # IGH
-                - { chr: 22, start: 24652428,  end: 25418531  } # IGL
+          # NOTE: both IGK loci are rearranged and inactivated so this
+          # regions actually starts at IGKDEL
+          pat:
+            lines:
+              - { chr: 2,  start: 88868025,  end: 90383961  } # IGK
+              - { chr: 7,  start: 38373030,  end: 38494618  } # TRB
+              - { chr: 7,  start: 142831129, end: 143396922 } # TRG
+              - { chr: 14, start: 21320867,  end: 22186894  } # TRA/D
+              - { chr: 14, start: 105296422, end: 105793950 } # IGH
+              - { chr: 22, start: 20560550,  end: 21469622  } # IGL
+          mat:
+            lines:
+              - { chr: 2,  start: 88855564,  end: 90457523  } # IGK
+              - { chr: 7,  start: 38345242,  end: 38476019  } # TRB
+              - { chr: 7,  start: 143849922, end: 144425196 } # TRG
+              - { chr: 14, start: 23572454,  end: 24503857  } # TRA/D
+              - { chr: 14, start: 107586020, end: 108649327 } # IGH
+              - { chr: 22, start: 24652428,  end: 25418531  } # IGL
 
         # lifted off from hg38 stratification above
         kir:
-          bed:
-            dip:
-              lines:
-                - { chr: 19, hap: 0, start: 57430456, end: 57612879 }
-                - { chr: 19, hap: 1, start: 57338741, end: 57569585 }
+          dip:
+            lines:
+              - { chr: 19, hap: 0, start: 57430456, end: 57612879 }
+              - { chr: 19, hap: 1, start: 57338741, end: 57569585 }
 
         # lifted off from hg38 stratification above
         mhc:
-          bed:
-            dip:
-              lines:
-                - { chr: 6, hap: 0, start: 28466613, end: 33509399 }
-                - { chr: 6, hap: 1, start: 28463469, end: 33412256 }
+          dip:
+            lines:
+              - { chr: 6, hap: 0, start: 28466613, end: 33509399 }
+              - { chr: 6, hap: 1, start: 28463469, end: 33412256 }
 
       mappability:
         unplaced_chr_patterns: ["^chr(MT|EBV)$"]
@@ -777,7 +795,7 @@ diploid2_stratifications:
         chr_filter: [21, 22]
         include:
           xy: false
-          segdups: false
+          segdups: true
           cds: true
           vdj: true
           kir: true
@@ -786,23 +804,25 @@ diploid2_stratifications:
         other_strats:
           OtherDifficult:
             test_hap:
-              bed:
+              data:
                 dip:
                   lines:
                     - {chr: 2, hap: 0, start: 10, end: 50}
                     - {chr: 2, hap: 1, start: 12, end: 60}
                     - {chr: 21, hap: 0, start: 10, end: 50}
                     - {chr: 21, hap: 1, start: 15, end: 55}
+              description: If you see this it worked.
             test_dip:
-              bed:
-                hap1:
+              data:
+                pat:
                   lines:
                     - {chr: 2, start: 10, end: 50}
                     - {chr: 21, start: 10, end: 50}
-                hap2:
+                mat:
                   lines:
                     - {chr: 2, start: 12, end: 60}
                     - {chr: 21, start: 15, end: 55}
+              description: If you see this it worked.
 
       test-map:
         chr_filter: [21]
@@ -824,6 +844,7 @@ diploid2_stratifications:
         chr_filter: [23, 24]
         include:
           low_complexity: false
+          segdups: false
           xy: false
           gc: null
           cds: false
@@ -859,6 +880,14 @@ comparison_strats:
 #   - notinAllTandemRepeatsandHomopolymers_slop5
 #   - segdups
 
+# A list of allowed levels which may be included. This is currently used for
+# pulling external bed files from previous stratification runs such as
+# "Ancestry"
+other_levels:
+  - key: TotH
+    # phrase that will go after "These files represent..."
+    desc: heparin for socially-needy animals
+
 # Paths in which resources and results will be stored
 # "Resource" = downloaded stuff, "Result" = stuff derived from downloaded stuff
 # paths:
@@ -869,3 +898,8 @@ comparison_strats:
 # tools:
 #   repseq: https://github.com/ndwarshuis/repseq/archive/refs/tags/v1.1.0.tar.gz
 #   gemlib: https://sourceforge.net/projects/gemlibrary/files/gem-library/Binary%20pre-release%203/GEM-binaries-Linux-x86_64-core_i3-20130406-045632.tbz2/download
+
+# stuff for documenting the readmes goes here
+# docs:
+  # pipeline_repo: url_for_repo
+  # config_repo: url_for_repo

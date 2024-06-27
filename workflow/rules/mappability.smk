@@ -1,6 +1,6 @@
 from os.path import splitext, basename
 from pathlib import Path
-from common.config import CoreLevel
+from common.config import CoreLevel, MutualPathPair
 
 mlty = config.to_bed_dirs(CoreLevel.MAPPABILITY)
 
@@ -9,6 +9,34 @@ gem_wc_constraints = {
     "m": "\d+",
     "e": "\d+",
 }
+
+
+def single_nonunique_inputs(ref_final_key, build_key):
+    c = checkpoints.merge_nonunique.get(
+        ref_final_key=ref_final_key, build_key=build_key
+    )
+    with c.output.single_lowmap.open() as f:
+        return json.load(f)
+
+
+def all_mappability(ref_final_key, build_key):
+    # guard to prevent checkpoint from firing when we call this function
+    bd = config.to_build_data_full(ref_final_key, build_key)
+    if not bd.want_mappability:
+        return None
+
+    ss = single_nonunique_inputs(ref_final_key, build_key)
+    return config.all_lowmap(
+        ref_final_key,
+        build_key,
+        MutualPathPair(
+            Path(rules.merge_nonunique.output.all_lowmap),
+            Path(rules.invert_merged_nonunique.output[0]),
+        ),
+        [Path(p) for p in ss],
+        Path(rules.mappability_readme.output[0]),
+    )
+
 
 ################################################################################
 # index/align
@@ -170,7 +198,7 @@ rule combine_dip1_nonunique_beds:
         mlty.inter.postsort.data / "combined_unique_l{l}_m{m}_e{e}.bed.gz",
     shell:
         """
-        cat {input.hap1} {input.hap2} > {output}
+        cat {input.pat} {input.mat} > {output}
         """
 
 
@@ -194,7 +222,8 @@ checkpoint merge_nonunique:
         gapless=rules.get_gapless.output.auto,
         genome=rules.filter_sort_ref.output["genome"],
     output:
-        mlty.inter.postsort.data / "nonunique_output.json",
+        single_lowmap=mlty.inter.postsort.data / "single_lowmap.json",
+        all_lowmap=mlty.final("lowmappabilityall"),
     log:
         mlty.inter.postsort.log / "nonunique_output.txt",
     params:
@@ -215,29 +244,27 @@ checkpoint merge_nonunique:
         "../scripts/python/bedtools/mappability/merge_nonunique.py"
 
 
-def nonunique_inputs(ref_final_key, build_key):
-    c = checkpoints.merge_nonunique.get(
-        ref_final_key=ref_final_key, build_key=build_key
-    )
-    with c.output[0].open() as f:
-        return json.load(f)
-
-
 use rule _invert_autosomal_regions as invert_merged_nonunique with:
     input:
-        lambda w: nonunique_inputs(w.ref_final_key, w.build_key)["all_lowmap"],
+        rules.merge_nonunique.output.all_lowmap,
     output:
         mlty.final("notinlowmappabilityall"),
 
 
-def nonunique_inputs_flat(ref_final_key, build_key):
-    res = nonunique_inputs(ref_final_key, build_key)
-    return [res["all_lowmap"], *res["single_lowmap"]]
-
-
-def mappabilty_inputs(ref_final_key, build_key):
-    return nonunique_inputs_flat(ref_final_key, build_key) + expand(
-        rules.invert_merged_nonunique.output,
-        ref_final_key=ref_final_key,
-        build_key=build_key,
-    )
+# TODO what is the >0.9 thing in awk above?
+rule mappability_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/mappability_description.j2",
+        methods="workflow/templates/mappability_methods.j2",
+        map_env="workflow/envs/map.yml",
+        bedtools_env="workflow/envs/bedtools.yml",
+    params:
+        paths=lambda w: all_mappability(w["ref_final_key"], w["build_key"]),
+    output:
+        mlty.readme,
+    conda:
+        "../envs/templates.yml"
+    localrule: True
+    script:
+        "../scripts/python/templates/format_readme/format_mappability.py"

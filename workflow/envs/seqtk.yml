@@ -1,8 +1,36 @@
-name: seqtk
+# provides
+# - seqtk=1.4
+# - bedtools=2.30
+# - samtools=1.14
+
+name: giab-strats-seqtk
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - seqtk=1.4
-  - bedtools=2.30
-  - samtools=1.14
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=2_gnu
+  - bedtools=2.30.0=h468198e_3
+  - bzip2=1.0.8=hd590300_5
+  - c-ares=1.28.1=hd590300_0
+  - ca-certificates=2024.6.2=hbcca054_0
+  - htslib=1.20=h5efdd21_1
+  - keyutils=1.6.1=h166bdaf_0
+  - krb5=1.21.2=h659d440_0
+  - libcurl=8.8.0=hca28451_0
+  - libdeflate=1.20=hd590300_0
+  - libedit=3.1.20191231=he28a2e2_2
+  - libev=4.33=hd590300_2
+  - libgcc-ng=13.2.0=h77fa898_7
+  - libgomp=13.2.0=h77fa898_7
+  - libnghttp2=1.58.0=h47da74e_1
+  - libssh2=1.11.0=h0841786_0
+  - libstdcxx-ng=13.2.0=hc0a3c3a_7
+  - libzlib=1.2.13=h4ab18f5_6
+  - ncurses=6.2=h58526e2_4
+  - openssl=3.3.1=h4ab18f5_0
+  - samtools=1.14=hb421002_0
+  - seqtk=1.4=he4a0461_2
+  - xz=5.2.6=h166bdaf_0
+  - zlib=1.2.13=h4ab18f5_6
+  - zstd=1.5.6=ha6fb4c9_0

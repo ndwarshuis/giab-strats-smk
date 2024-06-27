@@ -5,10 +5,35 @@ from common.config import (
     flip_full_refkey,
 )
 
-dip = config.to_bed_dirs(CoreLevel.DIPLOID)
-
 # TODO don't hardcode minimap2 params (which might be changed if we move to a
 # different asm)
+
+dip = config.to_bed_dirs(CoreLevel.DIPLOID)
+
+
+def all_diploid(ref_final_key, build_key):
+    bd = config.to_build_data_full(ref_final_key, build_key)
+
+    def go(name):
+        return [
+            Path(p)
+            for p in expand(
+                getattr(rules, name).output,
+                allow_missing=True,
+                merge_len=bd.build.include.hets,
+            )
+        ]
+
+    return config.all_diploid(
+        ref_final_key,
+        build_key,
+        all_xy(ref_final_key, build_key),
+        go("merge_het_regions"),
+        go("invert_het_regions"),
+        go("merge_het_SNVorSV_regions"),
+        go("invert_het_SNVorSV_regions"),
+        Path(rules.diploid_readme.output[0]),
+    )
 
 
 def minimap_inputs(wildcards):
@@ -245,7 +270,7 @@ rule combine_dip1_hets:
         dip.inter.postsort.data / "combined_het_regions.bed.gz",
     shell:
         """
-        cat {input.hap1} {input.hap2} > {output}
+        cat {input.pat} {input.mat} > {output}
         """
 
 
@@ -265,7 +290,8 @@ use rule combine_dip1_hets as combine_SNVorSV_dip1_hets with:
 # nothing").
 rule concat_xy_nonpar:
     input:
-        lambda w: all_xy_nonPAR(w.ref_final_key, w.build_key),
+        lambda w: all_xy(w.ref_final_key, w.build_key).sex.nonpar_paths,
+        # lambda w: all_xy_nonPAR(w.ref_final_key, w.build_key),
     output:
         dip.inter.postsort.data / "xy_nonpar.bed",
     # /dev/null will keep cat from hanging in case there are no input files. The
@@ -285,11 +311,11 @@ rule merge_het_regions:
         genome=rules.filter_sort_ref.output["genome"],
         xy_nonpar=rules.concat_xy_nonpar.output,
     output:
-        dip.final("het_regions_{merge_len}k"),
+        dip.final("het_regions_{merge_len}"),
     conda:
         "../envs/bedtools.yml"
     params:
-        size=lambda w: int(w["merge_len"]) * 1000,
+        size=lambda w: int(w["merge_len"]),
     wildcard_constraints:
         merge_len=f"\d+",
     # NOTE: The initial gunzip is very necessary despite the fact that mergeBed
@@ -317,7 +343,7 @@ use rule merge_het_regions as merge_het_SNVorSV_regions with:
         genome=rules.filter_sort_ref.output["genome"],
         xy_nonpar=rules.concat_xy_nonpar.output,
     output:
-        dip.final("het_SNVorSV_regions_{merge_len}k"),
+        dip.final("het_SNVorSV_regions_{merge_len}"),
     wildcard_constraints:
         merge_len=f"\d+",
 
@@ -329,7 +355,7 @@ rule invert_het_regions:
         genome=rules.filter_sort_ref.output["genome"],
         xy_nonpar=rules.concat_xy_nonpar.output,
     output:
-        dip.final("hom_regions_{merge_len}k"),
+        dip.final("hom_regions_{merge_len}"),
     conda:
         "../envs/bedtools.yml"
     wildcard_constraints:
@@ -350,19 +376,24 @@ use rule invert_het_regions as invert_het_SNVorSV_regions with:
         genome=rules.filter_sort_ref.output["genome"],
         xy_nonpar=rules.concat_xy_nonpar.output,
     output:
-        dip.final("hom_SNVorSV_regions_{merge_len}k"),
+        dip.final("hom_SNVorSV_regions_{merge_len}"),
     wildcard_constraints:
         merge_len=f"\d+",
 
 
-def het_hom_inputs(ref_final_key, build_key):
-    bd = config.to_build_data(strip_full_refkey(ref_final_key), build_key)
-    return expand(
-        rules.invert_het_regions.output
-        + rules.invert_het_SNVorSV_regions.output
-        + rules.merge_het_regions.output
-        + rules.merge_het_SNVorSV_regions.output,
-        merge_len=bd.build.include.hets,
-        ref_final_key=ref_final_key,
-        build_key=build_key,
-    )
+rule diploid_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/diploid_description.j2",
+        methods="workflow/templates/diploid_methods.j2",
+        bedtools_env="workflow/envs/bedtools.yml",
+        diploid_env="workflow/envs/quasi-dipcall.yml",
+    params:
+        paths=lambda w: all_diploid(w["ref_final_key"], w["build_key"]),
+    output:
+        dip.readme,
+    conda:
+        "../envs/templates.yml"
+    localrule: True
+    script:
+        "../scripts/python/templates/format_readme/format_diploid.py"

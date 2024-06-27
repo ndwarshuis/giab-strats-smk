@@ -16,6 +16,11 @@ def get_md5(p: Path, unzip: bool = False) -> str:
     return h.hexdigest()
 
 
+def gzip_is_empty(p: Path) -> bool:
+    with gzip.open(p, "rb") as f:
+        return len(f.read(1)) == 0
+
+
 def setup_logging(path: str, console: bool = False) -> Logger:
     import logging
 
@@ -164,7 +169,10 @@ def check_processes(
                     cmd = args.decode()
                 else:
                     cmd = str(args)
-                lf.write(f"{cmd}: {err.decode()}\n")
+                if err:
+                    lf.write(f"{cmd}: {err.decode()}\n")
+                else:
+                    lf.write(f"{cmd}: return code {p.returncode}\n")
 
     if some_error:
         exit(1)

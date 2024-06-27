@@ -33,6 +33,21 @@ _conda_activate () {
     fi
 }
 
+_test_env () {
+    for mod in "$python_root/$1"/*; do
+        _conda_activate "$1"
+        if [[ "$mod" != *.yml ]]; then
+            echo "Testing scripts for $1 module: $mod"
+
+            _run_test flake8 "$mod"
+            _run_test _mypy "$mod"
+
+            echo ""
+        fi
+    done
+}
+
+
 eval "$(${CONDA_EXE} shell.bash hook 2> /dev/null)"
 
 python_root="workflow/scripts/python"
@@ -45,23 +60,15 @@ fi
 _conda_activate bedtools
 
 echo "Testing common module"
-echo ""
 
 # test the common dir since flake8 doesn't follow imports
 _run_test flake8 "$python_root/common"
-_run_test mypy "$python_root/common"
+_run_test _mypy "$python_root/common"
 
-for mod in "$python_root/bedtools"/*; do
-    if [[ "$mod" != *.yml ]]; then
-        echo "Testing scripts for bedtools module: $mod"
-        echo ""
-    
-        _run_test flake8 "$mod"
-        _run_test _mypy "$mod"
-    
-        echo ""
-    fi
-done
+echo ""
+
+_test_env bedtools
+_test_env templates
 
 
 if (( anyfail == 1 )); then

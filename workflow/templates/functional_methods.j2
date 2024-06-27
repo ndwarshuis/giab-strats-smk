@@ -1,0 +1,15 @@
+## Refseq Source
+
+{{ src_txt }}
+
+{% if processing_txt is not none -%}
+## Processing
+
+{{ processing_txt }}
+
+{% endif -%}
+## Software
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}
+

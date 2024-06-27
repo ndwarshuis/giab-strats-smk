@@ -1,0 +1,92 @@
+The following is a short summary of the files contained in this directory. For
+more depth on how each file was created, see next section.
+
+Note that in all cases, 5bp slop is added to each repeat region. Slop does not
+count toward the length of a given region in the cases where the filename
+indicates repeats of a given length.
+
+## Simple Repeats
+
+### Perfect Repeats
+
+These represent continuous runs of perfectly repeating patterns with 1-4
+subunits:
+
+- SimpleRepeat_homopolymer = 1bp repeats
+- SimpleRepeat_diTR = 2bp repeats
+- SimpleRepeat_triTR = 3bp repeats
+- SimpleRepeat_quadTR = 4bp repeats
+
+In the case of subunits >1bp long, either end of the repeat may contain only
+part of the subunit.
+
+Each file represents a range of lengths either written as `XtoY` which means `X
+<= length <= Y` or `geX` which means `length >= X`. These are further subdivided
+into AT- and GC-specific regions:
+{% for file in perfect_files %}
+- `{{ file }}`
+{%- endfor %}
+
+### Imperfect Homopolymers
+
+These represent homopolymers that may be interrupted by one non-homopolymer base
+(either at least 11 or 21 base pairs long). Note that due to the way
+homopolymers are defined, the shortest continuous length where all bases are the
+same is 4 base pairs: 
+{% for file in imperfect_files %}
+- `{{ file }}`
+{%- endfor %}
+
+### All Homopolymers
+
+These contain all homopolymers >=7 base pairs and all imperfect homopolymers
+>=11 base pairs long:
+
+`{{ homopolymers_file }}`
+
+This is the complement of the above:
+
+`{{ not_homopolymers_file }}`
+
+{% if sat_file is not none -%}
+## Satellites
+
+The following contains all satellite repeat regions:
+
+`{{ sat_file }}`
+
+And this is the complement of the above:
+
+`{{ not_sat_file }}`
+
+{% endif -%}
+{% if all_tr_file is not none -%}
+## Union repeat files
+
+### All Tandem Repeats
+
+These contain all tandem repeats of various lengths. Note that this does NOT
+contain perfect or imperfect homopolymers:
+{% for file in all_filtered_tr_files %}
+- `{{ file }}`
+{%- endfor %}
+
+This is a union of the above files:
+
+`{{ all_tr_file }}`
+
+This is the complement of the above:
+
+`{{ not_all_tr_file }}`
+
+### All Repeats
+
+This has all tandem repeats from the above section with perfect/imperfect
+homopolymers:
+
+`{{ all_repeats_file }}`
+
+This is the complement of the above:
+
+`{{ not_all_repeats_file }}`
+{%- endif -%}

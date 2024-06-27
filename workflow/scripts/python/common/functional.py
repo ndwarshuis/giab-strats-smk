@@ -23,6 +23,10 @@ def fmap_maybe_def(default: Y, f: Callable[[X], Y], x: X | None) -> Y:
     return default if x is None else f(x)
 
 
+def maybe_to_list(x: X | None) -> list[X]:
+    return [] if x is None else [x]
+
+
 def fmap_maybe(f: Callable[[X], Y], x: X | None) -> None | Y:
     return fmap_maybe_def(None, f, x)
 
@@ -30,6 +34,25 @@ def fmap_maybe(f: Callable[[X], Y], x: X | None) -> None | Y:
 def both(f: Callable[[X], Y], x: tuple[X, X]) -> tuple[Y, Y]:
     """2-tuple functor thingy"""
     return (f(x[0]), f(x[1]))
+
+
+def thrice(f: Callable[[X], Y], x: tuple[X, X, X]) -> tuple[Y, Y, Y]:
+    """3-tuple functor thingy"""
+    return (f(x[0]), f(x[1]), f(x[2]))
+
+
+def maybe2(x: tuple[X | None, X | None]) -> tuple[X, X] | None:
+    if x[0] is not None and x[1] is not None:
+        return (x[0], x[1])
+    else:
+        return None
+
+
+def maybe3(x: tuple[X | None, X | None, X | None]) -> tuple[X, X, X] | None:
+    if x[0] is not None and x[1] is not None and x[2] is not None:
+        return (x[0], x[1], x[2])
+    else:
+        return None
 
 
 def const(x: X) -> Callable[[Y], X]:
@@ -66,7 +89,7 @@ class DesignError(Exception):
     pass
 
 
-def raise_inline(msg: str) -> NoReturn:
+def raise_inline(msg: str | None = None) -> NoReturn:
     """Raise a design error.
 
     Useful for when I'm in a lambda and want to scream like a typical metalcore
@@ -89,54 +112,6 @@ def not_none_unsafe(x: X | None, f: Callable[[X], Y], msg: None | str = None) ->
     return f(x)
 
 
-def match1_unsafe(xs: list[X], f: Callable[[X], Y], msg: None | str = None) -> Y:
-    """Call function with the one value from a singleton list.
-
-    Error if list is not a singleton.
-    """
-    match xs:
-        case [x]:
-            return f(x)
-        case _:
-            raise DesignError(
-                msg if msg is not None else f"One input expected, got {len(xs)}"
-            )
-
-
-def match2_unsafe(xs: list[X], f: Callable[[X, X], Y], msg: None | str = None) -> Y:
-    """Call function with the twos value from a 2-ary list.
-
-    Error if list does not have two members.
-    """
-    match xs:
-        case [x1, x2]:
-            return f(x1, x2)
-        case _:
-            raise DesignError(
-                msg if msg is not None else f"Two inputs expected, got {len(xs)}"
-            )
-
-
-def match12_unsafe(
-    xs: list[X],
-    f1: Callable[[X], Y],
-    f2: Callable[[X, X], Y],
-    msg: None | str = None,
-) -> Y:
-    """Combination of `match1_unsafe` and `match2_unsafe` with two functions
-    for each case. Error if input list is does not have one or two elements.
-    """
-    match xs:
-        case [x1]:
-            return f1(x1)
-        case [x1, x2]:
-            return f2(x1, x2)
-        case _:
-            raise DesignError(
-                msg if msg is not None else f"Two inputs expected, got {len(xs)}"
-            )
-
-
 # versions of unzip that won't return an empty tuple when given an empty list
 def unzip2(xs: list[tuple[X, Y]]) -> tuple[list[X], list[Y]]:
     return ([x[0] for x in xs], [x[1] for x in xs])
@@ -144,3 +119,17 @@ def unzip2(xs: list[tuple[X, Y]]) -> tuple[list[X], list[Y]]:
 
 def unzip3(xs: list[tuple[X, Y, Z]]) -> tuple[list[X], list[Y], list[Z]]:
     return ([x[0] for x in xs], [x[1] for x in xs], [x[2] for x in xs])
+
+
+def filter_dict_strict(ds: dict[str, X], xs: set[str]) -> dict[str, X]:
+    notindict = set(xs) - set(ds)
+    if len(notindict) > 0:
+        raise DesignError(f"Items not in input dictionary keys: {notindict}")
+    return {k: v for k, v in ds.items() if k in xs}
+
+
+def uncons_maybe(xs: list[X]) -> tuple[X, list[X]] | None:
+    if len(xs) == 0:
+        return None
+    else:
+        return (xs[0], xs[1:])

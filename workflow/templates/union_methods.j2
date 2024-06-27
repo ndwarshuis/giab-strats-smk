@@ -1,0 +1,31 @@
+## Description of methods used to generate the stratifications
+
+Each of these union bed is simply a merging of other stratification files
+elsewhere. To create these, we first combined them with `multiIntersectBed`
+followed by `mergeBed`.
+
+Complements were obtained with `complementBed`.
+
+### Segdups and low-mappability
+
+This was created by combining the following:
+
+`{{ map_file }}`
+`{{ segdup_file }}`
+
+{% if all_difficult_files|length > 0 -%}
+### All difficult
+
+This bed was created by merging the previous segmental duplications+lowmap bed
+with the following:
+
+{% for file in all_difficult_files -%}
+`{{ file }}`
+{% endfor %}
+
+{% endif -%}
+## Software
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor -%}
+

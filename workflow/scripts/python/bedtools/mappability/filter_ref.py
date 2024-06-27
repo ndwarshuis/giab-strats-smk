@@ -29,7 +29,13 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         all_chrs = [x.split("\t")[0] for x in f]
 
     def run_samtools(
-        bd: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyVcfT],
+        bd: cfg.BuildData_[
+            cfg.RefSrcT,
+            cfg.BedSrcT,
+            cfg.VcfSrcT,
+            cfg.BedCoordsT,
+            cfg.BuildCompareT,
+        ],
         pat: cfg.ChrPattern,
     ) -> None:
         def any_map_pattern(c: str) -> bool:
