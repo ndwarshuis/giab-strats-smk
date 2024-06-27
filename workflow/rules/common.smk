@@ -68,7 +68,7 @@ def bed_src_inputs(pathlist, f, wildcards):
     """Expand pathlist given a refkey and a function to lookup a source file
     for which refsrckeys can be defined."""
     rk = wildcards.ref_key
-    rsks = config.refkey_to_bed_refsrckeys(f, rk)
+    rsks = config.refkey_to_bed_refsrckeys_smk(f, rk)
     return expand(pathlist, ref_src_key=rsks)
 
 
@@ -76,7 +76,7 @@ def bed_src_bd_inputs(pathlist, f, wildcards):
     """Like 'bed_src_inputs' but for build data. Used for benchmark files."""
     rk = wildcards.ref_key
     bk = wildcards.build_key
-    rsks = config.buildkey_to_bed_refsrckeys(f, rk, bk)
+    rsks = config.buildkey_to_bed_refsrckeys_smk(f, rk, bk)
     return expand(pathlist, allow_missing=True, ref_src_key=rsks, build_key=bk)
 
 

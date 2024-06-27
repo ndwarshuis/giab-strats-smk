@@ -26,6 +26,14 @@ pipeline that generated these stratifications runs these tests internally.
 to the total length of each reference/chromosome. This was inspected prior to
 release to ensure sensible coverage.
 
+### Window Coverage Plots
+
+Each reference has a set of window coverage plots (as html files) in the
+`window_coverages` directory which shows the fraction of bases within 1Mbp
+windows for each chromosome covered by a given stratification. This provides
+finer detail that the coverage plots above and can be used to detect any obvious
+extra/missing coverage in regions where a different level is expected.
+
 ## Benchmarking
 
 `benchmark_summary.html` contains benchmark results (using `hap.py`) for a

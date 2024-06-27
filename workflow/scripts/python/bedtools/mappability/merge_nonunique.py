@@ -24,7 +24,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     genome = cfg.smk_to_input_name(smk, "genome")
     gapless = cfg.smk_to_input_name(smk, "gapless")
     log = cfg.smk_to_log(smk)
-    out = cfg.smk_to_output(smk)
+    out_single = cfg.smk_to_output_name(smk, "single_lowmap")
+    out_all = cfg.smk_to_output_name(smk, "all_lowmap")
     path_pattern = cfg.smk_to_param_str(smk, "path_pattern")
 
     im, fm = sconf.buildkey_to_ref_mappers(
@@ -61,14 +62,14 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
             p2, p3 = merge_bed(o1, o)
             check_processes([p1, p2, p3], log)
 
-    all_lowmap = final_path("lowmappabilityall")
+    # all_lowmap = final_path("lowmappabilityall")
     single_lowmap = []
 
     # If there is only one input, merge this to make one "all_nonunique" bed.
     # Otherwise, merge each individual input and then combine these with
     # multi-intersect to make the "all_nonunique" bed.
     if len(inputs) == 1:
-        merge_single(Path(inputs[0]), all_lowmap)
+        merge_single(Path(inputs[0]), out_all)
     else:
         # first read/sort/write all single bed files
         single_lowmap = [to_single_output(Path(i).name) for i in inputs]
@@ -77,14 +78,11 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         # once all the single files are on disk, stream them together; this
         # allows us to avoid keeping multiple dataframes in memory at once
         p1, mi_out = multiIntersectBed(single_lowmap)
-        p2, p3 = merge_bed(mi_out, all_lowmap)
+        p2, p3 = merge_bed(mi_out, out_all)
         check_processes([p1, p2, p3], log)
 
-    with open(out, "w") as f:
-        obj = {
-            "all_lowmap": str(all_lowmap),
-            "single_lowmap": [str(p) for p in single_lowmap],
-        }
+    with open(out_single, "w") as f:
+        obj = [str(p) for p in single_lowmap]
         json.dump(obj, f)
 
 

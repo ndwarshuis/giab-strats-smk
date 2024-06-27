@@ -1,9 +1,58 @@
+from itertools import chain
 from more_itertools import unzip, flatten
 from collections import namedtuple
-from common.config import CoreLevel, si_to_rmsk, si_to_simreps, si_to_satellites
+from common.config import (
+    CoreLevel,
+    si_to_rmsk,
+    si_to_simreps,
+    si_to_satellites,
+    MutualPathPair,
+)
 from functools import partial
 
 lc = config.to_bed_dirs(CoreLevel.LOWCOMPLEXITY)
+
+
+def all_low_complexity_sources(ref_key):
+    return config.all_low_complexity_sources(
+        ref_key,
+        Path(rules.download_rmsk.output[0]),
+        Path(rules.download_censat.output[0]),
+        Path(rules.download_simreps.output[0]),
+    )
+
+
+def all_low_complexity_sources_wc(wildcards):
+    return all_low_complexity_sources(wildcards["ref_key"])
+
+
+def all_low_complexity(ref_final_key, build_key):
+    return config.all_low_complexity(
+        ref_final_key,
+        build_key,
+        all_low_complexity_sources(strip_full_refkey(ref_final_key)),
+        [Path(p) for p in rules._all_perfect_uniform_repeats.input],
+        [Path(p) for p in rules._all_imperfect_uniform_repeats.input],
+        MutualPathPair(
+            Path(rules.merge_all_uniform_repeats.output[0]),
+            Path(rules.invert_all_uniform_repeats.output[0]),
+        ),
+        MutualPathPair(
+            Path(rules.merge_satellites.output[0]),
+            Path(rules.invert_satellites.output[0]),
+        ),
+        [Path(p) for p in rules.all_TRs.input],
+        MutualPathPair(
+            Path(rules.merge_filtered_TRs.output[0]),
+            Path(rules.invert_TRs.output[0]),
+        ),
+        MutualPathPair(
+            Path(rules.merge_HPs_and_TRs.output[0]),
+            Path(rules.invert_HPs_and_TRs.output[0]),
+        ),
+        Path(rules.low_complexity_readme.output[0]),
+    )
+
 
 ################################################################################
 ## uniform repeats
@@ -295,7 +344,7 @@ use rule merge_imperfect_uniform_repeats as merge_imperfect_uniform_repeats_comp
         bases=bases_constraint,
 
 
-rule all_uniform_repeats:
+rule _all_perfect_uniform_repeats:
     input:
         # Perfect (greater than X)
         *[
@@ -348,6 +397,11 @@ rule all_uniform_repeats:
                 else []
             )
         ],
+    localrule: True
+
+
+rule _all_imperfect_uniform_repeats:
+    input:
         # Imperfect (greater than X)
         expand(
             rules.merge_imperfect_uniform_repeats_complement.output,
@@ -363,6 +417,13 @@ rule all_uniform_repeats:
             )
             for x in IMPERFECT_LENS
         },
+    localrule: True
+
+
+rule all_uniform_repeats:
+    input:
+        **rules._all_perfect_uniform_repeats.input,
+        **rules._all_imperfect_uniform_repeats.input,
     localrule: True
 
 
@@ -382,7 +443,8 @@ use rule download_gaps as download_simreps with:
 
 checkpoint normalize_simreps:
     input:
-        lambda w: bed_src_inputs(rules.download_simreps.output, si_to_simreps, w),
+        lambda w: all_low_complexity_sources_wc(w).trf_sources,
+        # lambda w: bed_src_inputs(rules.download_simreps.output, si_to_simreps, w),
     output:
         lc.inter.filtersort.data / "simreps.json",
     params:
@@ -430,7 +492,8 @@ use rule download_gaps as download_rmsk with:
 
 checkpoint normalize_rmsk:
     input:
-        lambda w: bed_src_inputs(rules.download_rmsk.output, si_to_rmsk, w),
+        lambda w: all_low_complexity_sources_wc(w).rmsk_sources,
+        # lambda w: bed_src_inputs(rules.download_rmsk.output, si_to_rmsk, w),
     output:
         lc.inter.filtersort.data / "rmsk.txt.gz",
     params:
@@ -494,7 +557,8 @@ use rule download_gaps as download_censat with:
 # actually in them. 2-4k is probably a safe default
 checkpoint normalize_censat:
     input:
-        lambda w: bed_src_inputs(rules.download_censat.output, si_to_satellites, w),
+        lambda w: all_low_complexity_sources_wc(w).sat_sources,
+        # lambda w: bed_src_inputs(rules.download_censat.output, si_to_satellites, w),
     output:
         lc.inter.filtersort.data / "censat.json",
     params:
@@ -705,51 +769,21 @@ use rule invert_satellites as invert_HPs_and_TRs with:
         lc.final("notinAllTandemRepeatsandHomopolymers_slop5"),
 
 
-# rule all_low_complexity:
-#     input:
-#         # Uniform repeats
-#         rules.all_uniform_repeats.input,
-#         rules.merge_all_uniform_repeats.output,
-#         rules.invert_all_uniform_repeats.output,
-#         # Satellites
-#         rules.merge_satellites.output,
-#         rules.invert_satellites.output,
-#         # Tandem Repeats
-#         rules.all_TRs.input,
-#         rules.merge_filtered_TRs.output,
-#         rules.invert_TRs.output,
-#         # "Everything" (in theory)
-#         rules.merge_HPs_and_TRs.output,
-#         rules.invert_HPs_and_TRs.output,
-#     localrule: True
-
-
-def all_low_complexity(ref_final_key):
-    rd = config.to_ref_data_full(ref_final_key)
-    rmsk = rd.has_low_complexity_rmsk
-    simreps = rd.has_low_complexity_simreps
-    censat = rd.has_low_complexity_censat
-    has_sats = rmsk or censat
-
-    # include uniform repeats no matter what
-    urs = (
-        rules.all_uniform_repeats.input
-        + rules.merge_all_uniform_repeats.output
-        + rules.invert_all_uniform_repeats.output
-    )
-
-    # include satellites only if we have rmsk or censat
-    sats = (
-        rules.merge_satellites.output + rules.invert_satellites.output
-        if has_sats
-        else []
-    )
-
-    # include tandem repeats and merged output if we have rmsk/censat and simreps
-    trs = (
-        rules.all_TRs.input + rules.merge_filtered_TRs.output + rules.invert_TRs.output
-    )
-    merged = rules.merge_HPs_and_TRs.output + rules.invert_HPs_and_TRs.output
-    all_trs_and_hps = trs + merged if has_sats and simreps else []
-
-    return all_trs_and_hps + sats + urs
+rule low_complexity_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/lowcomplexity_description.j2",
+        methods="workflow/templates/lowcomplexity_methods.j2",
+        bedtools_env="workflow/envs/bedtools.yml",
+        _sources=lambda w: all_low_complexity(
+            w["ref_final_key"], w["build_key"]
+        ).all_sources,
+    params:
+        paths=lambda w: all_low_complexity(w["ref_final_key"], w["build_key"]),
+    output:
+        lc.readme,
+    conda:
+        "../envs/templates.yml"
+    localrule: True
+    script:
+        "../scripts/python/templates/format_readme/format_lowcomplexity.py"

@@ -1,6 +1,30 @@
-from common.config import CoreLevel, si_to_superdups
+from common.config import CoreLevel, si_to_superdups, strip_full_refkey, MutualPathPair
 
 segdup = config.to_bed_dirs(CoreLevel.SEGDUPS)
+
+
+def all_segdups_sources(ref_key):
+    return config.all_segdups_sources(
+        ref_key,
+        Path(rules.download_superdups.output[0]),
+    )
+
+
+def all_segdups(ref_final_key, build_key):
+    return config.all_segdups(
+        ref_final_key,
+        build_key,
+        all_segdups_sources(strip_full_refkey(ref_final_key)),
+        MutualPathPair(
+            Path(rules.merge_superdups.output[0]),
+            Path(rules.notin_superdups.output[0]),
+        ),
+        MutualPathPair(
+            Path(rules.filter_long_superdups.output[0]),
+            Path(rules.notin_long_superdups.output[0]),
+        ),
+        Path(rules.segdups_readme.output[0]),
+    )
 
 
 use rule download_gaps as download_superdups with:
@@ -9,13 +33,13 @@ use rule download_gaps as download_superdups with:
     log:
         segdup.src.log / "superdups.log",
     params:
-        src=lambda w: config.refsrckey_to_bed_src(si_to_superdups, w.ref_src_key),
+        src=lambda w: to_bed_src(si_to_superdups, w),
     localrule: True
 
 
 checkpoint normalize_superdups:
     input:
-        lambda w: bed_src_inputs(rules.download_superdups.output, si_to_superdups, w),
+        lambda w: all_segdups_sources(w["ref_key"]).all_sources,
     output:
         segdup.inter.filtersort.data / "segdups.json",
     params:
@@ -78,10 +102,19 @@ use rule notin_superdups as notin_long_superdups with:
         segdup.final("notinsegdups_gt10kb"),
 
 
-rule all_segdups:
+rule segdups_readme:
     input:
-        rules.merge_superdups.output,
-        rules.filter_long_superdups.output,
-        rules.notin_superdups.output,
-        rules.notin_long_superdups.output,
+        common="workflow/templates/common.j2",
+        description="workflow/templates/segdups_description.j2",
+        methods="workflow/templates/segdups_methods.j2",
+        _sources=lambda w: all_segdups(w["ref_final_key"], w["build_key"]).all_sources,
+        bedtools_env="workflow/envs/bedtools.yml",
+    output:
+        segdup.readme,
+    params:
+        paths=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
+    conda:
+        "../envs/templates.yml"
     localrule: True
+    script:
+        "../scripts/python/templates/format_readme/format_segdups.py"

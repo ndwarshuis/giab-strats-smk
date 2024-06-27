@@ -11,9 +11,9 @@ def main(smk: Any) -> None:
     bbBin = cfg.smk_to_input(smk)
     opath = cfg.smk_to_output(smk)
     log = cfg.smk_to_log(smk)
-    src: cfg.AnyBedSrc | None = smk.params.src
+    src: cfg.BedSrc | None = smk.params.src
 
-    def check_md5(src: cfg.BedFileSrc) -> None:
+    def check_md5(src: cfg.BedSrc) -> None:
         if src.md5 is not None and src.md5 != (actual := io.get_md5(opath, True)):
             with open(log, "a") as f:
                 f.write(f"md5s don't match; wanted {src.md5}, actual {actual}\n")

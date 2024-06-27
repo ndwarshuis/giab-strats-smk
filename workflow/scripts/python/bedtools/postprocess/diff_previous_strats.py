@@ -15,8 +15,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     old_path = cfg.smk_to_input_name(smk, "old")
     rkf = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)
-    bd = sconf.to_build_data(cfg.strip_full_refkey(rkf), bk)
-    comparison = bd.build.comparison
+    comparison = sconf.get_comparison(rkf, bk)
 
     fm = sconf.buildkey_to_ref_mappers(
         cfg.wc_to_reffinalkey(ws),

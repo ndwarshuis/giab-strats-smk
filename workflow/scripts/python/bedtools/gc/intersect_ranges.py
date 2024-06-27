@@ -63,26 +63,28 @@ def write_middle_range_bed(
     return str(out)
 
 
+# ASSUME low/high are non-empty and the same length subset to range bounds
 def write_intersected_range_beds(
     final_path: Callable[[str], Path],
     low: list[GCInput],
     high: list[GCInput],
     log: Path,
-) -> list[str]:
+) -> tuple[Path, list[str]]:
     pairs = zip(
         [x for x in low if x.is_range_bound],
         [x for x in reversed(high) if x.is_range_bound],
     )
     torun = [
-        (i, final_path(f"gclt{b1.fraction}orgt{b2.fraction}_slop50"), b1, b2)
-        for i, (b1, b2) in enumerate(pairs)
+        (final_path(f"gclt{b1.fraction}orgt{b2.fraction}_slop50"), b1, b2)
+        for b1, b2 in pairs
     ]
-    for i, bed_out, b1, b2 in torun:
+    for bed_out, b1, b2 in torun:
         p1, o1 = multiIntersectBed([b1.bed, b2.bed])
         p2, o2 = mergeBed(o1, [])
         bgzip_file(o2, bed_out)
         check_processes([p1, p2], log)
-    return [str(t[1]) for t in torun]
+    out = [t[0] for t in torun]
+    return (out[0], [str(p) for p in out[1:]])
 
 
 def main(smk: Any, sconf: cfg.GiabStrats) -> None:
@@ -94,7 +96,8 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     genome_path = cfg.smk_to_input_name(smk, "genome")
     gapless_path = cfg.smk_to_input_name(smk, "gapless")
     log_path = cfg.smk_to_log(smk)
-    out_path = cfg.smk_to_output(smk)
+    out_widest = cfg.smk_to_output_name(smk, "widest_extreme")
+    out_all = cfg.smk_to_output_name(smk, "all_gc")
 
     rfk = cfg.wc_to_reffinalkey(ws)
     bk = cfg.wc_to_buildkey(ws)
@@ -123,14 +126,16 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         gapless,
         log_path,
     )
-    inter_strats = write_intersected_range_beds(
+    widest_extreme, other_extremes = write_intersected_range_beds(
         final_path,
         low,
         high,
         log_path,
     )
 
-    with open(out_path, "w") as f:
+    # ASSUME there is one extreme denoted in the config (otherwise we won't have
+    # something to put in "widest extreme"
+    with open(out_all, "w") as f:
         # put the first low and last high input here since these are already
         # in the final directory
         ranges: list[str] = [
@@ -142,10 +147,12 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         ]
         obj = {
             "gc_ranges": ranges,
-            "widest_extreme": inter_strats[0],
-            "other_extremes": inter_strats[1:],
+            "widest_extreme": str(widest_extreme),
+            "other_extremes": other_extremes,
         }
         json.dump(obj, f, indent=4)
+
+    out_widest.symlink_to(widest_extreme.resolve())
 
 
 main(snakemake, snakemake.config)  # type: ignore

@@ -23,7 +23,7 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         cfg.wc_to_reffinalkey(ws),
         cfg.wc_to_buildkey(ws),
         lambda hap, bd: bd.refdata.ref.noop_conversion(bd.build_chrs).split(hap),
-        lambda hap, bd: hap.choose(*bd.refdata.ref.noop_conversion(bd.build_chrs)),
+        lambda hap, bd: bd.refdata.ref.noop_conversion(bd.build_chrs).choose(hap),
     )
     im = m.init_mapper
     fm = m.final_mapper

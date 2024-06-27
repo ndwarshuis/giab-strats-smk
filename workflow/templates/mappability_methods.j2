@@ -1,0 +1,56 @@
+Regions with low mappability for different read lengths and error rates were
+generated using GEM (see below for source) on the reference fasta. The GEM
+mappability tool finds regions `l` basepairs long that match other regions in
+the reference genome with up to `m` mismatches (SNPs) and up to `e` indels <
+15bp.
+
+{%- if params|length > 1 %}
+
+We generated mappability files representing all unique regions using
+`gem-mappability` with the following parameters:
+
+{% for p in params %}
+- `l` = {{ p.length }}, `m` = {{ p.mismatches }}, `e` = {{ p.indels }}
+{%- endfor %}
+
+Each of these were then converted to wig files using `gem-2-wig` which were then
+parsed into bed files using `wig2bed` from BEDOPS and then filtered for
+mappability above 90%. These were then complemented (`complementBed`) to find
+non-unique regions. Then non-unique regions <100bp apart in each bed file were
+merged together using `mergeBed`. These are the 'Specific low-mappability
+regions' described above.
+
+The `lowmappabilityall` bed file was created by intersecting
+(`multiIntersectBed`) and merging (`mergeBed`) each individual non-unique bed
+together. This result was then complemented using `complementBed` to make the
+`notinlowmappabilityall`.
+
+{%- else %}
+
+We generated one mappability file representing all unique regions using
+`gem-mappability` with the following parameters:
+
+- `l` = {{ params[0].length }}, `m` = {{ params[0].mismatches }}, `e` = {{ params[0].indels }}
+
+This was then converted to a wig file using `gem-2-wig` which was then parsed
+into a bed file using `wig2bed` from BEDOPS and then filtered for mappability
+above 90%. This was then complemented (`complementBed`) to find non-unique
+regions. Then non-unique regions <100bp apart were merged together using
+`mergeBed`, makeing the `lowmappabilityall` bed file.
+
+This result was then complemented using `complementBed` to make the
+`notinlowmappabilityall`.
+{%- endif %}
+
+## Software
+
+The GEM mappability program ([Derrien T, Estellé J, Marco Sola S, Knowles DG,
+Raineri E, Guigó R, et al. (2012) Fast Computation and Applications of Genome
+Mappability. PLoS ONE 7(1):
+e30377](https://doi.org/10.1371/journal.pone.0030377)) was downloaded from
+{{ gemurl }}
+
+Other dependencies:
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}

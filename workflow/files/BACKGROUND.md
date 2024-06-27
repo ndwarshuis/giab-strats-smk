@@ -1,9 +1,7 @@
-# GIAB Stratifications
+# Background
 
-This repository contains the pipeline and configuration used for generating and
-evaluating the Genome-in-a-Bottle stratifications. The stratification files were
-developed with the Global Alliance for Genomic Health (GA4GH) Benchmarking Team,
-the [Genome in a Bottle Consortium
+The stratification files were developed with the Global Alliance for Genomic
+Health (GA4GH) Benchmarking Team, the [Genome in a Bottle Consortium
 (GIAB)](https://www.nist.gov/programs-projects/genome-bottle) and the
 [Telomere-to-Telomere Consortium
 (T2T)](https://sites.google.com/ucsc.edu/t2tworkinggroup). They are intended as
@@ -16,18 +14,7 @@ site](https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-st
 These files can be used as a standard resource of BED files for use with GA4GH
 benchmark tools such as [hap.py](https://github.com/Illumina/hap.py).
 
-These files were generated using the configuration
-[here](https://github.com/ndwarshuis/giab-stratifications) and the pipeline
-located [here](https://github.com/ndwarshuis/giab-strats-smk). Please see these
-for further information, including exact code and source files.
-
-Currently, this pipeline is set up to build stratifications for the following
-references:
-* GRCh37
-* GRCh38
-* CHM13
-
-## General Information
+# General Information
 
 Author Information
 - Principal Investigator: Justin Zook, NIST, jzook@nist.gov
@@ -36,7 +23,7 @@ Author Information
 - Jennifer McDaniel, NIST, jennifer.mcdaniel@nist.gov
 - Nate Dwarshuis, NIST, nathan.dwarshuis@nist.gov
 
-## Sharing/Access Information
+# Sharing/Access Information
 
 Licenses/restrictions placed on the data, or limitations of reuse:
 Publicly released data are freely available for reuse without embargo.
@@ -50,7 +37,7 @@ hap.py please reference:
 	Best practices for benchmarking germline small-variant calls in human genomes. 
 	Nat Biotechnol 37, 555-560 (2019). https://doi.org/10.1038/s41587-019-0054-x
     
-### Links to publicly accessible locations of the data:
+## Links to publicly accessible locations of the data:
 
 [GIAB FTP URL](https://ftp://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/)
 - Individual stratification BED files as well as zipped directories (tar.gz) of files
@@ -58,86 +45,7 @@ hap.py please reference:
 - .tsvs for benchmarking with hap.py
 - MD5 checksums
 
-## Summary Of Stratifications
-
-Stratifications can be binned into several types. General information for
-stratification types are provided below.
-
-These categories are present for all indicated references unless otherwise
-noted.
-
-### Low Complexity
-
-Regions with different types and sizes of low complexity sequence, e.g.,
-homopolymers, STRs, VNTRs and other locally repetitive sequences.
-
-### Segmental Duplications
-
-Regions with segmental duplications (generally defined as repeated regions >1kb
-with >90% similarity).
-
-### XY
-
-Chomosome XY specific regions such as PAR, XTR or ampliconic.
-
-### Functional Regions
-
-Regions to stratify variants inside and outside coding regions.
-
-### GC Content
-
-Regions with different ranges (%) of GC content.
-
-### Mappability
-
-Regions where short read mapping can be challenging.
-
-### Telomeres
-
-Telomeric regions. These are included for CHM13 only.
-
-### Union
-
-Regions with different general types of difficult regions or any type of
-difficult region or complex variant. For example, performance can be measured in
-just "easy" or "all difficult" regions of the genome.
-
-### Ancestry
-
-Regions with inferred patterns of local ancestry.
-
-These only exist for GRCh38.
-
-### Genome Specific (GIAB benchmark v4.2.1)
-
-Difficult regions due to potentially difficult variation in a NIST/GIAB sample,
-including 1) regions containing putative compound heterozygous variants 2) small
-regions containing multiple phased variants, 3) regions with potential
-structural or copy number variation.
-
-These only exist for GRCh37/8.
-
-### Functional Technically Difficult
-
-Functional, or potentially functional, regions that are also likely to be
-technically difficult to sequences.
-
-These only exist for GRCh37/8.
-
-### Other Difficult
-
-These regions that are difficult to sequences for miscellaneous reasons. In the
-case of GRCh37/38, these include regions near gaps or errors in the reference or
-regions that are known to be expanded/collapsed relative to most other genomes.
-
-This category also includes highly polymorphic regions such as those coding the
-major histocompatibility complex (MHC), the VDJ regions, and regions coding the
-killer-cell immunoglobulin-like receptor (KIR). These are all highly polymorphic
-in nature and thus difficult to sequence.
-
-Finally, in the case of CHM13, this category also includes the rDNA arrays.
-
-## Data-Use Policy 
+# Data-Use Policy 
 
 This data/work was created by employees of the National Institute of Standards
 and Technology (NIST), an agency of the Federal Government. Pursuant to title 17

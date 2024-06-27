@@ -1,0 +1,38 @@
+## Methods
+
+{% if gaps_src is not none -%}
+### Gaps
+
+{{ gaps_src }}
+
+Regions were extended in either direction by 15000 base pairs using `slopBed`
+followed by `mergeBed`.
+
+{% endif -%}
+{% if refseq_src is not none -%}
+### Refseq
+
+{{ refseq_src }}
+
+{% endif -%}
+{% for name, src in immuno_srcs.items() -%}
+### {{ name }}
+
+{{ src }}
+
+{% endfor -%}
+{% if other_srcs|length > 0 -%}
+### Other
+
+These bed files were taken as-is from their denoted sources.
+{% for other_name, other_src in other_srcs.items() %}
+#### {{ other_name }}
+
+{{ other_src }}
+{% endfor %}
+{% endif -%}
+## Software
+{% for dep, version in deps.items() %}
+- {{ dep }}: version {{ version }}
+{%- endfor %}
+

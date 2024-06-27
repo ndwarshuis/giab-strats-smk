@@ -109,11 +109,11 @@ use rule filter_sort_ref as filter_sort_split_ref_nohap with:
 
 rule download_gaps:
     input:
-        rules.build_kent.output,
+        rules.build_kent.output.bb2bed,
     output:
         ref.src.reference.data / "gap.bed.gz",
     params:
-        src=lambda w: config.refsrckey_to_bed_src(si_to_gaps, w.ref_src_key),
+        src=lambda w: to_bed_src(si_to_gaps, w),
     localrule: True
     log:
         ref.src.reference.log / "download_gaps.log",
@@ -133,7 +133,7 @@ def gapless_input(wildcards):
     gaps_target = (
         expand(
             rules.download_gaps.output,
-            ref_src_key=config.refkey_to_bed_refsrckeys(si_to_gaps, rk),
+            ref_src_key=config.refkey_to_bed_refsrckeys_smk(si_to_gaps, rk),
         )
         if bd.have_gaps
         else None
@@ -181,7 +181,7 @@ use rule download_gaps as download_bench_vcf with:
     output:
         ref.src.benchmark.data / "bench.vcf.gz",
     params:
-        src=lambda w: config.buildkey_to_bed_src(
+        src=lambda w: config.buildkey_to_vcf_src(
             bd_to_bench_vcf,
             w.ref_src_key,
             w.build_key,

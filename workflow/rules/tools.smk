@@ -22,9 +22,22 @@ rule download_gem:
         "curl -sS -L -o {output} {params.url}"
 
 
-rule unpack_gem:
+rule check_gem:
     input:
         rules.download_gem.output,
+    output:
+        config.tools_src_dir / "gemlib.tbz2.valid",
+    localrule: True
+    params:
+        validhash=config.tools.gemhash,
+    script:
+        "../scripts/python/bedtools/misc/test_hash.py"
+
+
+rule unpack_gem:
+    input:
+        archive=rules.download_gem.output,
+        _test=rules.check_gem.output,
     output:
         # called by other binaries
         config.tools_bin_dir / "gem-indexer_fasta2meta+cont",
@@ -38,10 +51,11 @@ rule unpack_gem:
         bins=lambda wildcards, output: " ".join(
             str(gemlib_bin / basename(o)) for o in output
         ),
+    localrule: True
     shell:
         """
         mkdir -p {config.tools_bin_dir} && \
-        tar xjf {input} \
+        tar xjf {input.archive} \
         --directory {config.tools_bin_dir} \
         --strip-components=2 \
         {params.bins}
@@ -99,6 +113,7 @@ use rule download_repseq as download_kent with:
         config.tools_src_dir / "kent.tar.gz",
     params:
         url=config.tools.kent,
+    localrule: True
 
 
 use rule unpack_repseq as unpack_kent with:
@@ -106,27 +121,30 @@ use rule unpack_repseq as unpack_kent with:
         rules.download_kent.output,
     output:
         directory(config.tools_make_dir / "kent"),
+    localrule: True
 
 
-# NOTE this entire thing is simply to get bigBedToBed, which I can't seem to
-# install using conda without it complaining that the constraints for my other
-# packages can't be satisfied (something about openssl and python needing
-# different version). This binary is also available on the UCSC download portal
-# but it doesn't seem to be version-tagged. "easy" solution: build from source.
-# Start by building just the kent libraries and then just build the bigBedToBed
-# binary.
+# NOTE this entire thing is simply to get bigBedToBed and bedToBigBed, which I
+# can't seem to install using conda without it complaining that the constraints
+# for my other packages can't be satisfied (something about openssl and python
+# needing different version). This binary is also available on the UCSC download
+# portal but it doesn't seem to be version-tagged. "easy" solution: build from
+# source. Start by building just the kent libraries and then just build the
+# binaries.
 rule build_kent:
     input:
         rules.unpack_kent.output[0],
     output:
-        config.tools_bin_dir / "bigBedToBed",
+        bb2bed=config.tools_bin_dir / "bigBedToBed",
+        bed2bb=config.tools_bin_dir / "bedToBigBed",
     threads: 8
     log:
         config.log_tools_dir / "tools" / "kent_build.log",
     conda:
         "../envs/kent.yml"
     params:
-        destdir=lambda _, output: str(Path(output[0]).parent),
+        bb2bed_dest=lambda _, output: str(Path(output["bb2bed"]).parent),
+        bed2bb_dest=lambda _, output: str(Path(output["bed2bb"]).parent),
     shell:
         """
         here=$(pwd)
@@ -138,7 +156,10 @@ rule build_kent:
           make libs -j{threads} > $here/{log} 2>&1 
 
         cd $here/{input}/src/utils/bigBedToBed
-        make DESTDIR=$here/{params.destdir} BINDIR=/ 2>&1 > $here/{log}
+        make DESTDIR=$here/{params.bb2bed_dest} BINDIR=/ 2>&1 > $here/{log}
+
+        cd $here/{input}/src/utils/bedToBigBed
+        make DESTDIR=$here/{params.bed2bb_dest} BINDIR=/ 2>&1 > $here/{log}
         """
 
 

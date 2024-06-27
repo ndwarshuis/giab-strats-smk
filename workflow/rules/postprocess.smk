@@ -10,54 +10,63 @@ post_bench_dir = config.bench_build_dir / "postprocess"
 validation_dir = config.final_root_dir / "validation"
 
 
-def expand_strat_targets_inner(ref_final_key, build_key):
-    # TODO this is crude
-    # NOTE we need to do this because despite the final key potentially having
-    # one or two haps, the configuration applies to both haps simultaneously
-    bd = config.to_build_data_full(ref_final_key, build_key)
-    function_targets = [
-        (lambda rk, _: all_low_complexity(rk), bd.want_low_complexity),
-        (gc_inputs_flat, bd.want_gc),
-        (mappabilty_inputs, bd.have_and_want_mappability),
-        (het_hom_inputs, bd.want_hets),
-        (all_xy_sex, True),
-        (all_other, True),
-    ]
-    rule_targets = [
-        (rules.filter_autosomes.output, bd.want_xy_auto),
-        (rules.all_segdups.input, bd.have_and_want_segdups),
-        (rules.find_telomeres.output, bd.want_telomeres),
-        (rules.all_segdup_and_map.input, bd.have_and_want_segdup_and_map),
-        (rules.all_alldifficult.input, bd.have_and_want_alldifficult),
-        (rules.get_gaps.output, bd.have_gaps),
-        (rules.all_cds.input, bd.have_and_want_cds),
-        (rules.remove_vdj_gaps.output, bd.have_and_want_vdj),
-        (rules.remove_kir_gaps.output, bd.have_and_want_kir),
-        (rules.remove_mhc_gaps.output, bd.have_and_want_mhc),
-    ]
-    all_function = [f(ref_final_key, build_key) for f, test in function_targets if test]
-    all_rule = [tgt for tgt, test in rule_targets if test]
+# split these functions apart so I can use non-checkpoint paths without angering
+# the snakemake gods
+ALL_NON_CP_TARGETS = [
+    all_diploid,
+    all_functional,
+    all_otherdifficult,
+    all_low_complexity,
+    all_segdups,
+    all_telomeres,
+    all_union,
+    all_xy,
+] + [
+    lambda rk, bk, lk=lk: all_misc(lk, rk, bk) for lk in config.other_level_keys
+]  # semi-official hack to get lambda to make closure around lk (if lk=lk isn't
+# present then each lambda will only use the last value of lk in the loop,
+# see https://docs.python.org/3.4/faq/programming.html#id10)
 
-    # combine and ensure that all "targets" refer to final bed files
-    all_targets = [y for xs in all_function + all_rule for y in xs]
-    invalid = [f for f in all_targets if not f.startswith(str(config.final_root_dir))]
-    if len(invalid) > 0:
-        raise DesignError(f"invalid targets: {invalid}")
-    return all_targets
+ALL_TARGETS = [
+    all_gc,
+    all_mappability,
+    *ALL_NON_CP_TARGETS,
+]
 
 
-def expand_strat_targets(wildcards):
-    return expand_strat_targets_inner(wildcards.ref_final_key, wildcards.build_key)
+def all_strat_targets(wildcards):
+    rk = wildcards["ref_final_key"]
+    bk = wildcards["build_key"]
+    return [t for f in ALL_TARGETS if (r := f(rk, bk)) is not None for t in r.all_final]
+
+
+def all_readme_targets(wildcards):
+    rk = wildcards["ref_final_key"]
+    bk = wildcards["build_key"]
+    return [r.readme for f in ALL_TARGETS if (r := f(rk, bk)) is not None]
 
 
 rule list_all_strats:
     input:
-        expand_strat_targets,
+        all_strat_targets,
     output:
         post_inter_dir / "all_strats.txt",
     localrule: True
     script:
         "../scripts/python/bedtools/postprocess/list_strats.py"
+
+
+rule list_all_bb_strats:
+    input:
+        bed2bb=rules.build_kent.output.bed2bb,
+        targets=all_strat_targets,
+        genome=rules.filter_sort_ref.output.genome,
+    output:
+        post_inter_dir / "all_bb_strats.txt",
+    log:
+        post_log_dir / "all_bb_strats.log",
+    script:
+        "../scripts/python/bedtools/postprocess/list_convert_bb.py"
 
 
 rule generate_md5sums:
@@ -67,8 +76,17 @@ rule generate_md5sums:
         config.final_build_dir / "{ref_final_key}-genome-stratifications-md5s.txt",
     conda:
         "../envs/bedtools.yml"
+    localrule: True
     script:
         "../scripts/python/bedtools/postprocess/list_md5.py"
+
+
+use rule generate_md5sums as generate_bb_md5sums with:
+    input:
+        rules.list_all_bb_strats.output,
+    output:
+        config.final_build_dir / "{ref_final_key}-genome-stratifications-bb-md5s.txt",
+    localrule: True
 
 
 rule generate_tsv_list:
@@ -76,9 +94,21 @@ rule generate_tsv_list:
         rules.list_all_strats.output,
     output:
         config.final_build_dir / "{ref_final_key}-all-stratifications.tsv",
+    params:
+        suffix=".bed.gz",
     localrule: True
     script:
         "../scripts/python/bedtools/postprocess/generate_tsv.py"
+
+
+use rule generate_tsv_list as generate_bb_tsv_list with:
+    input:
+        rules.list_all_bb_strats.output,
+    output:
+        config.final_build_dir / "{ref_final_key}-all-bb-stratifications.tsv",
+    params:
+        suffix=".bb",
+    localrule: True
 
 
 rule unit_test_strats:
@@ -147,9 +177,7 @@ rule compare_strats:
         # haplotype)
         old=lambda w: expand(
             rules.download_comparison_strat_tarball.output,
-            compare_key=config.to_build_data(
-                w.ref_final_key, w.build_key
-            ).build.compare_key,
+            compare_key=config.compare_key(w.ref_final_key, w.build_key),
         )[0],
         # use this to target a specific rule to satisfy the snakemake scheduler,
         # the thing I actually need here is the parent directory
@@ -170,8 +198,8 @@ rule all_comparisons:
     input:
         [
             expand(rules.compare_strats.output, ref_final_key=rk, build_key=bk)[0]
-            for rk, bk in zip(*config.all_build_keys)
-            if config.to_build_data(rk, bk).build.compare_key is not None
+            for rk, bk in zip(*config.all_full_build_keys)
+            if config.compare_key(rk, bk) is not None
         ],
     localrule: True
 
@@ -281,39 +309,111 @@ rule summarize_happy:
         "../scripts/rmarkdown/rmarkdown/benchmark.Rmd"
 
 
-rule copy_READMEs:
+rule copy_strat_background:
     input:
-        main="workflow/files/README_main.md",
-        validation="workflow/files/README_validation.md",
+        "workflow/files/BACKGROUND.md",
     output:
-        validation=validation_dir / "README.md",
-        main=config.final_root_dir / "README.md",
+        config.final_build_dir / "{ref_final_key}-BACKGROUND.md",
+    localrule: True
     shell:
         """
-        cp {input.main} {output.main}
-        cp {input.validation} {output.validation}
+        cp {input} {output}
         """
+
+
+rule copy_validation_README:
+    input:
+        "workflow/files/README_validation.md",
+    output:
+        validation_dir / "README.md",
+    localrule: True
+    shell:
+        """
+        cp {input} {output}
+        """
+
+
+rule build_strat_README:
+    input:
+        readme="workflow/templates/main.j2",
+        ref=lambda w: expand_final_to_src(rules.download_ref.output, w)[0],
+    output:
+        config.final_build_dir / "{ref_final_key}-README.md",
+    params:
+        segdups=lambda w: all_segdups(w["ref_final_key"], w["build_key"]),
+        functional=lambda w: all_functional(w["ref_final_key"], w["build_key"]),
+        otherdiff=lambda w: all_otherdifficult(w["ref_final_key"], w["build_key"]),
+        union=lambda w: all_union(w["ref_final_key"], w["build_key"]),
+        xy=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
+    conda:
+        "../envs/templates.yml"
+    localrule: True
+    script:
+        "../scripts/python/templates/format_readme/format_main.py"
+
+
+# include bed/bb in both of these since tar will complain of the bed->bb step is
+# changing the directory contents while it is running
+def bb_inputs(wildcards):
+    rk = wildcards["ref_final_key"]
+    bk = wildcards["build_key"]
+    t = config.to_build_data_full(rk, bk).want_bb
+    return {
+        "_bb_checksums": (rules.generate_bb_md5sums.output if t else []),
+        "_all_bb": rules.generate_bb_tsv_list.output if t else [],
+    }
 
 
 rule generate_tarballs:
     input:
-        all_strats=rules.generate_tsv_list.output,
-        _checksums=rules.generate_md5sums.output,
+        unpack(bb_inputs),
+        all_bed=rules.generate_tsv_list.output,
+        background=rules.copy_strat_background.output,
+        readme=rules.build_strat_README.output,
+        _bed_checksums=rules.generate_md5sums.output,
+        _strat_readmes=all_readme_targets,
     output:
         config.final_root_dir
         / "genome-stratifications-{ref_final_key}@{build_key}.tar.gz",
     params:
-        parent=lambda _, input: Path(input.all_strats[0]).parent.parent,
-        target=lambda _, input: Path(input.all_strats[0]).parent.name,
+        parent=lambda _, input: Path(input.all_bed[0]).parent.parent,
+        target=lambda _, input: Path(input.all_bed[0]).parent.name,
+    localrule: True
     shell:
         """
-        tar czf {output} -C {params.parent} {params.target}
+        tar czf {output} -C {params.parent} \
+          --exclude=*.bb \
+          --exclude=*-all-bb-stratifications.tsv \
+          --exclude=*-genome-stratifications-bb-md5s.txt \
+          {params.target} 
+        """
+
+
+rule generate_bb_tarballs:
+    input:
+        # since double-star apparently doesn't apply to functions
+        unpack(bb_inputs),
+        **rules.generate_tarballs.input,
+    output:
+        config.final_root_dir
+        / "genome-stratifications-bb-{ref_final_key}@{build_key}.tar.gz",
+    params:
+        parent=lambda _, input: Path(input.all_bed[0]).parent.parent,
+        target=lambda _, input: Path(input.all_bed[0]).parent.name,
+    localrule: True
+    shell:
+        """
+        tar czf {output} -C {params.parent} \
+          --exclude=*.bed.gz \
+          --exclude=*-all-stratifications.tsv \
+          --exclude=*-genome-stratifications-md5s.txt \
+          {params.target} 
         """
 
 
 rule checksum_everything:
     input:
-        rules.copy_READMEs.output,
+        rules.copy_validation_README.output,
         rules.make_coverage_plots.output,
         rules.summarize_happy.output,
         rules.all_comparisons.input,
@@ -322,10 +422,16 @@ rule checksum_everything:
             expand(rules.generate_tarballs.output, ref_final_key=rk, build_key=bk)
             for rk, bk in zip(*config.all_full_build_keys)
         ],
+        [
+            expand(rules.generate_bb_tarballs.output, ref_final_key=rk, build_key=bk)
+            for rk, bk in zip(*config.all_full_build_keys)
+            if config.to_build_data_full(rk, bk).want_bb
+        ],
     output:
         config.final_root_dir / "genome-stratifications-md5s.txt",
     params:
         root=config.final_root_dir,
+    localrule: True
     shell:
         """
         find {params.root} -type f -exec md5sum {{}} + | \

@@ -9,7 +9,7 @@ from common.bed import (
     subtractBed,
 )
 from common.io import check_processes, tee, bgzip_file
-from common.functional import match1_unsafe, match2_unsafe, DesignError
+from common.functional import DesignError
 import pandas as pd
 
 
@@ -33,10 +33,10 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
     log = cfg.smk_to_log(smk)
     ws: dict[str, Any] = smk.wildcards
 
-    def go(
-        x: cfg.BuildData_[cfg.RefSrcT, cfg.AnyBedT, cfg.AnyVcfT]
-    ) -> cfg.BedFile[cfg.AnyBedT] | None:
-        return x.refdata.strat_inputs.gap
+    # def go(
+    #     x: cfg.BuildData_[cfg.RefSrcT, cfg.BedSrcT, cfg.VcfSrcT, cfg.BedCoordsT]
+    # ) -> cfg.BedFile[cfg.BedSrcT] | cfg.BedCoordsT | None:
+    #     return x.refdata.strat_inputs.gap
 
     # If we have gap input, make the gapless file, otherwise just symlink to the
     # genome bed file (which just means the entire genome is gapless)
@@ -46,28 +46,38 @@ def main(smk: Any, sconf: cfg.GiabStrats) -> None:
         gaps_df = sconf.with_build_data_and_bed_full(
             cfg.wc_to_reffinalkey(ws),
             cfg.wc_to_buildkey(ws),
-            go,
-            lambda bd, bf: match1_unsafe(
-                gap_inputs, lambda i: cfg.read_filter_sort_hap_bed(bd, bf, i)
-            ),
-            lambda bd, bf: match1_unsafe(
-                gap_inputs, lambda i: cfg.read_filter_sort_dip1to1_bed(bd, bf, i)
-            ),
-            lambda hap, bd, bf: match1_unsafe(
+            cfg.bd_to_gaps,
+            lambda bd, b: cfg.with_inputs_hap(
+                b,
                 gap_inputs,
-                lambda i: hap.choose(*cfg.read_filter_sort_dip1to2_bed(bd, bf, i)),
+                lambda i, bf: cfg.read_filter_sort_hap_bed(bd, bf, i),
+                lambda bc: cfg.build_hap_coords_df(bd, bc),
             ),
-            lambda bd, bf: match2_unsafe(
+            lambda bd, b: cfg.with_inputs_dip1(
+                b,
                 gap_inputs,
-                lambda i0, i1: cfg.read_filter_sort_dip2to1_bed(bd, bf, (i0, i1)),
+                lambda i, bf: cfg.read_filter_sort_dip1to1_bed(bd, bf, i),
+                lambda bc: cfg.build_dip1to1_coords_df(bd, bc),
             ),
-            lambda hap, bd, bf: match2_unsafe(
+            lambda hap, bd, b: cfg.with_inputs_dip1(
+                b,
                 gap_inputs,
-                lambda i0, i1: cfg.read_filter_sort_dip2to2_bed(
-                    bd,
-                    bf,
-                    *hap.choose((i0, cfg.Haplotype.HAP1), (i1, cfg.Haplotype.HAP2))
+                lambda i, bf: cfg.read_filter_sort_dip1to2_bed(bd, bf, i),
+                lambda bc: cfg.build_dip1to2_coords_df(bd, bc),
+            ).choose(hap),
+            lambda bd, b: cfg.with_inputs_dip2(
+                b,
+                gap_inputs,
+                lambda i, bf: cfg.read_filter_sort_dip2to1_bed(bd, bf, i),
+                lambda bc: cfg.build_dip2to1_coords_df(bd, bc),
+            ),
+            lambda hap, bd, b: cfg.with_inputs_dip2(
+                b,
+                gap_inputs,
+                lambda i, bf: cfg.read_filter_sort_dip2to2_bed(
+                    bd, bf, i.choose(hap), hap
                 ),
+                lambda bc: cfg.build_dip2to2_coords_df(hap, bd, bc),
             ),
         )
 

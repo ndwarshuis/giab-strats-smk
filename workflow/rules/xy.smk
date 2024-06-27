@@ -1,6 +1,22 @@
-from common.config import CoreLevel
+from common.config import CoreLevel, MutualPathPair
 
 xy = config.to_bed_dirs(CoreLevel.XY)
+
+
+def all_xy(ref_final_key, build_key):
+    return config.all_xy(
+        ref_final_key,
+        build_key,
+        Path(rules.download_genome_features_bed.output[0]),
+        Path(rules.filter_XTR_features.output[0]),
+        Path(rules.filter_ampliconic_features.output[0]),
+        MutualPathPair(
+            Path(rules.write_PAR_final.output[0]),
+            Path(rules.invert_PAR.output[0]),
+        ),
+        Path(rules.filter_autosomes.output[0]),
+        Path(rules.xy_readme.output[0]),
+    )
 
 
 use rule download_gaps as download_genome_features_bed with:
@@ -61,15 +77,6 @@ use rule filter_XTR_features as filter_ampliconic_features with:
         level="Ampliconic",
 
 
-# def par_input(wildcards):
-#     test_fun = config.want_xy_y if wildcards.sex_chr == "Y" else config.want_xy_x
-#     return (
-#         rules.write_PAR_final.output
-#         if test_fun(wildcards.ref_key, wildcards.build_key)
-#         else rules.write_PAR_intermediate.output
-#     )
-
-
 rule invert_PAR:
     input:
         bed=rules.write_PAR_final.output,
@@ -103,61 +110,19 @@ rule filter_autosomes:
         """
 
 
-# helper functions for build targets; note that for each of these we need to
-# first get a list of the X/Y chromosomes required (in the case of dip2, for
-# the haplotype at hand)
-def all_xy_features(ref_final_key, build_key):
-    bd = config.to_build_data_full(ref_final_key, build_key)
-    sex_chrs = config.buildkey_to_wanted_xy_names(ref_final_key, build_key)
-    all_targets = [
-        (rules.filter_XTR_features.output[0], bd.have_xy_XTR),
-        (rules.filter_ampliconic_features.output[0], bd.have_xy_ampliconic),
-    ]
-    targets = [x for x, y in all_targets if y]
-    return expand(
-        targets,
-        allow_missing=True,
-        sex_chr=sex_chrs,
-        ref_final_key=ref_final_key,
-        build_key=build_key,
-    )
-
-
-def _all_xy_PAR_from_rule(rulename, ref_final_key, build_key):
-    bd = config.to_build_data_full(ref_final_key, build_key)
-    sex_chrs = [
-        c
-        for c in config.buildkey_to_wanted_xy_names(ref_final_key, build_key)
-        if bd.have_xy_PAR(c)
-    ]
-    return expand(
-        rulename,
-        allow_missing=True,
-        sex_chr=sex_chrs,
-        ref_final_key=ref_final_key,
-        build_key=build_key,
-    )
-
-
-def all_xy_PAR(ref_final_key, build_key):
-    return _all_xy_PAR_from_rule(
-        rules.write_PAR_final.output,
-        ref_final_key,
-        build_key,
-    )
-
-
-def all_xy_nonPAR(ref_final_key, build_key):
-    return _all_xy_PAR_from_rule(
-        rules.invert_PAR.output,
-        ref_final_key,
-        build_key,
-    )
-
-
-def all_xy_sex(ref_final_key, build_key):
-    return (
-        all_xy_PAR(ref_final_key, build_key)
-        + all_xy_nonPAR(ref_final_key, build_key)
-        + all_xy_features(ref_final_key, build_key)
-    )
+rule xy_readme:
+    input:
+        common="workflow/templates/common.j2",
+        description="workflow/templates/xy_description.j2",
+        methods="workflow/templates/xy_methods.j2",
+        bedtools_env="workflow/envs/bedtools.yml",
+        _sources=lambda w: all_xy(w["ref_final_key"], w["build_key"]).all_sources,
+    params:
+        paths=lambda w: all_xy(w["ref_final_key"], w["build_key"]),
+    output:
+        xy.readme,
+    conda:
+        "../envs/templates.yml"
+    localrule: True
+    script:
+        "../scripts/python/templates/format_readme/format_xy.py"
